@@ -3,11 +3,6 @@ package com.example.shade.model;
 import jakarta.persistence.*;
 import lombok.Data;
 
-/**
- * Date-6/21/2025
- * By Sardor Tokhirov
- * Time-10:48 AM (GMT+5)
- */
 @Data
 @Entity
 @Table(name = "platforms")
@@ -26,12 +21,23 @@ public class Platform {
     @Column(nullable = false, unique = true)
     private String apiKey;
 
+    // A "common" platform will have a null secret.
+    @Column(unique = true, nullable = true)
+    private String secret;
+
+    // This field will differentiate the types in the database.
     @Column(nullable = false)
+    private String type; // Replaces isMostbet for better extensibility
+
+    // A "mostbet" platform will have a null login.
+    @Column(unique = true, nullable = true)
     private String login;
 
-    @Column(nullable = false)
+    // A "mostbet" platform will have a null password.
+    @Column(nullable = true)
     private String password;
 
-    @Column(nullable = false, unique = true)
+    // A "mostbet" platform will have a null workplaceId.
+    @Column(unique = true, nullable = true, name = "workplace_id")
     private String workplaceId;
 }
