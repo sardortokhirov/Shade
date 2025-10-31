@@ -52,7 +52,7 @@ public class PlatformService {
             // Null out the other params to ensure data integrity
             platform.setLogin(null);
             platform.setPassword(null);
-            platform.setWorkplaceId(null);
+            platform.setWorkplaceId(request.getWorkplaceId());
         } else { // Default to "common"
             validateCommonInputs(request, platform.getId() == null); // Check password only for new platforms
             platform.setLogin(request.getLogin());

@@ -27,7 +27,7 @@ public class Platform {
 
     // This field will differentiate the types in the database.
     @Column(nullable = false)
-    private String type; // Replaces isMostbet for better extensibility
+    private String type;
 
     // A "mostbet" platform will have a null login.
     @Column(unique = true, nullable = true)
@@ -38,6 +38,6 @@ public class Platform {
     private String password;
 
     // A "mostbet" platform will have a null workplaceId.
-    @Column(unique = true, nullable = true, name = "workplace_id")
+    @Column(unique = true,  name = "workplace_id")
     private String workplaceId;
 }

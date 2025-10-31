@@ -52,6 +52,7 @@ public class TopUpService {
     private final BlockedUserRepository blockedUserRepository;
     private final HumoService humoService;
     private final LanguageSessionService languageSessionService;
+    private final MostbetService mostbetService;
 
     public void startTopUp(Long chatId) {
         logger.info("Starting top-up for chatId: {}", chatId);
@@ -85,7 +86,7 @@ public class TopUpService {
         messageSender.sendMessage(message, chatId);
     }
 
-    public void handleCallback(Long chatId, String callback) {
+    public void handleCallback(Long chatId, String callback) throws Exception {
         logger.info("Callback received for chatId {}: {}", chatId, callback);
         if (callback.equals("TOPUP_PAYMENT_CONFIRM")) {
             List<Integer> messageIds = sessionService.getMessageIds(chatId);
@@ -216,94 +217,115 @@ public class TopUpService {
         String platformName = sessionService.getUserData(chatId, "platform").replace("_", "");
         Platform platform = platformRepository.findByName(platformName)
                 .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
+        if (platform.getType().equals("mostbet")){
+            Currency currency = platform.getCurrency();
+            HizmatRequest request = HizmatRequest.builder()
+                    .chatId(chatId)
+                    .platform(platformName)
+                    .platformUserId(userId)
+                    .fullName("MOSTBET")
+                    .status(RequestStatus.PENDING)
+                    .createdAt(LocalDateTime.now(ZoneId.of("GMT+5")))
+                    .currency(currency)
+                    .amount(0L)
+                    .type(RequestType.TOP_UP)
+                    .build();
+            requestRepository.save(request);
+            sessionService.setUserData(chatId, "platformUserId", userId);
+            sessionService.setUserData(chatId, "fullName", "mostbet");
+            sessionService.setUserState(chatId, "TOPUP_APPROVE_USER");
 
-        String hash = platform.getApiKey();
-        String cashierPass = platform.getPassword();
-        String cashdeskId = platform.getWorkplaceId();
+            handleApproveUser(chatId);
+        }else {
+            String hash = platform.getApiKey();
+            String cashierPass = platform.getPassword();
+            String cashdeskId = platform.getWorkplaceId();
 
-        if (hash == null || cashierPass == null || cashdeskId == null || hash.isEmpty() || cashierPass.isEmpty() || cashdeskId.isEmpty()) {
-            logger.error("Invalid platform credentials for platform {}: hash={}, cashierPass={}, cashdeskId={}",
-                    platformName, hash, cashierPass, cashdeskId);
-            SendMessage message = new SendMessage();
-            message.setChatId(chatId);
-            message.setText(languageSessionService.getTranslation(chatId, "topup.message.platform_credentials_error"));
-            message.setReplyMarkup(createBonusMenuKeyboard(chatId));
-            messageSender.sendMessage(message, chatId);
-            return;
-        }
-
-        String confirmInput = userId + ":" + hash;
-        String confirm = DigestUtils.md5DigestAsHex(confirmInput.getBytes(StandardCharsets.UTF_8));
-        String sha256Input1 = "hash=" + hash + "&userid=" + userId + "&cashdeskid=" + cashdeskId;
-        String sha256Result1 = sha256Hex(sha256Input1);
-        String md5Input = "userid=" + userId + "&cashierpass=" + cashierPass + "&hash=" + hash;
-        String md5Result = DigestUtils.md5DigestAsHex(md5Input.getBytes(StandardCharsets.UTF_8));
-        String finalSignature = sha256Hex(sha256Result1 + md5Result);
-
-        logger.debug("Validating user ID {}: confirmInput={}, confirm={}, sha256Input1={}, sha256Result1={}, md5Input={}, md5Result={}, finalSignature={}",
-                userId, confirmInput, confirm, sha256Input1, sha256Result1, md5Input, md5Result, finalSignature);
-
-        String apiUrl = String.format("https://partners.servcul.com/CashdeskBotAPI/Users/%s?confirm=%s&cashdeskId=%s",
-                userId, confirm, cashdeskId);
-        logger.info("Validating user ID {} for platform {} (chatId: {}), URL: {}", userId, platformName, chatId, apiUrl);
-
-        try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("sign", finalSignature);
-            HttpEntity<String> entity = new HttpEntity<>(headers);
-
-            ResponseEntity<UserProfile> response = restTemplate.exchange(apiUrl, HttpMethod.GET, entity, UserProfile.class);
-            UserProfile profile = response.getBody();
-
-            if (response.getStatusCode().is2xxSuccessful() && profile != null && profile.getUserId() != null && profile.getName() != null) {
-                String fullName = profile.getName();
-                sessionService.setUserData(chatId, "platformUserId", userId);
-                sessionService.setUserData(chatId, "fullName", fullName);
-                Currency currency = Currency.UZS;
-                if (profile.getCurrencyId() == 1L) {
-                    currency = Currency.RUB;
-                }
-                HizmatRequest request = HizmatRequest.builder()
-                        .chatId(chatId)
-                        .platform(platformName)
-                        .platformUserId(userId)
-                        .fullName(fullName)
-                        .status(RequestStatus.PENDING)
-                        .createdAt(LocalDateTime.now(ZoneId.of("GMT+5")))
-                        .currency(currency)
-                        .amount(0L)
-                        .type(RequestType.TOP_UP)
-                        .build();
-                requestRepository.save(request);
-
-                sessionService.setUserState(chatId, "TOPUP_APPROVE_USER");
-                sendUserApproval(chatId, fullName, userId);
-            } else {
-                logger.warn("Invalid user profile for ID {} on platform {}. Response: {}", userId, platformName, profile);
-                sendNoUserFound(chatId);
+            if (hash == null || cashierPass == null || cashdeskId == null || hash.isEmpty() || cashierPass.isEmpty() || cashdeskId.isEmpty()) {
+                logger.error("Invalid platform credentials for platform {}: hash={}, cashierPass={}, cashdeskId={}",
+                        platformName, hash, cashierPass, cashdeskId);
+                SendMessage message = new SendMessage();
+                message.setChatId(chatId);
+                message.setText(languageSessionService.getTranslation(chatId, "topup.message.platform_credentials_error"));
+                message.setReplyMarkup(createBonusMenuKeyboard(chatId));
+                messageSender.sendMessage(message, chatId);
+                return;
             }
-        } catch (HttpClientErrorException.NotFound e) {
-            logger.warn("User not found for ID {} on platform {}: {}", userId, platformName, e.getMessage());
-            sendNoUserFound(chatId);
-        } catch (HttpClientErrorException e) {
-            logger.error("API error for user ID {} on platform {}: {}", userId, platformName, e.getMessage());
-            String errorMessage = e.getStatusCode().value() == 401 ?
-                    languageSessionService.getTranslation(chatId, "topup.message.auth_failed") :
-                    e.getStatusCode().value() == 403 ?
-                            languageSessionService.getTranslation(chatId, "topup.message.invalid_confirm") :
-                            languageSessionService.getTranslation(chatId, "topup.message.generic_api_error");
-            sendMessageWithNavigation(chatId, errorMessage + ". Please try again.");
-        } catch (Exception e) {
-            logger.error("Error calling API for user ID {} on platform {}: {}", userId, platformName, e.getMessage());
-            sendMessageWithNavigation(chatId, languageSessionService.getTranslation(chatId, "topup.message.api_error"));
+
+            String confirmInput = userId + ":" + hash;
+            String confirm = DigestUtils.md5DigestAsHex(confirmInput.getBytes(StandardCharsets.UTF_8));
+            String sha256Input1 = "hash=" + hash + "&userid=" + userId + "&cashdeskid=" + cashdeskId;
+            String sha256Result1 = sha256Hex(sha256Input1);
+            String md5Input = "userid=" + userId + "&cashierpass=" + cashierPass + "&hash=" + hash;
+            String md5Result = DigestUtils.md5DigestAsHex(md5Input.getBytes(StandardCharsets.UTF_8));
+            String finalSignature = sha256Hex(sha256Result1 + md5Result);
+
+            logger.debug("Validating user ID {}: confirmInput={}, confirm={}, sha256Input1={}, sha256Result1={}, md5Input={}, md5Result={}, finalSignature={}",
+                    userId, confirmInput, confirm, sha256Input1, sha256Result1, md5Input, md5Result, finalSignature);
+
+            String apiUrl = String.format("https://partners.servcul.com/CashdeskBotAPI/Users/%s?confirm=%s&cashdeskId=%s",
+                    userId, confirm, cashdeskId);
+            logger.info("Validating user ID {} for platform {} (chatId: {}), URL: {}", userId, platformName, chatId, apiUrl);
+
+            try {
+                HttpHeaders headers = new HttpHeaders();
+                headers.set("sign", finalSignature);
+                HttpEntity<String> entity = new HttpEntity<>(headers);
+
+                ResponseEntity<UserProfile> response = restTemplate.exchange(apiUrl, HttpMethod.GET, entity, UserProfile.class);
+                UserProfile profile = response.getBody();
+
+                if (response.getStatusCode().is2xxSuccessful() && profile != null && profile.getUserId() != null && profile.getName() != null) {
+                    String fullName = profile.getName();
+                    sessionService.setUserData(chatId, "platformUserId", userId);
+                    sessionService.setUserData(chatId, "fullName", fullName);
+                    Currency currency = Currency.UZS;
+                    if (profile.getCurrencyId() == 1L) {
+                        currency = Currency.RUB;
+                    }
+                    HizmatRequest request = HizmatRequest.builder()
+                            .chatId(chatId)
+                            .platform(platformName)
+                            .platformUserId(userId)
+                            .fullName(fullName)
+                            .status(RequestStatus.PENDING)
+                            .createdAt(LocalDateTime.now(ZoneId.of("GMT+5")))
+                            .currency(currency)
+                            .amount(0L)
+                            .type(RequestType.TOP_UP)
+                            .build();
+                    requestRepository.save(request);
+
+                    sessionService.setUserState(chatId, "TOPUP_APPROVE_USER");
+                    sendUserApproval(chatId, fullName, userId);
+                } else {
+                    logger.warn("Invalid user profile for ID {} on platform {}. Response: {}", userId, platformName, profile);
+                    sendNoUserFound(chatId);
+                }
+            } catch (HttpClientErrorException.NotFound e) {
+                logger.warn("User not found for ID {} on platform {}: {}", userId, platformName, e.getMessage());
+                sendNoUserFound(chatId);
+            } catch (HttpClientErrorException e) {
+                logger.error("API error for user ID {} on platform {}: {}", userId, platformName, e.getMessage());
+                String errorMessage = e.getStatusCode().value() == 401 ?
+                        languageSessionService.getTranslation(chatId, "topup.message.auth_failed") :
+                        e.getStatusCode().value() == 403 ?
+                                languageSessionService.getTranslation(chatId, "topup.message.invalid_confirm") :
+                                languageSessionService.getTranslation(chatId, "topup.message.generic_api_error");
+                sendMessageWithNavigation(chatId, errorMessage + ". Please try again.");
+            } catch (Exception e) {
+                logger.error("Error calling API for user ID {} on platform {}: {}", userId, platformName, e.getMessage());
+                sendMessageWithNavigation(chatId, languageSessionService.getTranslation(chatId, "topup.message.api_error"));
+            }
         }
+
     }
 
     private void handleApproveUser(Long chatId) {
         sessionService.setUserState(chatId, "TOPUP_CARD_INPUT");
         sessionService.addNavigationState(chatId, "TOPUP_APPROVE_USER");
         String fullName = sessionService.getUserData(chatId, "fullName");
-        if (fullName == null) {
+        if (fullName == null&&!fullName.equals("mostbet")) {
             logger.error("FullName is null for chatId {}", chatId);
             messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "topup.message.user_data_not_found"));
             sessionService.setUserState(chatId, "TOPUP_USER_ID_INPUT");
@@ -405,7 +427,7 @@ public class TopUpService {
         sendPaymentInstruction(chatId);
     }
 
-    private void verifyPayment(Long chatId) {
+    private void verifyPayment(Long chatId) throws Exception {
         HizmatRequest request = requestRepository.findByChatIdAndStatus(chatId, RequestStatus.PENDING_PAYMENT)
                 .orElse(null);
         if (request == null) {
@@ -498,9 +520,15 @@ public class TopUpService {
 
             request.setStatus(RequestStatus.APPROVED);
             requestRepository.save(request);
-
-            BalanceLimit transferSuccessful = transferToPlatform(request, adminCard);
-
+            String platformName = request.getPlatform();
+            Platform platform = platformRepository.findByName(platformName)
+                    .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
+            BalanceLimit transferSuccessful =null;
+            if (platform.getType().equals("mostbet")){
+                transferSuccessful=mostbetService.transferToPlatform(request,adminCard);
+            }else {
+                 transferToPlatform(request, adminCard);
+            }
             if (transferSuccessful != null) {
                 UserBalance balance = userBalanceRepository.findById(chatId)
                         .orElseGet(() -> {
@@ -663,7 +691,7 @@ public class TopUpService {
                 .replace("[", "\\[");
     }
 
-    public void handleScreenshotApproval(Long chatId, Long requestId, boolean approve) {
+    public void handleScreenshotApproval(Long chatId, Long requestId, boolean approve) throws Exception {
         HizmatRequest request = requestRepository.findById(requestId)
                 .orElse(null);
         if (request == null) {
@@ -686,7 +714,15 @@ public class TopUpService {
             request.setStatus(RequestStatus.APPROVED);
             requestRepository.save(request);
 
-            BalanceLimit transferSuccessful = transferToPlatform(request, adminCard);
+            String platformName = request.getPlatform();
+            Platform platform = platformRepository.findByName(platformName)
+                    .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
+            BalanceLimit transferSuccessful =null;
+            if (platform.getType().equals("mostbet")){
+                transferSuccessful=mostbetService.transferToPlatform(request,adminCard);
+            }else {
+                transferToPlatform(request, adminCard);
+            }
             if (transferSuccessful != null) {
                 UserBalance balance = userBalanceRepository.findById(request.getChatId())
                         .orElseGet(() -> {
@@ -825,7 +861,19 @@ public class TopUpService {
             request.setStatus(RequestStatus.APPROVED);
             requestRepository.save(request);
 
-            BalanceLimit transferSuccessful = transferToPlatform(request, adminCard);
+            String platformName = request.getPlatform();
+            Platform platform = platformRepository.findByName(platformName)
+                    .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
+            BalanceLimit transferSuccessful =null;
+            if (platform.getType().equals("mostbet")){
+                try {
+                    transferSuccessful=mostbetService.transferToPlatform(request,adminCard);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }else {
+                transferToPlatform(request, adminCard);
+            }
             if (transferSuccessful != null) {
                 UserBalance balance = userBalanceRepository.findById(requestId)
                         .orElseGet(() -> {

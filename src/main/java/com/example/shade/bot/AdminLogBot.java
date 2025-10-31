@@ -188,7 +188,7 @@ public class AdminLogBot extends TelegramLongPollingBot {
         logger.info("Sent message to admin chatId {}: {}", chatId, message.getText());
     }
 
-    private void handleCallbackQuery(String callbackData, Long chatId, Integer messageId) {
+    private void handleCallbackQuery(String callbackData, Long chatId, Integer messageId) throws Exception {
         logger.info("Processing callback from admin chatId {}: {}", chatId, callbackData);
 
         // Remove buttons from original message

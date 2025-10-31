@@ -497,7 +497,7 @@ public class AdminBotService {
         try {
             Double rate = exchangeRateService.getLatestRate();
             messageSender.sendTextMessage(chatId, 
-                String.format("💱 Joriy valyuta kursi:\n\n1 USD = %.2f UZS", rate));
+                String.format("💱 Joriy valyuta kursi:\n\n1 rub = %.2f UZS", rate));
         } catch (Exception e) {
             log.error("Error getting exchange rate", e);
             messageSender.sendTextMessage(chatId, "❌ Xatolik yuz berdi: " + e.getMessage());
@@ -510,7 +510,7 @@ public class AdminBotService {
             Double rate = Double.parseDouble(rateStr);
             exchangeRateService.updateRate(rate);
             messageSender.sendTextMessage(chatId, 
-                String.format("✅ Valyuta kursi yangilandi!\n\n1 USD = %.2f UZS", rate));
+                String.format("✅ Valyuta kursi yangilandi!\n\n1 RUB = %.2f UZS", rate));
             sendExchangeRateMenu(chatId);
         } catch (NumberFormatException e) {
             messageSender.sendTextMessage(chatId, "❌ Noto'g'ri format. Masalan: 12750.50");
