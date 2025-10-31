@@ -168,8 +168,4 @@ public class AdminCardController {
                 });
     }
 
-    private String maskCard(String cardNumber) {
-        if (cardNumber == null || cardNumber.length() < 4) return "INVALID CARD";
-        return cardNumber.substring(0, 4) + "****" + cardNumber.substring(cardNumber.length() - 4);
-    }
 }

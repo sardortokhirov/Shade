@@ -38,10 +38,10 @@ public class AdminLogBot extends TelegramLongPollingBot {
     private final TopUpService topUpService;
     private final BlockedUserRepository blockedUserRepository;
 
-    @Value("${telegram.admin.bot.token}")
+    @Value("${telegram.admin.log.bot.token}")
     private String botToken;
 
-    @Value("${telegram.admin.bot.username}")
+    @Value("${telegram.admin.log.bot.username}")
     private String botUsername;
 
     // Static list of motivational texts in Uzbek
