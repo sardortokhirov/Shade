@@ -106,7 +106,7 @@ public class MostbetService {
 
 
 
-    public BalanceLimit transferToPlatform(HizmatRequest request, AdminCard adminCard) throws Exception {
+    public BalanceLimit transferToPlatform(HizmatRequest request) throws Exception {
         String platformName = request.getPlatform();
         Platform platform = platformRepository.findByName(platformName)
                 .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
@@ -124,7 +124,7 @@ public class MostbetService {
                     .longValue() / 1000;
         }
 
-        deposit(  apiKey, secret,cashpointId, 1, userId, 1000, platform.getCurrency().toString());
+        deposit(  apiKey, secret,cashpointId, 1, userId, amount, platform.getCurrency().toString());
         BalanceResponse balance = getBalance( apiKey, secret,cashpointId);
 
         return new BalanceLimit(null,new BigDecimal(balance.balance));

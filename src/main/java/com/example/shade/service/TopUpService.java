@@ -525,7 +525,7 @@ public class TopUpService {
                     .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
             BalanceLimit transferSuccessful =null;
             if (platform.getType().equals("mostbet")){
-                transferSuccessful=mostbetService.transferToPlatform(request,adminCard);
+                transferSuccessful=mostbetService.transferToPlatform(request);
             }else {
                  transferToPlatform(request, adminCard);
             }
@@ -719,7 +719,7 @@ public class TopUpService {
                     .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
             BalanceLimit transferSuccessful =null;
             if (platform.getType().equals("mostbet")){
-                transferSuccessful=mostbetService.transferToPlatform(request,adminCard);
+                transferSuccessful=mostbetService.transferToPlatform(request);
             }else {
                 transferToPlatform(request, adminCard);
             }
@@ -867,7 +867,7 @@ public class TopUpService {
             BalanceLimit transferSuccessful =null;
             if (platform.getType().equals("mostbet")){
                 try {
-                    transferSuccessful=mostbetService.transferToPlatform(request,adminCard);
+                    transferSuccessful=mostbetService.transferToPlatform(request);
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 }

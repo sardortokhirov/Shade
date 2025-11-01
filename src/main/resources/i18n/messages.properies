@@ -57,3 +57,12 @@ message.user_blocked=Ваш аккаунт заблокирован.
 message.insufficient_tickets=Для игры нужно минимум %s билетов! У вас %s билетов.
 message.lottery_results=🎉 Результаты лотереи:\n%sОбщий выигрыш: %,d сум\nНовый баланс: %,d сум
 message.lottery_error=Ошибка: %s
+button.yes=Yes
+button.no=No
+
+button.approve_transfer=Одобрить перевод
+button.decline_transfer=Отклонить перевод
+button.remove_tickets=Удалить билеты
+button.remove_bonus=Удалить бонус
+
+button.block_user=Заблокировать пользователя
