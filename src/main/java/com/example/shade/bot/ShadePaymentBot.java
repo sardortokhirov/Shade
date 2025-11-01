@@ -128,7 +128,7 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
 
                 // 2. Delegate all other Admin-related states/callbacks to the handler
                 // It should only run if notifications are ON, OR if the user is currently in a state machine.
-                if (adminUpdateHandler.isUserInAdminState(chatId) || (isAdmin && adminChatOpt.get().isReceiveNotifications())) {
+                if (adminUpdateHandler.isUserInAdminState(chatId) || (isAdmin && adminChatOpt.get().isSettings())) {
                     if (adminUpdateHandler.handleUpdate(update)) {
                         return; // Admin logic handled the update (e.g., button click, state input)
                     }
@@ -457,7 +457,7 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
     }
 
     public void handleAdminCommand(Long chatId, AdminChat adminChat) {
-        if (adminChat.isReceiveNotifications()) {
+        if (adminChat.isSettings()) {
             // 1. Clear main bot session state
             messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "HOME");
             sessionService.clearSession(chatId);
@@ -473,7 +473,7 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
     }
 
     public void handleKassaCommand(Long chatId, AdminChat adminChat) {
-        adminChat.setReceiveNotifications(false);
+        adminChat.setSettings(false);
         adminChatRepository.save(adminChat);
 
         // Clear any active admin session state

@@ -17,4 +17,5 @@ public class AdminChat {
     @Id
     private Long chatId;
     private boolean receiveNotifications;
+    private boolean isSettings=false;
 }
