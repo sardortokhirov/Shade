@@ -104,7 +104,41 @@ public class MostbetService {
         return resp.getBody();
     }
 
+    public WithdrawalResult withdrawMoney(String apiKey, String secret, String cashpointId, String userId, String code) throws Exception {
+        System.out.println("Attempting to find a pending withdrawal for user: " + userId);
 
+        // Step 1: Search for a pending withdrawal request using the user ID as a filter.
+        CashoutListResponse pendingWithdrawals = getCashoutList(apiKey, secret, cashpointId, 1, 50, userId);
+
+        if (pendingWithdrawals == null || pendingWithdrawals.items() == null || pendingWithdrawals.items().isEmpty()) {
+            throw new IllegalStateException("No pending withdrawal request found for user ID: " + userId);
+        }
+
+        CashoutItem requestToConfirm = pendingWithdrawals.items().get(0);
+        long transactionId = requestToConfirm.transactionId();
+        // Store the amount and currency from the found request
+        double amountWithdrawn = requestToConfirm.amount();
+        String currency = requestToConfirm.currency();
+
+        System.out.println("Found pending request. Transaction ID: " + transactionId + " for amount " + amountWithdrawn + " " + currency + ". Now confirming...");
+
+        // Step 2: Confirm the cashout using the found transactionId and the provided code.
+        TransactionResponse confirmation = confirmCashout(apiKey, secret, cashpointId, code, transactionId);
+
+        // Step 3: Combine information from both steps and return the new, more detailed object.
+        return new WithdrawalResult(confirmation.transactionId(), confirmation.status(), amountWithdrawn, currency);
+    }
+
+
+
+    public CashoutListResponse getCashoutList(String apiKey, String secret, String cashpointId, int page, int size, String search) throws Exception {
+        String qs = "page=" + page + "&size=" + size + (search != null && !search.isEmpty() ? "&searchString=" + search : "");
+        String path = API_PATH_PREFIX + "/" + cashpointId + "/player/cashout/list/page?" + qs;
+        HttpEntity<?> req = new HttpEntity<>(headers(apiKey, secret, path, ""));
+        String url = FULL_BASE_URL + "/" + cashpointId + "/player/cashout/list/page?" + qs;
+        ResponseEntity<CashoutListResponse> resp = restTemplate.exchange(url, HttpMethod.GET, req, CashoutListResponse.class);
+        return resp.getBody();
+    }
 
     public BalanceLimit transferToPlatform(HizmatRequest request) throws Exception {
         String platformName = request.getPlatform();
@@ -130,6 +164,8 @@ public class MostbetService {
         return new BalanceLimit(null,new BigDecimal(balance.balance));
     }
 
+    public record CashoutListResponse(List<CashoutItem> items, int totalCount) {}
+    public record CashoutItem(long transactionId, String playerId, double amount, int brandId, String currency) {}
 
     public record BalanceResponse(double balance, String currency) {}
     public record DepositRequest(int brandId, String playerId, double amount, String currency) {}
@@ -137,4 +173,6 @@ public class MostbetService {
     public record CashoutConfirm(String code, long transactionId) {}
     public record TransactionItem(long transactionId, String type, String status, String subject, int brandId, String playerId, String date, double amount, String currency) {}
     public record TransactionListResponse(List<TransactionItem> items) {}
+    public record WithdrawalResult(long transactionId, String status, double amount, String currency) {}
+
 }

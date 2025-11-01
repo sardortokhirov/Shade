@@ -315,7 +315,7 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
         return markup;
     }
 
-    private void handleTextMessage(String messageText, Long chatId) {
+    private void handleTextMessage(String messageText, Long chatId) throws Exception {
         logger.info("Processing message from chatId {}: {}", chatId, messageText);
         String state = sessionService.getUserState(chatId);
         if ("AWAITING_PHONE_NUMBER".equals(state)) {

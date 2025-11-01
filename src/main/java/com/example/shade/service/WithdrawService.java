@@ -45,6 +45,7 @@ public class WithdrawService {
     private final LanguageSessionService languageSessionService;
     private final RestTemplate restTemplate = new RestTemplate();
     private final BlockedUserRepository blockedUserRepository;
+    private final MostbetService mostbetService;
 
     public void startWithdrawal(Long chatId) {
         logger.info("Starting withdrawal for chatId: {}", chatId);
@@ -53,7 +54,7 @@ public class WithdrawService {
         sendPlatformSelection(chatId);
     }
 
-    public void handleTextInput(Long chatId, String text) {
+    public void handleTextInput(Long chatId, String text) throws Exception {
         String state = sessionService.getUserState(chatId);
         logger.info("Text input for chatId {}, state: {}, text: {}", chatId, state, text);
         if (state == null) {
@@ -64,7 +65,8 @@ public class WithdrawService {
             case "WITHDRAW_USER_ID_INPUT" -> handleUserIdInput(chatId, text);
             case "WITHDRAW_CARD_INPUT" -> handleCardInput(chatId, text);
             case "WITHDRAW_CODE_INPUT" -> handleCodeInput(chatId, text);
-            default -> backMenuMessage(chatId, languageSessionService.getTranslation(chatId, "withdraw.message.select_from_menu"));
+            default ->
+                    backMenuMessage(chatId, languageSessionService.getTranslation(chatId, "withdraw.message.select_from_menu"));
         }
     }
 
@@ -89,7 +91,8 @@ public class WithdrawService {
         }
 
         switch (callback) {
-            case "WITHDRAW_USE_SAVED_ID" -> validateUserId(chatId, sessionService.getUserData(chatId, "platformUserId"));
+            case "WITHDRAW_USE_SAVED_ID" ->
+                    validateUserId(chatId, sessionService.getUserData(chatId, "platformUserId"));
             case "WITHDRAW_APPROVE_USER" -> handleApproveUser(chatId);
             case "WITHDRAW_REJECT_USER" -> {
                 sessionService.setUserState(chatId, "WITHDRAW_USER_ID_INPUT");
@@ -246,103 +249,162 @@ public class WithdrawService {
         logger.info("Admin chatId {} {} withdraw requestId {}", adminChatId, approve ? "approved" : "rejected", requestId);
     }
 
-    private BigDecimal processPayout(Long chatId, String platformName, String userId, String code, Long requestId, String cardNumber) {
+    private BigDecimal processPayout(Long chatId, String platformName, String userId, String code, Long requestId, String cardNumber)  {
         Platform platform = platformRepository.findByName(platformName.replace("_", ""))
                 .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
 
-        String hash = platform.getApiKey();
-        String cashierPass = platform.getPassword();
-        String cashdeskId = platform.getWorkplaceId();
-        String lng = "uz";
+        if (platform.getType().equals("mostbet")) {
+            try {
+                MostbetService.WithdrawalResult withdrawalResult = mostbetService.withdrawMoney(
+                        platform.getApiKey(),
+                        platform.getSecret(),
+                        platform.getWorkplaceId(),
+                        userId,
+                        code
+                );
 
-        if (hash == null || cashierPass == null || cashdeskId == null || hash.isEmpty() || cashierPass.isEmpty() || cashdeskId.isEmpty()) {
-            logger.error("Invalid platform credentials for platform {}: hash={}, cashierPass={}, cashdeskId={}",
-                    platformName, hash, cashierPass, cashdeskId);
-            messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "withdraw.message.platform_credentials_error"));
-            return null;
-        }
+                // Check if the API call was successful and the transaction is completed
+                if (withdrawalResult != null && "COMPLETED".equalsIgnoreCase(withdrawalResult.status())) {
+                    BigDecimal amountWithdrawn = BigDecimal.valueOf(withdrawalResult.amount());
 
-        try {
-            Integer.parseInt(cashdeskId);
-        } catch (NumberFormatException e) {
-            logger.error("Invalid cashdeskId format for platform {}: {}", platformName, cashdeskId);
-            messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "withdraw.message.platform_credentials_error"));
-            return null;
-        }
+                    logger.info("✅ Mostbet Payout successful for userId {} on platform {}, amount={}, requestId: {}",
+                            userId, platformName, amountWithdrawn, requestId);
 
-        String confirm = DigestUtils.md5DigestAsHex((userId + ":" + hash).getBytes(StandardCharsets.UTF_8));
-        String sha256Input1 = "hash=" + hash + "&lng=" + lng + "&userid=" + userId;
-        String sha256Result1 = sha256Hex(sha256Input1);
-        String md5Input = "code=" + code + "&cashierpass=" + cashierPass + "&cashdeskid=" + cashdeskId;
-        String md5Result = DigestUtils.md5DigestAsHex(md5Input.getBytes(StandardCharsets.UTF_8));
-        String finalSignature = sha256Hex(sha256Result1 + md5Result);
+                    // Return the amount withdrawn, which is the successful outcome
+                    return amountWithdrawn;
+                } else {
+                    // Handle cases where the transaction was created but not completed (e.g., status is 'NEW' or 'PROCESSING')
+                    String status = (withdrawalResult != null) ? withdrawalResult.status() : "UNKNOWN";
+                    logger.warn("❌ Mostbet Payout for userId {} on platform {} did not complete. Final status: {}", userId, platformName, status);
 
-        String apiUrl = String.format("https://partners.servcul.com/CashdeskBotAPI/Deposit/%s/Payout", userId);
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("sign", finalSignature);
-        headers.setContentType(MediaType.APPLICATION_JSON);
-
-        Map<String, Object> body = new HashMap<>();
-        body.put("cashdeskId", Integer.parseInt(cashdeskId));
-        body.put("lng", lng);
-        body.put("code", code);
-        body.put("confirm", confirm);
-
-        try {
-            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
-            ResponseEntity<Map> response = restTemplate.exchange(apiUrl, HttpMethod.POST, entity, Map.class);
-            Map<String, Object> responseBody = response.getBody();
-
-            Object successObj = responseBody != null ? responseBody.get("success") : null;
-            if (successObj == null && responseBody != null) {
-                successObj = responseBody.get("Success");
-            }
-            HizmatRequest request = requestRepository.findById(requestId)
-                    .orElse(null);
-            String errorMsg = responseBody != null && responseBody.get("Message") != null
-                    ? responseBody.get("Message").toString()
-                    : "Platformdan noto‘g‘ri javob qaytdi.";
-
-            String cancelLogMessage = String.format(
-                    languageSessionService.getTranslation(chatId, "withdraw.message.payout_failed"),
-                    request.getId(), cardNumber, platform.getName(), userId, code, errorMsg,
-                    LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-            );
-            if (response.getStatusCode().is2xxSuccessful() && Boolean.TRUE.equals(successObj)) {
-                Object summaObj = responseBody.get("Summa");
-                BigDecimal summa = null;
-                if (summaObj != null) {
-                    try {
-                        summa = new BigDecimal(summaObj.toString());
-                    } catch (NumberFormatException e) {
-                        logger.warn("Failed to parse summa value: {}", summaObj);
-                    }
+                    // Fetch the request to format a detailed failure message for the user
+                    HizmatRequest request = requestRepository.findById(requestId).orElse(null);
+                    String errorMsg = "Platform returned status: " + status;
+                    String cancelLogMessage = String.format(
+                            languageSessionService.getTranslation(chatId, "withdraw.message.payout_failed"),
+                            request != null ? request.getId() : requestId, cardNumber, platform.getName(), userId, code, errorMsg,
+                            LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+                    );
+                    messageSender.sendMessage(chatId, cancelLogMessage);
+                    sendMainMenu(chatId);
+                    return null;
                 }
 
-                logger.info("✅ Payout successful for userId {} on platform {}, summa={}, requestId: {}", userId, platformName, summa, requestId);
-                return summa;
-            } else {
-                logger.warn("❌ Payout failed for userId {} on platform {}, response: {}", userId, platformName, responseBody);
+            } catch (Exception e) {
+                // Handle any exceptions thrown by the service (e.g., user not found, signature error, network issues)
+                logger.error("❌ Mostbet Payout failed for userId {} on platform {} with an exception:", userId, platformName, e);
+
+                // Re-use the existing detailed error message logic
+                HizmatRequest request = requestRepository.findById(requestId).orElse(null);
+                String errorMsg = e.getMessage(); // Get the specific error from the exception
+                String cancelLogMessage = String.format(
+                        languageSessionService.getTranslation(chatId, "withdraw.message.payout_failed"),
+                        request != null ? request.getId() : requestId, cardNumber, platform.getName(), userId, code, errorMsg,
+                        LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+                );
+
                 messageSender.sendMessage(chatId, cancelLogMessage);
                 sendMainMenu(chatId);
                 return null;
             }
-        } catch (HttpClientErrorException e) {
-            String errorMsg = e.getStatusCode().value() == 401 ? "Invalid signature" :
-                    e.getStatusCode().value() == 403 ? "Invalid confirm" : "API xatosi: " + e.getMessage();
-            logger.error("Payout API error for userId {} on platform {}: {}", userId, platformName, e.getMessage());
-            messageSender.sendMessage(chatId, String.format(languageSessionService.getTranslation(chatId, "withdraw.message.api_error"), errorMsg));
-            adminLogBotService.sendToAdmins("❌ Payout API error: " + errorMsg + " for requestId " + requestId);
-            sendMainMenu(chatId);
-            return null;
-        } catch (Exception e) {
-            logger.error("Unexpected error during payout for userId {} on platform {}: {}", userId, platformName, e.getMessage());
-            messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "withdraw.message.unknown_error"));
-            adminLogBotService.sendToAdmins("❌ Payout API error: Unexpected error for requestId " + requestId);
-            sendMainMenu(chatId);
-            return null;
+            // --- END OF MOSTBET IMPLEMENTATION ---
+
+        } else {
+            String hash = platform.getApiKey();
+            String cashierPass = platform.getPassword();
+            String cashdeskId = platform.getWorkplaceId();
+            String lng = "uz";
+
+            if (hash == null || cashierPass == null || cashdeskId == null || hash.isEmpty() || cashierPass.isEmpty() || cashdeskId.isEmpty()) {
+                logger.error("Invalid platform credentials for platform {}: hash={}, cashierPass={}, cashdeskId={}",
+                        platformName, hash, cashierPass, cashdeskId);
+                messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "withdraw.message.platform_credentials_error"));
+                return null;
+            }
+
+            try {
+                Integer.parseInt(cashdeskId);
+            } catch (NumberFormatException e) {
+                logger.error("Invalid cashdeskId format for platform {}: {}", platformName, cashdeskId);
+                messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "withdraw.message.platform_credentials_error"));
+                return null;
+            }
+
+            String confirm = DigestUtils.md5DigestAsHex((userId + ":" + hash).getBytes(StandardCharsets.UTF_8));
+            String sha256Input1 = "hash=" + hash + "&lng=" + lng + "&userid=" + userId;
+            String sha256Result1 = sha256Hex(sha256Input1);
+            String md5Input = "code=" + code + "&cashierpass=" + cashierPass + "&cashdeskid=" + cashdeskId;
+            String md5Result = DigestUtils.md5DigestAsHex(md5Input.getBytes(StandardCharsets.UTF_8));
+            String finalSignature = sha256Hex(sha256Result1 + md5Result);
+
+            String apiUrl = String.format("https://partners.servcul.com/CashdeskBotAPI/Deposit/%s/Payout", userId);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("sign", finalSignature);
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            Map<String, Object> body = new HashMap<>();
+            body.put("cashdeskId", Integer.parseInt(cashdeskId));
+            body.put("lng", lng);
+            body.put("code", code);
+            body.put("confirm", confirm);
+
+            try {
+                HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+                ResponseEntity<Map> response = restTemplate.exchange(apiUrl, HttpMethod.POST, entity, Map.class);
+                Map<String, Object> responseBody = response.getBody();
+
+                Object successObj = responseBody != null ? responseBody.get("success") : null;
+                if (successObj == null && responseBody != null) {
+                    successObj = responseBody.get("Success");
+                }
+                HizmatRequest request = requestRepository.findById(requestId)
+                        .orElse(null);
+                String errorMsg = responseBody != null && responseBody.get("Message") != null
+                        ? responseBody.get("Message").toString()
+                        : "Platformdan noto‘g‘ri javob qaytdi.";
+
+                String cancelLogMessage = String.format(
+                        languageSessionService.getTranslation(chatId, "withdraw.message.payout_failed"),
+                        request.getId(), cardNumber, platform.getName(), userId, code, errorMsg,
+                        LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+                );
+                if (response.getStatusCode().is2xxSuccessful() && Boolean.TRUE.equals(successObj)) {
+                    Object summaObj = responseBody.get("Summa");
+                    BigDecimal summa = null;
+                    if (summaObj != null) {
+                        try {
+                            summa = new BigDecimal(summaObj.toString());
+                        } catch (NumberFormatException e) {
+                            logger.warn("Failed to parse summa value: {}", summaObj);
+                        }
+                    }
+
+                    logger.info("✅ Payout successful for userId {} on platform {}, summa={}, requestId: {}", userId, platformName, summa, requestId);
+                    return summa;
+                } else {
+                    logger.warn("❌ Payout failed for userId {} on platform {}, response: {}", userId, platformName, responseBody);
+                    messageSender.sendMessage(chatId, cancelLogMessage);
+                    sendMainMenu(chatId);
+                    return null;
+                }
+            } catch (HttpClientErrorException e) {
+                String errorMsg = e.getStatusCode().value() == 401 ? "Invalid signature" :
+                        e.getStatusCode().value() == 403 ? "Invalid confirm" : "API xatosi: " + e.getMessage();
+                logger.error("Payout API error for userId {} on platform {}: {}", userId, platformName, e.getMessage());
+                messageSender.sendMessage(chatId, String.format(languageSessionService.getTranslation(chatId, "withdraw.message.api_error"), errorMsg));
+                adminLogBotService.sendToAdmins("❌ Payout API error: " + errorMsg + " for requestId " + requestId);
+                sendMainMenu(chatId);
+                return null;
+            } catch (Exception e) {
+                logger.error("Unexpected error during payout for userId {} on platform {}: {}", userId, platformName, e.getMessage());
+                messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "withdraw.message.unknown_error"));
+                adminLogBotService.sendToAdmins("❌ Payout API error: Unexpected error for requestId " + requestId);
+                sendMainMenu(chatId);
+                return null;
+            }
         }
+
     }
 
     private void handleUserIdInput(Long chatId, String userId) {
@@ -362,80 +424,104 @@ public class WithdrawService {
         Platform platform = platformRepository.findByName(platformName)
                 .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
 
-        String hash = platform.getApiKey();
-        String cashierPass = platform.getPassword();
-        String cashdeskId = platform.getWorkplaceId();
+        if (platform.getType().equals("mostbet")) {
+            String fullName = "MOSTBET";
+            sessionService.setUserData(chatId, "platformUserId", userId);
+            sessionService.setUserData(chatId, "fullName", fullName);
+            Currency currency = platform.getCurrency();
+            HizmatRequest request = HizmatRequest.builder()
+                    .chatId(chatId)
+                    .platform(platformName)
+                    .platformUserId(userId)
+                    .fullName(fullName)
+                    .status(RequestStatus.PENDING)
+                    .createdAt(LocalDateTime.now(ZoneId.of("GMT+5")))
+                    .type(RequestType.WITHDRAWAL)
+                    .currency(currency)
+                    .build();
+            requestRepository.save(request);
+            sessionService.setUserData(chatId, "platformUserId", userId);
+            sessionService.setUserState(chatId, "WITHDRAW_CARD_INPUT");
 
-        if (hash == null || cashierPass == null || cashdeskId == null || hash.isEmpty() || cashierPass.isEmpty() || cashdeskId.isEmpty()) {
-            logger.error("Invalid platform credentials for platform {}: hash={}, cashierPass={}, cashdeskId={}",
-                    platformName, hash, cashierPass, cashdeskId);
-            messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "withdraw.message.platform_credentials_error"));
-            return;
+            handleApproveUser(chatId);
         }
+        else {
 
-        try {
-            Integer.parseInt(cashdeskId);
-        } catch (NumberFormatException e) {
-            logger.error("Invalid cashdeskId format for platform {}: {}", platformName, cashdeskId);
-            messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "withdraw.message.platform_credentials_error"));
-            return;
-        }
+            String hash = platform.getApiKey();
+            String cashierPass = platform.getPassword();
+            String cashdeskId = platform.getWorkplaceId();
 
-        String confirmInput = userId + ":" + hash;
-        String confirm = DigestUtils.md5DigestAsHex(confirmInput.getBytes(StandardCharsets.UTF_8));
-        String sha256Input1 = "hash=" + hash + "&userid=" + userId + "&cashdeskid=" + cashdeskId;
-        String sha256Result1 = sha256Hex(sha256Input1);
-        String md5Input = "userid=" + userId + "&cashierpass=" + cashierPass + "&hash=" + hash;
-        String md5Result = DigestUtils.md5DigestAsHex(md5Input.getBytes(StandardCharsets.UTF_8));
-        String finalSignature = sha256Hex(sha256Result1 + md5Result);
-
-        String apiUrl = String.format("https://partners.servcul.com/CashdeskBotAPI/Users/%s?confirm=%s&cashdeskId=%s",
-                userId, confirm, cashdeskId);
-        logger.info("Validating user ID {} for platform {} (chatId: {}), URL: {}", userId, platformName, chatId, apiUrl);
-
-        try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("sign", finalSignature);
-            HttpEntity<String> entity = new HttpEntity<>(headers);
-
-            ResponseEntity<UserProfile> response = restTemplate.exchange(apiUrl, HttpMethod.GET, entity, UserProfile.class);
-            UserProfile profile = response.getBody();
-
-            if (response.getStatusCode().is2xxSuccessful() && profile != null && profile.getUserId() != null && !profile.getName().isEmpty()) {
-                String fullName = profile.getName();
-                sessionService.setUserData(chatId, "platformUserId", userId);
-                sessionService.setUserData(chatId, "fullName", fullName);
-                Currency currency = Currency.UZS;
-                if (profile.getCurrencyId() == 1L) {
-                    currency = Currency.RUB;
-                }
-                HizmatRequest request = HizmatRequest.builder()
-                        .chatId(chatId)
-                        .platform(platformName)
-                        .platformUserId(userId)
-                        .fullName(fullName)
-                        .status(RequestStatus.PENDING)
-                        .createdAt(LocalDateTime.now(ZoneId.of("GMT+5")))
-                        .type(RequestType.WITHDRAWAL)
-                        .currency(currency)
-                        .build();
-                requestRepository.save(request);
-
-                sessionService.setUserState(chatId, "WITHDRAW_APPROVE_USER");
-                sendUserApproval(chatId, fullName, userId);
-            } else {
-                logger.warn("Invalid user profile for ID {} on platform {}. Response: {}", userId, platformName, profile);
-                sendNoUserFound(chatId);
+            if (hash == null || cashierPass == null || cashdeskId == null || hash.isEmpty() || cashierPass.isEmpty() || cashdeskId.isEmpty()) {
+                logger.error("Invalid platform credentials for platform {}: hash={}, cashierPass={}, cashdeskId={}",
+                        platformName, hash, cashierPass, cashdeskId);
+                messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "withdraw.message.platform_credentials_error"));
+                return;
             }
-        } catch (HttpClientErrorException e) {
-            String errorMsg = e.getStatusCode().value() == 400 ? "Invalid cashdeskId or parameters: " + e.getResponseBodyAsString() :
-                    e.getStatusCode().value() == 401 ? "Invalid signature" :
-                            e.getStatusCode().value() == 403 ? "Invalid confirm" : "API xatosi: " + e.getMessage();
-            logger.error("Error calling API for user ID {} on platform {}: {}", userId, platformName, errorMsg);
-            sendMessageWithNavigation(chatId, String.format(languageSessionService.getTranslation(chatId, "withdraw.message.api_error"), errorMsg));
-        } catch (Exception e) {
-            logger.error("Unexpected error calling API for user ID {} on platform {}: {}", userId, platformName, e.getMessage());
-            sendMessageWithNavigation(chatId, languageSessionService.getTranslation(chatId, "withdraw.message.unknown_error"));
+
+            try {
+                Integer.parseInt(cashdeskId);
+            } catch (NumberFormatException e) {
+                logger.error("Invalid cashdeskId format for platform {}: {}", platformName, cashdeskId);
+                messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "withdraw.message.platform_credentials_error"));
+                return;
+            }
+
+            String confirmInput = userId + ":" + hash;
+            String confirm = DigestUtils.md5DigestAsHex(confirmInput.getBytes(StandardCharsets.UTF_8));
+            String sha256Input1 = "hash=" + hash + "&userid=" + userId + "&cashdeskid=" + cashdeskId;
+            String sha256Result1 = sha256Hex(sha256Input1);
+            String md5Input = "userid=" + userId + "&cashierpass=" + cashierPass + "&hash=" + hash;
+            String md5Result = DigestUtils.md5DigestAsHex(md5Input.getBytes(StandardCharsets.UTF_8));
+            String finalSignature = sha256Hex(sha256Result1 + md5Result);
+
+            String apiUrl = String.format("https://partners.servcul.com/CashdeskBotAPI/Users/%s?confirm=%s&cashdeskId=%s",
+                    userId, confirm, cashdeskId);
+            logger.info("Validating user ID {} for platform {} (chatId: {}), URL: {}", userId, platformName, chatId, apiUrl);
+
+            try {
+                HttpHeaders headers = new HttpHeaders();
+                headers.set("sign", finalSignature);
+                HttpEntity<String> entity = new HttpEntity<>(headers);
+
+                ResponseEntity<UserProfile> response = restTemplate.exchange(apiUrl, HttpMethod.GET, entity, UserProfile.class);
+                UserProfile profile = response.getBody();
+
+                if (response.getStatusCode().is2xxSuccessful() && profile != null && profile.getUserId() != null && !profile.getName().isEmpty()) {
+                    String fullName = profile.getName();
+                    sessionService.setUserData(chatId, "platformUserId", userId);
+                    sessionService.setUserData(chatId, "fullName", fullName);
+                    Currency currency = Currency.UZS;
+                    if (profile.getCurrencyId() == 1L) {
+                        currency = Currency.RUB;
+                    }
+                    HizmatRequest request = HizmatRequest.builder()
+                            .chatId(chatId)
+                            .platform(platformName)
+                            .platformUserId(userId)
+                            .fullName(fullName)
+                            .status(RequestStatus.PENDING)
+                            .createdAt(LocalDateTime.now(ZoneId.of("GMT+5")))
+                            .type(RequestType.WITHDRAWAL)
+                            .currency(currency)
+                            .build();
+                    requestRepository.save(request);
+
+                    sessionService.setUserState(chatId, "WITHDRAW_APPROVE_USER");
+                    sendUserApproval(chatId, fullName, userId);
+                } else {
+                    logger.warn("Invalid user profile for ID {} on platform {}. Response: {}", userId, platformName, profile);
+                    sendNoUserFound(chatId);
+                }
+            } catch (HttpClientErrorException e) {
+                String errorMsg = e.getStatusCode().value() == 400 ? "Invalid cashdeskId or parameters: " + e.getResponseBodyAsString() :
+                        e.getStatusCode().value() == 401 ? "Invalid signature" :
+                                e.getStatusCode().value() == 403 ? "Invalid confirm" : "API xatosi: " + e.getMessage();
+                logger.error("Error calling API for user ID {} on platform {}: {}", userId, platformName, errorMsg);
+                sendMessageWithNavigation(chatId, String.format(languageSessionService.getTranslation(chatId, "withdraw.message.api_error"), errorMsg));
+            } catch (Exception e) {
+                logger.error("Unexpected error calling API for user ID {} on platform {}: {}", userId, platformName, e.getMessage());
+                sendMessageWithNavigation(chatId, languageSessionService.getTranslation(chatId, "withdraw.message.unknown_error"));
+            }
         }
     }
 
@@ -479,7 +565,7 @@ public class WithdrawService {
         sendCodeInput(chatId);
     }
 
-    private void handleCodeInput(Long chatId, String code) {
+    private void handleCodeInput(Long chatId, String code) throws Exception {
         messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
         sessionService.clearMessageIds(chatId);
 
