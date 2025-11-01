@@ -20,11 +20,11 @@ import java.util.List;
 @Component
 public class AdminBotMessageSender {
 
-    private final AdminBot adminBot;
+    private final ShadePaymentBot shadePaymentBot;
 
     @Autowired
-    public AdminBotMessageSender(@Lazy AdminBot adminBot) {
-        this.adminBot = adminBot;
+    public AdminBotMessageSender(@Lazy ShadePaymentBot shadePaymentBot) {
+        this.shadePaymentBot = shadePaymentBot;
     }
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
 
@@ -34,7 +34,7 @@ public class AdminBotMessageSender {
         message.setText(text);
 
         try {
-            adminBot.execute(message);
+            shadePaymentBot.execute(message);
         } catch (TelegramApiException e) {
             log.error("Error sending message", e);
         }
@@ -60,7 +60,7 @@ public class AdminBotMessageSender {
         message.setReplyMarkup(keyboard);
 
         try {
-            adminBot.execute(message);
+            shadePaymentBot.execute(message);
         } catch (TelegramApiException e) {
             log.error("Error sending main menu", e);
         }
@@ -84,7 +84,7 @@ public class AdminBotMessageSender {
         message.setReplyMarkup(keyboard);
 
         try {
-            adminBot.execute(message);
+            shadePaymentBot.execute(message);
         } catch (TelegramApiException e) {
             log.error("Error sending features menu", e);
         }
@@ -111,7 +111,7 @@ public class AdminBotMessageSender {
         message.setReplyMarkup(keyboard);
 
         try {
-            adminBot.execute(message);
+            shadePaymentBot.execute(message);
         } catch (TelegramApiException e) {
             log.error("Error sending cards menu", e);
         }
@@ -169,7 +169,7 @@ public class AdminBotMessageSender {
         message.setReplyMarkup(keyboard);
 
         try {
-            adminBot.execute(message);
+            shadePaymentBot.execute(message);
         } catch (TelegramApiException e) {
             log.error("Error sending oson config selection", e);
         }
@@ -190,7 +190,7 @@ public class AdminBotMessageSender {
         message.setReplyMarkup(keyboard);
 
         try {
-            adminBot.execute(message);
+            shadePaymentBot.execute(message);
         } catch (TelegramApiException e) {
             log.error("Error sending payment system selection", e);
         }
@@ -211,7 +211,7 @@ public class AdminBotMessageSender {
         message.setReplyMarkup(keyboard);
 
         try {
-            adminBot.execute(message);
+            shadePaymentBot.execute(message);
         } catch (TelegramApiException e) {
             log.error("Error sending currency selection", e);
         }
@@ -237,7 +237,7 @@ public class AdminBotMessageSender {
         message.setReplyMarkup(keyboard);
 
         try {
-            adminBot.execute(message);
+            shadePaymentBot.execute(message);
         } catch (TelegramApiException e) {
             log.error("Error sending platforms menu", e);
         }
@@ -292,7 +292,7 @@ public class AdminBotMessageSender {
         message.setReplyMarkup(keyboard);
 
         try {
-            adminBot.execute(message);
+            shadePaymentBot.execute(message);
         } catch (TelegramApiException e) {
             log.error("Error sending oson config menu", e);
         }
@@ -346,7 +346,7 @@ public class AdminBotMessageSender {
         message.setReplyMarkup(keyboard);
 
         try {
-            adminBot.execute(message);
+            shadePaymentBot.execute(message);
         } catch (TelegramApiException e) {
             log.error("Error sending exchange rate menu", e);
         }
@@ -403,7 +403,7 @@ public class AdminBotMessageSender {
         message.setReplyMarkup(keyboard);
 
         try {
-            adminBot.execute(message);
+            shadePaymentBot.execute(message);
         } catch (TelegramApiException e) {
             log.error("Error sending lottery menu", e);
         }

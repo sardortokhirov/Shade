@@ -1,10 +1,7 @@
 package com.example.shade.bot;
 
 import com.example.shade.model.*;
-import com.example.shade.repository.BlockedUserRepository;
-import com.example.shade.repository.ReferralRepository;
-import com.example.shade.repository.UserBalanceRepository;
-import com.example.shade.repository.UserRepository;
+import com.example.shade.repository.*;
 import com.example.shade.service.*;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +29,7 @@ import java.io.File;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Component
 @RequiredArgsConstructor
@@ -50,6 +48,9 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
     private final FeatureService featureService;
     private final LanguageSessionService languageSessionService;
     private final UserRepository userRepository;
+    private final AdminChatRepository adminChatRepository;
+    private final ShadeAdminUpdateHandler adminUpdateHandler;
+    private final AdminBotService adminBotService;
 
     @Value("${telegram.bot.token}")
     private String botToken;
@@ -106,7 +107,33 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                 logger.warn("No chatId found in update: {}", update);
                 return;
             }
+            Optional<AdminChat> adminChatOpt = adminChatRepository.findById(chatId);
+            boolean isAdmin = adminChatOpt.isPresent();
 
+            if (isAdmin || adminUpdateHandler.isUserInAdminState(chatId)) {
+                // If user is an admin or is currently in an Admin state (WAITING_CARD_ID, etc.)
+
+                // 1. Handle /admin and /kassa commands (only via text message)
+                if (update.hasMessage() && update.getMessage().hasText()) {
+                    String text = update.getMessage().getText();
+                    if ("/admin".equals(text)) {
+                        handleAdminCommand(chatId, adminChatOpt.get()); // Pass the loaded AdminChat
+                        return;
+                    }
+                    if ("/kassa".equals(text)) {
+                        handleKassaCommand(chatId, adminChatOpt.get()); // Pass the loaded AdminChat
+                        return;
+                    }
+                }
+
+                // 2. Delegate all other Admin-related states/callbacks to the handler
+                // It should only run if notifications are ON, OR if the user is currently in a state machine.
+                if (adminUpdateHandler.isUserInAdminState(chatId) || (isAdmin && adminChatOpt.get().isReceiveNotifications())) {
+                    if (adminUpdateHandler.handleUpdate(update)) {
+                        return; // Admin logic handled the update (e.g., button click, state input)
+                    }
+                }
+            }
             // Handle referral for /start ref_
             if (update.hasMessage() && update.getMessage().hasText() && update.getMessage().getText().startsWith("/start ref_")) {
                 String messageText = update.getMessage().getText();
@@ -307,7 +334,7 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
             sendPhoneNumberRequest(chatId);
             return;
         }
-        if (messageText.equals("/start")) {
+         if (messageText.equals("/start")) {
             sendMainMenu(chatId, true);
         } else if (messageText.equals("/topup")) {
             if (!featureService.canPerformTopUp()) {
@@ -427,6 +454,38 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
             logger.error("Error handling callback {} for chatId {}: {}", callback, chatId, e.getMessage());
             messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "message.callback_error"));
         }
+    }
+
+    public void handleAdminCommand(Long chatId, AdminChat adminChat) {
+        if (adminChat.isReceiveNotifications()) {
+            // 1. Clear main bot session state
+            messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "HOME");
+            sessionService.clearSession(chatId);
+
+            // 2. Open Admin Panel (delegates to AdminBotService, which sends the menu)
+            adminBotService.sendMainMenu(chatId);
+        } else {
+            // Admin but notifications are OFF. Notify them.
+            // NOTE: You'll need to add 'message.admin_notification_off_prompt' to your LanguageService.
+            String message = languageSessionService.getTranslation(chatId, "message.admin_notification_off_prompt");
+            messageSender.sendMessage(chatId, message);
+        }
+    }
+
+    public void handleKassaCommand(Long chatId, AdminChat adminChat) {
+        adminChat.setReceiveNotifications(false);
+        adminChatRepository.save(adminChat);
+
+        // Clear any active admin session state
+        adminUpdateHandler.clearAdminSession(chatId);
+
+        // Notify the user in their language
+        // NOTE: You'll need to add 'message.admin_bot_turned_off' to your LanguageService.
+        String message = languageSessionService.getTranslation(chatId, "message.admin_bot_turned_off");
+        messageSender.sendMessage(chatId, message);
+
+        // Send back to main menu
+        sendMainMenu(chatId, true);
     }
 
     public void sendMainMenu(Long chatId, boolean clearSession) {
