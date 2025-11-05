@@ -42,7 +42,6 @@ public class BonusService {
     private final BlockedUserRepository blockedUserRepository;
     private final AdminChatRepository adminChatRepository;
     private final ExchangeRateRepository exchangeRateRepository;
-    private final LottoBotService lottoBotService;
     private final LotteryService lotteryService;
     private final MessageSender messageSender;
     private final AdminLogBotService adminLogBotService;
@@ -578,7 +577,7 @@ public class BonusService {
         HizmatRequest request = requestRepository.findById(requestId)
                 .orElseThrow(() -> new IllegalStateException("Request not found: " + requestId));
 
-        creditReferral(request.getChatId(), request.getAmount());
+//        creditReferral(request.getChatId(), request.getAmount());
 
         String platformName = request.getPlatform();
         Platform platformData = platformRepository.findByName(platformName)
