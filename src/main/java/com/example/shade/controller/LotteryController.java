@@ -1,8 +1,13 @@
 package com.example.shade.controller;
 
+import com.example.shade.bot.AdminBotMessageSender;
+import com.example.shade.bot.MessageSender;
 import com.example.shade.model.LotteryPrize;
 import com.example.shade.model.UserBalance;
+import com.example.shade.repository.BlockedUserRepository;
 import com.example.shade.repository.LotteryPrizeRepository;
+import com.example.shade.service.AdminLogBotService;
+import com.example.shade.service.LanguageSessionService;
 import com.example.shade.service.LotteryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -11,6 +16,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.servlet.http.HttpServletRequest;
+
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.List;
 
@@ -21,6 +30,9 @@ import java.util.List;
 public class LotteryController {
     private final LotteryService lotteryService;
     private final LotteryPrizeRepository lotteryPrizeRepository;
+    private final AdminBotMessageSender messageSender;
+    private final LanguageSessionService languageSessionService;
+    private final AdminLogBotService adminLogBotService;
 
     private boolean authenticate(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
@@ -80,6 +92,17 @@ public class LotteryController {
         }
         try {
             lotteryService.deleteTickets(chatId);
+            messageSender.sendTextMessage(chatId, languageSessionService.getTranslation(chatId, "message.tickets_deleted_success"));
+
+            String logMessage = String.format(
+                    "Biletlar o'chirildi ✅\n" +
+                            "👤 User ID [%d]\n" +
+                            "📅 [%s] ",
+                    chatId,
+                    LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+            );
+            adminLogBotService.sendLog(logMessage);
+
             return ResponseEntity.noContent().build();
         } catch (IllegalStateException e) {
             return ResponseEntity.notFound().build();
@@ -93,6 +116,17 @@ public class LotteryController {
         }
         try {
             lotteryService.deleteBalance(chatId);
+            messageSender.sendTextMessage(chatId, languageSessionService.getTranslation(chatId, "message.balance_deleted_success"));
+
+            String logMessage = String.format(
+                    "Balans o'chirildi ✅\n" +
+                            "👤 User ID [%d]\n" +
+                            "📅 [%s] ",
+                    chatId,
+                    LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+            );
+            adminLogBotService.sendLog(logMessage);
+
             return ResponseEntity.noContent().build();
         } catch (IllegalStateException e) {
             return ResponseEntity.notFound().build();
@@ -107,6 +141,22 @@ public class LotteryController {
         try {
             lotteryService.awardTickets(chatId, amount);
             UserBalance balance = lotteryService.getBalance(chatId);
+            messageSender.sendTextMessage(chatId, languageSessionService.getTranslation(chatId, "message.tickets_added_success"));
+            String logMessage = String.format(
+                    "Biletlar qo'shildi ✅\n" +
+                            "👤 User ID [%d]\n" +
+                            "💸 Qo'shilgan miqdor: %d bilet\n" +
+                            "🎟️ Jami biletlar: %d\n" +
+                            "💰 Balans: %s\n" +
+                            "📅 [%s] ",
+                    chatId,
+                    amount,
+                    balance.getTickets(),  // assume getTickets()
+                    balance.getBalance(),  // adjust field
+                    LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+            );
+            adminLogBotService.sendLog(logMessage);  // pass message
+
             return ResponseEntity.ok(balance);
         } catch (IllegalStateException e) {
             return ResponseEntity.notFound().build();
