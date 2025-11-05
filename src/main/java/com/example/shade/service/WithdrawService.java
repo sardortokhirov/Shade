@@ -80,7 +80,7 @@ public class WithdrawService {
 
     public void handleCallback(Long chatId, String callback) {
         logger.info("Callback received for chatId {}: {}", chatId, callback);
-        messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
+//        messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
         sessionService.clearMessageIds(chatId);
 
         if (callback.startsWith("APPROVE_WITHDRAW:") || callback.startsWith("REJECT_WITHDRAW:")) {
@@ -408,7 +408,7 @@ public class WithdrawService {
     }
 
     private void handleUserIdInput(Long chatId, String userId) {
-        messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
+//        messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
         sessionService.clearMessageIds(chatId);
 
         if (!isValidUserId(userId)) {
@@ -540,7 +540,7 @@ public class WithdrawService {
     }
 
     private void handleCardInput(Long chatId, String card) {
-        messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
+//        messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
         sessionService.clearMessageIds(chatId);
 
         if (!isValidCard(card)) {
@@ -566,7 +566,7 @@ public class WithdrawService {
     }
 
     private void handleCodeInput(Long chatId, String code) throws Exception {
-        messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
+//        messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
         sessionService.clearMessageIds(chatId);
 
         if (!isValidCode(code)) {

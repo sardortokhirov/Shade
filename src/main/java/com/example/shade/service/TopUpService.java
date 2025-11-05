@@ -94,7 +94,7 @@ public class TopUpService {
                 messageSender.editMessageToRemoveButtons(chatId, messageIds.get(messageIds.size() - 1));
             }
         } else {
-            messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
+//            messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
         }
         sessionService.clearMessageIds(chatId);
 
@@ -202,7 +202,7 @@ public class TopUpService {
     }
 
     private void handleUserIdInput(Long chatId, String userId) {
-        messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
+//        messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
         sessionService.clearMessageIds(chatId);
 
         if (!isValidUserId(userId)) {
@@ -336,7 +336,7 @@ public class TopUpService {
     }
 
     private void handleCardInput(Long chatId, String card) {
-        messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
+//        messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
         sessionService.clearMessageIds(chatId);
 
         if (!isValidCard(card)) {
@@ -362,7 +362,7 @@ public class TopUpService {
     }
 
     private void handleAmountInput(Long chatId, String amountText) {
-        messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
+//        messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
         sessionService.clearMessageIds(chatId);
         try {
             long amount = Long.parseLong(amountText.replaceAll("[^\\d]", ""));
@@ -432,7 +432,7 @@ public class TopUpService {
                 .orElse(null);
         if (request == null) {
             logger.error("No pending payment request found for chatId {}", chatId);
-            messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
+//            messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
             sessionService.clearMessageIds(chatId);
             messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "topup.message.request_not_found"));
             sendMainMenu(chatId);
@@ -593,7 +593,7 @@ public class TopUpService {
                 );
                 adminLogBotService.sendLog(logMessageAdmin);
 
-                messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
+//                messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
                 sessionService.clearMessageIds(chatId);
                 sessionService.setUserData(chatId, PAYMENT_ATTEMPTS_KEY, "0");
                 messageSender.sendMessage(chatId, logMessage +

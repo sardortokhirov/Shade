@@ -201,8 +201,8 @@ public class MessageSender {
             logger.info("Forwarded message {} from chat {} to chat {}", messageId, fromChatId, toChatId);
             return true;
         } catch (TelegramApiException e) {
-            logger.error("Error forwarding message {} from chat {} to chat {}: {}", 
-                messageId, fromChatId, toChatId, e.getMessage());
+            logger.error("Error forwarding message {} from chat {} to chat {}: {}",
+                    messageId, fromChatId, toChatId, e.getMessage());
             return false;
         }
     }
@@ -217,8 +217,8 @@ public class MessageSender {
             logger.info("Copied message {} from chat {} to chat {}", messageId, fromChatId, toChatId);
             return true;
         } catch (TelegramApiException e) {
-            logger.error("Error copying message {} from chat {} to chat {}: {}", 
-                messageId, fromChatId, toChatId, e.getMessage());
+            logger.error("Error copying message {} from chat {} to chat {}: {}",
+                    messageId, fromChatId, toChatId, e.getMessage());
             return false;
         }
     }
@@ -228,10 +228,10 @@ public class MessageSender {
     public boolean sendMessageBasedOnType(Long chatId, Message originalMessage) {
         try {
             // For media messages, use copyMessage to avoid file ID issues between bots
-            if (originalMessage.hasPhoto() || originalMessage.hasVideo() || 
-                originalMessage.hasDocument() || originalMessage.hasAudio() || 
-                originalMessage.hasVoice() || originalMessage.hasAnimation() || 
-                originalMessage.hasSticker() || originalMessage.hasVideoNote()) {
+            if (originalMessage.hasPhoto() || originalMessage.hasVideo() ||
+                    originalMessage.hasDocument() || originalMessage.hasAudio() ||
+                    originalMessage.hasVoice() || originalMessage.hasAnimation() ||
+                    originalMessage.hasSticker() || originalMessage.hasVideoNote()) {
 
                 return copyMessage(chatId, originalMessage.getChatId(), originalMessage.getMessageId());
             } else if (originalMessage.hasText()) {
@@ -262,18 +262,18 @@ public class MessageSender {
         }
     }
 
-    public void animateAndDeleteMessages(Long chatId, List<Integer> messageIds, String animationType) {
-        if (messageIds == null || messageIds.isEmpty()) {
-            return;
-        }
-        for (Integer messageId : messageIds) {
-            try {
-                bot.execute(new DeleteMessage(String.valueOf(chatId), messageId));
-            } catch (TelegramApiException e) {
-                if (!e.getMessage().contains("message to delete not found")) {
-                    logger.error("Error deleting message {} for chatId {}: {}", messageId, chatId, e.getMessage());
-                }
-            }
-        }
-    }
+//    public void animateAndDeleteMessages(Long chatId, List<Integer> messageIds, String animationType) {
+//        if (messageIds == null || messageIds.isEmpty()) {
+//            return;
+//        }
+//        for (Integer messageId : messageIds) {
+//            try {
+//                bot.execute(new DeleteMessage(String.valueOf(chatId), messageId));
+//            } catch (TelegramApiException e) {
+//                if (!e.getMessage().contains("message to delete not found")) {
+//                    logger.error("Error deleting message {} for chatId {}: {}", messageId, chatId, e.getMessage());
+//                }
+//            }
+//        }
+//    }
 }

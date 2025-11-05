@@ -63,7 +63,7 @@ public class BonusService {
 
     public void handleCallback(Long chatId, String callback) throws Exception {
         logger.info("Bonus callback for chatId {}: {}", chatId, callback);
-        messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
+//        messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
         sessionService.clearMessageIds(chatId);
 
         if (callback.startsWith("BONUS_TOPUP_PLATFORM:")) {
@@ -332,7 +332,7 @@ public class BonusService {
     }
 
     private void handleUserIdInput(Long chatId, String userId) {
-        messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
+//        messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
         sessionService.clearMessageIds(chatId);
 
         if (!isValidUserId(userId)) {
@@ -459,7 +459,7 @@ public class BonusService {
     }
 
     private void handleTopUpInput(Long chatId, String input) {
-        messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
+//        messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
         sessionService.clearMessageIds(chatId);
 
         String amountStr = input.trim();
@@ -590,7 +590,7 @@ public class BonusService {
                 request.setStatus(RequestStatus.BONUS_APPROVED);
                 request.setTransactionId(UUID.randomUUID().toString());
                 requestRepository.save(request);
-                messageSender.animateAndDeleteMessages(request.getChatId(), sessionService.getMessageIds(request.getChatId()), "OPEN");
+//                messageSender.animateAndDeleteMessages(request.getChatId(), sessionService.getMessageIds(request.getChatId()), "OPEN");
                 sessionService.clearMessageIds(request.getChatId());
                 String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
 
@@ -669,7 +669,7 @@ public class BonusService {
                     request.setTransactionId(UUID.randomUUID().toString());
                     requestRepository.save(request);
                     logger.info("✅ Platform transfer completed: chatId={}, userId={}, amount={}", request.getChatId(), userId, amount);
-                    messageSender.animateAndDeleteMessages(request.getChatId(), sessionService.getMessageIds(request.getChatId()), "OPEN");
+//                    messageSender.animateAndDeleteMessages(request.getChatId(), sessionService.getMessageIds(request.getChatId()), "OPEN");
                     sessionService.clearMessageIds(request.getChatId());
                     String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
 

@@ -338,21 +338,21 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                 messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "message.feature_unavailable"));
                 return;
             }
-            messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
+//            messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
             topUpService.startTopUp(chatId);
         } else if (messageText.equals("/withdraw")) {
             if (!featureService.canPerformWithdraw()) {
                 messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "message.feature_unavailable"));
                 return;
             }
-            messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
+//            messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
             withdrawService.startWithdrawal(chatId);
         } else if (messageText.equals("/bonus")) {
             if (!featureService.canPerformBonus()) {
                 messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "message.feature_unavailable"));
                 return;
             }
-            messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
+//            messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
             bonusService.startBonus(chatId);
         } else if (state != null && state.startsWith("TOPUP_")) {
             topUpService.handleTextInput(chatId, messageText);
@@ -375,7 +375,7 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                         messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "message.feature_unavailable"));
                         return;
                     }
-                    messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
+//                    messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
                     topUpService.startTopUp(chatId);
                 }
                 case "WITHDRAW" -> {
@@ -383,7 +383,7 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                         messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "message.feature_unavailable"));
                         return;
                     }
-                    messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
+//                    messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
                     withdrawService.startWithdrawal(chatId);
                 }
                 case "BONUS" -> {
@@ -391,16 +391,16 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                         messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "message.feature_unavailable"));
                         return;
                     }
-                    messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
+//                    messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
                     bonusService.startBonus(chatId);
                 }
                 case "CONTACT" -> {
-                    messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
+//                    messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
                     contactService.handleContact(chatId);
                 }
                 case "HOME" -> sendMainMenu(chatId, true);
                 case "BACK" -> {
-                    messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "BACK");
+//                    messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "BACK");
                     String state = sessionService.getUserState(chatId);
                     if (state != null && state.startsWith("TOPUP_")) {
                         topUpService.handleBack(chatId);
@@ -424,7 +424,7 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                                 messageSender.editMessageToRemoveButtons(chatId, messageIds.get(messageIds.size() - 1));
                             }
                         } else {
-                            messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
+//                            messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
                         }
                         topUpService.handleCallback(chatId, callback);
                     } else if (callback.startsWith("WITHDRAW_")) {
@@ -432,14 +432,14 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                             messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "message.feature_unavailable"));
                             return;
                         }
-                        messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
+//                        messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
                         withdrawService.handleCallback(chatId, callback);
                     } else if (callback.startsWith("BONUS_")) {
                         if (!featureService.canPerformBonus()) {
                             messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "message.feature_unavailable"));
                             return;
                         }
-                        messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
+//                        messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
                         bonusService.handleCallback(chatId, callback);
                     } else {
                         logger.warn("Unknown callback for chatId {}: {}", chatId, callback);
@@ -458,7 +458,7 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
         adminChatRepository.save(adminChat);
         adminUpdateHandler.setUserInAdminState(chatId);
         // 1. Clear main bot session state
-        messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "HOME");
+//        messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "HOME");
         sessionService.clearSession(chatId);
         // 2. Open Admin Panel (delegates to AdminBotService, which sends the menu)
         adminBotService.sendMainMenu(chatId);
@@ -483,7 +483,7 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
 
     public void sendMainMenu(Long chatId, boolean clearSession) {
         if (clearSession) {
-            messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "HOME");
+//            messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "HOME");
             sessionService.clearSession(chatId);
         }
 
