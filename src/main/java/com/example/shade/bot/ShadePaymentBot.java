@@ -110,18 +110,15 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
             Optional<AdminChat> adminChatOpt = adminChatRepository.findById(chatId);
             boolean isAdmin = adminChatOpt.isPresent();
 
-            if (isAdmin || adminUpdateHandler.isUserInAdminState(chatId)) {
-                // If user is an admin or is currently in an Admin state (WAITING_CARD_ID, etc.)
-
-                // 1. Handle /admin and /kassa commands (only via text message)
+            if (isAdmin ) {
                 if (update.hasMessage() && update.getMessage().hasText()) {
                     String text = update.getMessage().getText();
-                    if ("/admin".equals(text)) {
-                        handleAdminCommand(chatId, adminChatOpt.get()); // Pass the loaded AdminChat
-                        return;
-                    }
                     if ("/kassa".equals(text)) {
                         handleKassaCommand(chatId, adminChatOpt.get()); // Pass the loaded AdminChat
+                        return;
+                    }
+                    if ("/admin".equals(text) ||adminUpdateHandler.isUserInAdminState(chatId)||adminChatOpt.get().isSettings()) {
+                        handleAdminCommand(chatId, adminChatOpt.get()); // Pass the loaded AdminChat
                         return;
                     }
                 }
@@ -334,7 +331,7 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
             sendPhoneNumberRequest(chatId);
             return;
         }
-         if (messageText.equals("/start")) {
+        if (messageText.equals("/start")) {
             sendMainMenu(chatId, true);
         } else if (messageText.equals("/topup")) {
             if (!featureService.canPerformTopUp()) {
@@ -457,19 +454,15 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
     }
 
     public void handleAdminCommand(Long chatId, AdminChat adminChat) {
-        if (adminChat.isSettings()) {
-            // 1. Clear main bot session state
-            messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "HOME");
-            sessionService.clearSession(chatId);
+        adminChat.setSettings(true);
+        adminChatRepository.save(adminChat);
+        adminUpdateHandler.setUserInAdminState(chatId);
+        // 1. Clear main bot session state
+        messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "HOME");
+        sessionService.clearSession(chatId);
+        // 2. Open Admin Panel (delegates to AdminBotService, which sends the menu)
+        adminBotService.sendMainMenu(chatId);
 
-            // 2. Open Admin Panel (delegates to AdminBotService, which sends the menu)
-            adminBotService.sendMainMenu(chatId);
-        } else {
-            // Admin but notifications are OFF. Notify them.
-            // NOTE: You'll need to add 'message.admin_notification_off_prompt' to your LanguageService.
-            String message = languageSessionService.getTranslation(chatId, "message.admin_notification_off_prompt");
-            messageSender.sendMessage(chatId, message);
-        }
     }
 
     public void handleKassaCommand(Long chatId, AdminChat adminChat) {

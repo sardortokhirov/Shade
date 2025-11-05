@@ -50,7 +50,7 @@ public class AdminBotService {
     private final UserRepository userRepository;
     private final MessageSender userMessageSender;
 
-    @Value("${telegram.admin.bot.token}")
+    @Value("${telegram.bot.username}")
     private String botToken;
 
     // Main menu

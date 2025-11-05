@@ -1,6 +1,5 @@
 package com.example.shade.config;
 
-import com.example.shade.bot.AdminBot;
 import com.example.shade.bot.AdminLogBot;
 import com.example.shade.bot.LottoLogBot;
 import com.example.shade.bot.ShadePaymentBot;
@@ -30,9 +29,6 @@ public class BotInitializer {
     private LottoLogBot lottoLogBot;
 
 
-    @Autowired
-    private AdminBot adminBot;
-
 
     @PostConstruct
     public void init() {
@@ -41,7 +37,6 @@ public class BotInitializer {
             botsApi.registerBot(adminLogBot); // ✅ Register second bot here
             botsApi.registerBot(shadePaymentBot);
             botsApi.registerBot(lottoLogBot);
-            botsApi.registerBot(adminBot);
             System.out.println("✅ Both bots started and registered successfully!");
         } catch (TelegramApiException e) {
             System.out.println("❌ Failed to register bots: " + e.getMessage());

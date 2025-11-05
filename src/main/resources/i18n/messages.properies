@@ -66,3 +66,8 @@ button.remove_tickets=Удалить билеты
 button.remove_bonus=Удалить бонус
 
 button.block_user=Заблокировать пользователя
+
+message.admin_notification_off_prompt=Уведомления администратора отключены. Хотите включить их?
+
+
+message.admin_bot_turned_off=Админ-бот выключен.

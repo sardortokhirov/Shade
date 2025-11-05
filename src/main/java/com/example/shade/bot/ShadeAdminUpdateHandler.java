@@ -23,6 +23,10 @@ public class ShadeAdminUpdateHandler { // Renamed and no longer extends Telegram
         return userStates.containsKey(chatId);
     }
 
+    public void setUserInAdminState(Long chatId) {
+         userStates.put(chatId,null);
+    }
+
     // Helper method for /kassa command
     public void clearAdminSession(Long chatId) {
         userStates.remove(chatId);
