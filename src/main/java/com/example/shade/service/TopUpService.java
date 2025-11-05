@@ -553,7 +553,7 @@ public class TopUpService {
                                 "💸 Miqdor: %,d RUB\n" +
                                 "💳 Karta: `%s`\n" +
                                 "🔐 Admin kartasi: `%s`\n" +
-                                "🎟️ Chiptalar: %d\n\n" +
+                                "🎟️ Chiptalar: %d (+ %d )\n\n" +
                                 "📅 [%s]",
                         request.getId(),
                         request.getPlatform(),
@@ -562,6 +562,7 @@ public class TopUpService {
                         rubAmount,
                         request.getCardNumber(),
                         adminCard.getCardNumber(),
+                        balance.getTickets(),
                         tickets,
                         LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
                 );
@@ -749,7 +750,7 @@ public class TopUpService {
                                 "💸 Miqdor: %,d RUB\n" +
                                 "💳 Karta: `%s`\n" +
                                 "🔐 Admin kartasi: `%s`\n" +
-                                "🎟️ Chiptalar: %d\n\n" +
+                                "🎟️ Chiptalar: %d (+ %d )\n\n" +
                                 "📅 [%s] ",
                         request.getId(),
                         request.getChatId(), number,
@@ -759,6 +760,7 @@ public class TopUpService {
                         rubAmount,
                         request.getCardNumber(),
                         adminCard.getCardNumber(),
+                        balance.getTickets(),
                         tickets,
                         LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
                 );
@@ -900,7 +902,7 @@ public class TopUpService {
                                 "💸 Miqdor: %,d RUB\n" +
                                 "💳 Karta: `%s`\n" +
                                 "🔐 Admin kartasi: `%s`\n" +
-                                "🎟️ Chiptalar: %d\n\n" +
+                                "🎟️ Chiptalar: %d (+ %d )\n\n" +
                                 "📅 [%s] ",
                         request.getId(),
                         request.getChatId(), number,
@@ -910,6 +912,7 @@ public class TopUpService {
                         rubAmount,
                         request.getCardNumber(),
                         adminCard.getCardNumber(),
+                        balance.getTickets(),
                         tickets,
                         LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
                 );
