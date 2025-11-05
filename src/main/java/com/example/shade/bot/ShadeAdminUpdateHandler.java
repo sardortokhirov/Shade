@@ -1,5 +1,6 @@
 package com.example.shade.bot;
 
+import com.example.shade.model.Platform;
 import com.example.shade.service.AdminBotService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,10 +14,11 @@ import java.util.Map;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class ShadeAdminUpdateHandler { // Renamed and no longer extends TelegramLongPollingBot
+public class ShadeAdminUpdateHandler {
 
     private final AdminBotService adminBotService;
-    private final Map<Long, BotState> userStates = new HashMap<>(); // Uses external BotState enum
+    private final AdminBotMessageSender adminBotMessageSender;
+    private final Map<Long, BotState> userStates = new HashMap<>();
     private final Map<Long, Map<String, Object>> userContext = new HashMap<>();
 
     public boolean isUserInAdminState(Long chatId) {
@@ -24,10 +26,9 @@ public class ShadeAdminUpdateHandler { // Renamed and no longer extends Telegram
     }
 
     public void setUserInAdminState(Long chatId) {
-         userStates.put(chatId,null);
+        userStates.put(chatId,null);
     }
 
-    // Helper method for /kassa command
     public void clearAdminSession(Long chatId) {
         userStates.remove(chatId);
         userContext.remove(chatId);
@@ -38,7 +39,7 @@ public class ShadeAdminUpdateHandler { // Renamed and no longer extends Telegram
                 return handleMessage(update);
             } else if (update.hasCallbackQuery()) {
                 handleCallbackQuery(update);
-                return true; // Callbacks are always considered handled if processed
+                return true;
             }
         } catch (Exception e) {
             log.error("Error processing admin update", e);
@@ -47,42 +48,44 @@ public class ShadeAdminUpdateHandler { // Renamed and no longer extends Telegram
     }
 
 
-
     private boolean  handleMessage(Update update) {
         Long chatId = update.getMessage().getChatId();
 
-        // Handle /start command
         if (update.getMessage().hasText() && ("/admin".equals(update.getMessage().getText()) || "/kassa".equals(update.getMessage().getText()))) {
             return false;
         }
 
         BotState state = userStates.get(chatId);
+
+        // FIX: If state is null, and it's a text message (but not /admin or /kassa),
+        // we assume the user typed something unexpected. Send them back to the main menu.
         if (state == null) {
+            if (update.getMessage().hasText()) {
+                // Clear any leftover state just in case
+                clearAdminSession(chatId);
+                // Send back to main menu
+                adminBotService.sendMainMenu(chatId);
+                return true; // We handled it by navigating home
+            }
             return false;
         }
 
 
-        // If waiting for message to forward, accept any message type
         if (state == BotState.WAITING_FORWARD_MESSAGE) {
             Map<String, Object> context = userContext.getOrDefault(chatId, new HashMap<>());
             context.put("message", update.getMessage());
             userContext.put(chatId, context);
             userStates.put(chatId, BotState.WAITING_FORWARD_CONFIRMATION);
             adminBotService.requestForwardConfirmation(chatId, update.getMessage());
-            return false;
+            return true;
         }
 
-        // For other states, only process text messages
         if (update.getMessage().hasText()) {
             String text = update.getMessage().getText();
-            if (state != null) {
-                handleStateInput(chatId, text, state);
-            }
+            handleStateInput(chatId, text, state);
         } else {
-            // If not in WAITING_FORWARD_MESSAGE state and received non-text, inform user
-            if (state != null) {
-                adminBotService.requestInput(chatId, "❌ Iltimos, matn kiriting.");
-            }
+            // If in a state (not WAITING_FORWARD_MESSAGE) and received non-text, prompt for text
+            adminBotService.requestInput(chatId, "❌ Iltimos, matn kiriting.");
         }
         return true;
     }
@@ -132,21 +135,55 @@ public class ShadeAdminUpdateHandler { // Renamed and no longer extends Telegram
                 adminBotService.requestInput(chatId, "Platforma ID sini kiriting:");
             }
             case "platform_create" -> {
-                userStates.put(chatId, BotState.WAITING_PLATFORM_NAME);
+                userStates.put(chatId, BotState.WAITING_PLATFORM_TYPE);
                 userContext.put(chatId, new HashMap<>());
-                adminBotService.requestInput(chatId, "Platforma nomini kiriting:");
+                adminBotMessageSender.sendPlatformTypeSelection(chatId);
+            }
+            case "platform_type_common" -> {
+                Map<String, Object> context = userContext.getOrDefault(chatId, new HashMap<>());
+                context.put("type", "common");
+                userContext.put(chatId, context);
+                userStates.put(chatId, BotState.WAITING_PLATFORM_NAME);
+                adminBotService.requestInput(chatId, "Platforma nomini kiriting (common):");
+            }
+            case "platform_type_mostbet" -> {
+                Map<String, Object> context = userContext.getOrDefault(chatId, new HashMap<>());
+                context.put("type", "mostbet");
+                userContext.put(chatId, context);
+                userStates.put(chatId, BotState.WAITING_PLATFORM_NAME);
+                adminBotService.requestInput(chatId, "Platforma nomini kiriting (mostbet):");
             }
             case "platform_currency_RUB" -> {
                 Map<String, Object> context = userContext.get(chatId);
                 context.put("currency", "RUB");
-                userStates.put(chatId, BotState.WAITING_PLATFORM_API_KEY);
-                adminBotService.requestInput(chatId, "API Key kiriting:");
+                String type = (String) context.get("type");
+
+                if ("common".equalsIgnoreCase(type)) {
+                    userStates.put(chatId, BotState.WAITING_PLATFORM_API_KEY);
+                    adminBotService.requestInput(chatId, "API Key kiriting:");
+                } else if ("mostbet".equalsIgnoreCase(type)) {
+                    userStates.put(chatId, BotState.WAITING_PLATFORM_API_KEY);
+                    adminBotService.requestInput(chatId, "API Key kiriting:");
+                } else {
+                    log.error("Platform type not set in context: {}", chatId);
+                    adminBotService.sendPlatformsMenu(chatId);
+                }
             }
             case "platform_currency_UZS" -> {
                 Map<String, Object> context = userContext.get(chatId);
                 context.put("currency", "UZS");
-                userStates.put(chatId, BotState.WAITING_PLATFORM_API_KEY);
-                adminBotService.requestInput(chatId, "API Key kiriting:");
+                String type = (String) context.get("type");
+
+                if ("common".equalsIgnoreCase(type)) {
+                    userStates.put(chatId, BotState.WAITING_PLATFORM_API_KEY);
+                    adminBotService.requestInput(chatId, "API Key kiriting:");
+                } else if ("mostbet".equalsIgnoreCase(type)) {
+                    userStates.put(chatId, BotState.WAITING_PLATFORM_API_KEY);
+                    adminBotService.requestInput(chatId, "API Key kiriting:");
+                } else {
+                    log.error("Platform type not set in context: {}", chatId);
+                    adminBotService.sendPlatformsMenu(chatId);
+                }
             }
             case "platform_update" -> {
                 userStates.put(chatId, BotState.WAITING_PLATFORM_UPDATE_ID);
@@ -249,8 +286,10 @@ public class ShadeAdminUpdateHandler { // Renamed and no longer extends Telegram
 
     private void handleStateInput(Long chatId, String text, BotState state) {
         Map<String, Object> context = userContext.getOrDefault(chatId, new HashMap<>());
+        String type = (String) context.get("type");
 
         switch (state) {
+            // Card States
             case WAITING_CARD_ID -> {
                 adminBotService.getCardById(chatId, text);
                 userStates.remove(chatId);
@@ -268,7 +307,6 @@ public class ShadeAdminUpdateHandler { // Renamed and no longer extends Telegram
             case WAITING_CARD_BALANCE -> {
                 context.put("balance", text);
                 adminBotService.sendPaymentSystemSelection(chatId);
-                // State will be set when payment system is selected
             }
             case WAITING_CARD_OSON_ID -> {
                 context.put("osonConfigId", text);
@@ -304,19 +342,33 @@ public class ShadeAdminUpdateHandler { // Renamed and no longer extends Telegram
                 userStates.remove(chatId);
             }
 
+            // Platform States
             case WAITING_PLATFORM_ID -> {
                 adminBotService.getPlatformById(chatId, text);
                 userStates.remove(chatId);
             }
+            case WAITING_PLATFORM_TYPE -> {
+                adminBotMessageSender.sendPlatformTypeSelection(chatId);
+            }
             case WAITING_PLATFORM_NAME -> {
                 context.put("name", text);
                 adminBotService.sendCurrencySelection(chatId);
-                // State will be set when currency is selected
             }
             case WAITING_PLATFORM_API_KEY -> {
                 context.put("apiKey", text);
-                userStates.put(chatId, BotState.WAITING_PLATFORM_LOGIN);
-                adminBotService.requestInput(chatId, "Login kiriting:");
+
+                if ("common".equalsIgnoreCase(type)) {
+                    userStates.put(chatId, BotState.WAITING_PLATFORM_LOGIN);
+                    adminBotService.requestInput(chatId, "Login kiriting:");
+                } else if ("mostbet".equalsIgnoreCase(type)) {
+                    userStates.put(chatId, BotState.WAITING_PLATFORM_SECRET);
+                    adminBotService.requestInput(chatId, "Secret kiriting:");
+                }
+            }
+            case WAITING_PLATFORM_SECRET -> {
+                context.put("secret", text);
+                userStates.put(chatId, BotState.WAITING_PLATFORM_WORKPLACE_ID_mostbet);
+                adminBotService.requestInput(chatId, "Workplace ID kiriting:");
             }
             case WAITING_PLATFORM_LOGIN -> {
                 context.put("login", text);
@@ -335,10 +387,26 @@ public class ShadeAdminUpdateHandler { // Renamed and no longer extends Telegram
                 userStates.remove(chatId);
                 userContext.remove(chatId);
             }
+            case WAITING_PLATFORM_WORKPLACE_ID_mostbet -> {
+                context.put("workplaceId", text);
+                userContext.put(chatId, context);
+                adminBotService.createPlatform(chatId, context);
+                userStates.remove(chatId);
+                userContext.remove(chatId);
+            }
+
+            // Platform Update States
             case WAITING_PLATFORM_UPDATE_ID -> {
-                context.put("updatePlatformId", text);
-                userStates.put(chatId, BotState.WAITING_PLATFORM_UPDATE_NAME);
-                adminBotService.requestInput(chatId, "Yangi platforma nomini kiriting:");
+                try {
+                    Long platformId = Long.parseLong(text);
+                    Platform platform = adminBotService.getPlatformById(platformId);
+                    context.put("updatePlatformId", text);
+                    context.put("type", platform.getType());
+                    userStates.put(chatId, BotState.WAITING_PLATFORM_UPDATE_NAME);
+                    adminBotService.requestInput(chatId, "Yangi platforma nomini kiriting:");
+                } catch (Exception e) {
+                    adminBotService.requestInput(chatId, "❌ Noto'g'ri ID. Yangilanadigan platforma ID sini kiriting:");
+                }
             }
             case WAITING_PLATFORM_UPDATE_NAME -> {
                 context.put("name", text);
@@ -347,21 +415,39 @@ public class ShadeAdminUpdateHandler { // Renamed and no longer extends Telegram
             }
             case WAITING_PLATFORM_UPDATE_API_KEY -> {
                 context.put("apiKey", text);
-                userStates.put(chatId, BotState.WAITING_PLATFORM_UPDATE_LOGIN);
-                adminBotService.requestInput(chatId, "Yangi Login kiriting:");
-            }
-            case WAITING_PLATFORM_UPDATE_LOGIN -> {
-                context.put("login", text);
-                userStates.put(chatId, BotState.WAITING_PLATFORM_UPDATE_PASSWORD);
-                adminBotService.requestInput(chatId, "Yangi Password kiriting:");
-            }
-            case WAITING_PLATFORM_UPDATE_PASSWORD -> {
-                context.put("password", text);
                 userStates.put(chatId, BotState.WAITING_PLATFORM_UPDATE_WORKPLACE_ID);
                 adminBotService.requestInput(chatId, "Yangi Workplace ID kiriting:");
             }
             case WAITING_PLATFORM_UPDATE_WORKPLACE_ID -> {
                 context.put("workplaceId", text);
+                String updateType = (String) context.get("type");
+
+                if ("common".equalsIgnoreCase(updateType)) {
+                    userStates.put(chatId, BotState.WAITING_PLATFORM_UPDATE_LOGIN);
+                    adminBotService.requestInput(chatId, "Yangi Login kiriting:");
+                } else if ("mostbet".equalsIgnoreCase(updateType)) {
+                    userStates.put(chatId, BotState.WAITING_PLATFORM_UPDATE_SECRET);
+                    adminBotService.requestInput(chatId, "Yangi Secret kiriting (o'zgartirmasangiz - 'SKIP'):");
+                } else {
+                    adminBotService.updatePlatform(chatId, context);
+                    userStates.remove(chatId);
+                    userContext.remove(chatId);
+                }
+            }
+            case WAITING_PLATFORM_UPDATE_LOGIN -> {
+                context.put("login", text);
+                userStates.put(chatId, BotState.WAITING_PLATFORM_UPDATE_PASSWORD);
+                adminBotService.requestInput(chatId, "Yangi Password kiriting (o'zgartirmasangiz - 'SKIP'):");
+            }
+            case WAITING_PLATFORM_UPDATE_PASSWORD -> {
+                context.put("password", "SKIP".equalsIgnoreCase(text) ? null : text);
+                userContext.put(chatId, context);
+                adminBotService.updatePlatform(chatId, context);
+                userStates.remove(chatId);
+                userContext.remove(chatId);
+            }
+            case WAITING_PLATFORM_UPDATE_SECRET -> {
+                context.put("secret", "SKIP".equalsIgnoreCase(text) ? null : text);
                 userContext.put(chatId, context);
                 adminBotService.updatePlatform(chatId, context);
                 userStates.remove(chatId);
@@ -372,6 +458,7 @@ public class ShadeAdminUpdateHandler { // Renamed and no longer extends Telegram
                 userStates.remove(chatId);
             }
 
+            // OsonConfig States
             case WAITING_OSON_ID -> {
                 adminBotService.getOsonConfigById(chatId, text);
                 userStates.remove(chatId);
@@ -454,11 +541,13 @@ public class ShadeAdminUpdateHandler { // Renamed and no longer extends Telegram
                 userStates.remove(chatId);
             }
 
+            // Exchange rate States
             case WAITING_EXCHANGE_RATE -> {
                 adminBotService.updateExchangeRate(chatId, text);
                 userStates.remove(chatId);
             }
 
+            // Lottery States
             case WAITING_LOTTERY_PRIZE_NAME -> {
                 context.put("prizeName", text);
                 userStates.put(chatId, BotState.WAITING_LOTTERY_PRIZE_AMOUNT);
@@ -522,6 +611,7 @@ public class ShadeAdminUpdateHandler { // Renamed and no longer extends Telegram
                 userContext.remove(chatId);
             }
 
+            // Message Forwarding States
             case WAITING_FORWARD_CONFIRMATION -> {
                 if ("ha".equalsIgnoreCase(text) || "yes".equalsIgnoreCase(text)) {
                     adminBotService.confirmAndForwardMessage(chatId, context);
@@ -550,17 +640,21 @@ public class ShadeAdminUpdateHandler { // Renamed and no longer extends Telegram
 
         // Platform states
         WAITING_PLATFORM_ID,
+        WAITING_PLATFORM_TYPE,
         WAITING_PLATFORM_NAME,
         WAITING_PLATFORM_API_KEY,
+        WAITING_PLATFORM_SECRET,
         WAITING_PLATFORM_LOGIN,
         WAITING_PLATFORM_PASSWORD,
         WAITING_PLATFORM_WORKPLACE_ID,
+        WAITING_PLATFORM_WORKPLACE_ID_mostbet,
         WAITING_PLATFORM_UPDATE_ID,
         WAITING_PLATFORM_UPDATE_NAME,
         WAITING_PLATFORM_UPDATE_API_KEY,
+        WAITING_PLATFORM_UPDATE_WORKPLACE_ID,
         WAITING_PLATFORM_UPDATE_LOGIN,
         WAITING_PLATFORM_UPDATE_PASSWORD,
-        WAITING_PLATFORM_UPDATE_WORKPLACE_ID,
+        WAITING_PLATFORM_UPDATE_SECRET,
         WAITING_PLATFORM_DELETE_ID,
 
         // OsonConfig states

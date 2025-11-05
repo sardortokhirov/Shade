@@ -285,23 +285,44 @@ public class AdminBotService {
         }
     }
 
+    // Getter for use in handler (if needed for type check during update)
+    public Platform getPlatformById(Long platformId) {
+        return platformRepository.findById(platformId)
+                .orElseThrow(() -> new RuntimeException("Platforma topilmadi"));
+    }
+
     @Transactional
     public void createPlatform(Long chatId, Map<String, Object> context) {
         try {
+            String type = (String) context.get("type");
             String name = (String) context.get("name");
             String apiKey = (String) context.get("apiKey");
-            String login = (String) context.get("login");
-            String password = (String) context.get("password");
-            String workplaceId = (String) context.get("workplaceId");
             Currency currency = Currency.valueOf((String) context.get("currency"));
+            String workplaceId = (String) context.get("workplaceId");
 
             Platform platform = new Platform();
+            platform.setType(type);
             platform.setName(name);
             platform.setApiKey(apiKey);
-            platform.setLogin(login);
-            platform.setPassword(password);
-            platform.setWorkplaceId(workplaceId);
             platform.setCurrency(currency);
+            platform.setWorkplaceId(workplaceId);
+
+            if ("COMMON".equalsIgnoreCase(type)) {
+                String login = (String) context.get("login");
+                String password = (String) context.get("password");
+
+                platform.setLogin(login);
+                platform.setPassword(password);
+                platform.setSecret(null); // Ensure unused field is null
+            } else if ("MOSTBET".equalsIgnoreCase(type)) {
+                String secret = (String) context.get("secret");
+
+                platform.setSecret(secret);
+                platform.setLogin(null); // Ensure unused fields are null
+                platform.setPassword(null);
+            } else {
+                throw new IllegalArgumentException("Unknown platform type: " + type);
+            }
 
             platformRepository.save(platform);
             messageSender.sendTextMessage(chatId, "✅ Platforma muvaffaqiyatli qo'shildi!\nID: " + platform.getId());
@@ -318,8 +339,6 @@ public class AdminBotService {
             Long platformId = Long.parseLong((String) context.get("updatePlatformId"));
             String name = (String) context.get("name");
             String apiKey = (String) context.get("apiKey");
-            String login = (String) context.get("login");
-            String password = (String) context.get("password");
             String workplaceId = (String) context.get("workplaceId");
 
             Platform platform = platformRepository.findById(platformId)
@@ -327,9 +346,25 @@ public class AdminBotService {
 
             platform.setName(name);
             platform.setApiKey(apiKey);
-            platform.setLogin(login);
-            platform.setPassword(password);
             platform.setWorkplaceId(workplaceId);
+
+            if ("COMMON".equalsIgnoreCase(platform.getType())) {
+                String login = (String) context.get("login");
+                String password = (String) context.get("password");
+
+                platform.setLogin(login);
+                // Only update password if a new value (not null/SKIP) is provided
+                if (password != null && !password.isEmpty()) {
+                    platform.setPassword(password);
+                }
+            } else if ("MOSTBET".equalsIgnoreCase(platform.getType())) {
+                String secret = (String) context.get("secret");
+
+                // Only update secret if a new value (not null/SKIP) is provided
+                if (secret != null && !secret.isEmpty()) {
+                    platform.setSecret(secret);
+                }
+            }
 
             platformRepository.save(platform);
             messageSender.sendTextMessage(chatId, "✅ Platforma muvaffaqiyatli yangilandi!");
@@ -496,8 +531,8 @@ public class AdminBotService {
     public void getLatestExchangeRate(Long chatId) {
         try {
             Double rate = exchangeRateService.getLatestRate();
-            messageSender.sendTextMessage(chatId, 
-                String.format("💱 Joriy valyuta kursi:\n\n1 rub = %.2f UZS", rate));
+            messageSender.sendTextMessage(chatId,
+                    String.format("💱 Joriy valyuta kursi:\n\n1 rub = %.2f UZS", rate));
         } catch (Exception e) {
             log.error("Error getting exchange rate", e);
             messageSender.sendTextMessage(chatId, "❌ Xatolik yuz berdi: " + e.getMessage());
@@ -509,8 +544,8 @@ public class AdminBotService {
         try {
             Double rate = Double.parseDouble(rateStr);
             exchangeRateService.updateRate(rate);
-            messageSender.sendTextMessage(chatId, 
-                String.format("✅ Valyuta kursi yangilandi!\n\n1 RUB = %.2f UZS", rate));
+            messageSender.sendTextMessage(chatId,
+                    String.format("✅ Valyuta kursi yangilandi!\n\n1 RUB = %.2f UZS", rate));
             sendExchangeRateMenu(chatId);
         } catch (NumberFormatException e) {
             messageSender.sendTextMessage(chatId, "❌ Noto'g'ri format. Masalan: 12750.50");
@@ -664,9 +699,9 @@ public class AdminBotService {
 
     // ========== MESSAGE FORWARDING ==========
     public void requestForwardConfirmation(Long chatId, Message message) {
-        messageSender.sendTextMessage(chatId, 
-            "📨 Ushbu xabarni barcha foydalanuvchilarga yuborishni xohlaysizmi?\n\n" +
-            "Tasdiqlash uchun 'ha' yoki 'yes' deb yozing:");
+        messageSender.sendTextMessage(chatId,
+                "📨 Ushbu xabarni barcha foydalanuvchilarga yuborishni xohlaysizmi?\n\n" +
+                        "Tasdiqlash uchun 'ha' yoki 'yes' deb yozing:");
     }
 
     @Transactional
@@ -718,11 +753,11 @@ public class AdminBotService {
                 }
             }
 
-            messageSender.sendTextMessage(chatId, 
-                String.format("✅ Xabar yuborish yakunlandi!\n\n" +
-                    "✔️ Muvaffaqiyatli: %d\n" +
-                    "❌ Xato: %d\n" +
-                    "📊 Jami: %d", successCount, failCount, users.size()));
+            messageSender.sendTextMessage(chatId,
+                    String.format("✅ Xabar yuborish yakunlandi!\n\n" +
+                            "✔️ Muvaffaqiyatli: %d\n" +
+                            "❌ Xato: %d\n" +
+                            "📊 Jami: %d", successCount, failCount, users.size()));
 
             // Show main menu after completion
             sendMainMenu(chatId);

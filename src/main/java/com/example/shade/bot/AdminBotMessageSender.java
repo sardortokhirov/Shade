@@ -243,16 +243,51 @@ public class AdminBotMessageSender {
         }
     }
 
+    // NEW METHOD FOR PLATFORM TYPE SELECTION
+    public void sendPlatformTypeSelection(Long chatId) {
+        SendMessage message = new SendMessage();
+        message.setChatId(chatId.toString());
+        message.setText("Platforma turini tanlang:");
+
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        rows.add(createRow("⚙️ common", "platform_type_common"));
+        rows.add(createRow("🎰 mostbet", "platform_type_mostbet"));
+
+        rows.add(createRow("🔙 Ortga", "platforms_menu")); // Add back button
+
+        keyboard.setKeyboard(rows);
+        message.setReplyMarkup(keyboard);
+
+        try {
+            shadePaymentBot.execute(message);
+        } catch (TelegramApiException e) {
+            log.error("Error sending platform type selection", e);
+        }
+    }
+
     public void sendPlatformsList(Long chatId, List<Platform> platforms) {
         StringBuilder text = new StringBuilder("🌐 Platformalar:\n\n");
 
         for (Platform platform : platforms) {
             text.append("🆔 ID: ").append(platform.getId()).append("\n");
             text.append("📛 Nomi: ").append(platform.getName()).append("\n");
+            text.append("📊 Turi: ").append(platform.getType()).append("\n");
             text.append("💱 Valyuta: ").append(platform.getCurrency()).append("\n");
             text.append("🔑 API Key: ").append(maskPassword(platform.getApiKey())).append("\n");
-            text.append("👤 Login: ").append(platform.getLogin()).append("\n");
-            text.append("🏢 Workplace ID: ").append(platform.getWorkplaceId()).append("\n\n");
+
+            // Display fields based on type
+            if ("mostbet".equalsIgnoreCase(platform.getType())) {
+                text.append("🔒 Secret: ").append(maskPassword(platform.getSecret())).append("\n");
+            } else { // common
+                text.append("👤 Login: ").append(platform.getLogin()).append("\n");
+            }
+
+            if (platform.getWorkplaceId() != null) {
+                text.append("🏢 Workplace ID: ").append(platform.getWorkplaceId()).append("\n");
+            }
+            text.append("\n");
         }
 
         sendTextMessage(chatId, text.toString());
@@ -262,10 +297,17 @@ public class AdminBotMessageSender {
         StringBuilder text = new StringBuilder("🌐 Platforma ma'lumotlari:\n\n");
         text.append("🆔 ID: ").append(platform.getId()).append("\n");
         text.append("📛 Nomi: ").append(platform.getName()).append("\n");
+        text.append("📊 Turi: ").append(platform.getType()).append("\n");
         text.append("💱 Valyuta: ").append(platform.getCurrency()).append("\n");
         text.append("🔑 API Key: ").append(maskPassword(platform.getApiKey())).append("\n");
-        text.append("👤 Login: ").append(platform.getLogin()).append("\n");
-        text.append("🔐 Password: ").append(maskPassword(platform.getPassword())).append("\n");
+
+        if ("mostbet".equalsIgnoreCase(platform.getType())) {
+            text.append("🔒 Secret: ").append(maskPassword(platform.getSecret())).append("\n");
+        } else { // common
+            text.append("👤 Login: ").append(platform.getLogin()).append("\n");
+            text.append("🔐 Password: ").append(maskPassword(platform.getPassword())).append("\n");
+        }
+
         text.append("🏢 Workplace ID: ").append(platform.getWorkplaceId()).append("\n");
 
         sendTextMessage(chatId, text.toString());

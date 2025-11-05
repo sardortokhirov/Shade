@@ -117,7 +117,7 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                         handleKassaCommand(chatId, adminChatOpt.get()); // Pass the loaded AdminChat
                         return;
                     }
-                    if ("/admin".equals(text) ||adminUpdateHandler.isUserInAdminState(chatId)||adminChatOpt.get().isSettings()) {
+                    if ("/admin".equals(text) ) {
                         handleAdminCommand(chatId, adminChatOpt.get()); // Pass the loaded AdminChat
                         return;
                     }
