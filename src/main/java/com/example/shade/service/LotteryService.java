@@ -13,6 +13,7 @@ import com.example.shade.repository.UserBalanceRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -281,6 +282,20 @@ public class LotteryService {
             logger.info("Awarded {} UZS to chatId {}", amount, chatId);
         }
     }
+
+
+    public List<Long> getAllApprovedUsersChatIds() {
+        return hizmatRequestRepository.findDistinctChatIdsByStatusApproved();
+    }
+
+
+    public Page<UserBalance> getUserBalancesPaginated(int page, int size, String sortBy, String sortDirection) {
+        Sort.Direction direction = Sort.Direction.fromString(sortDirection.toUpperCase());
+        Sort sort = Sort.by(direction, sortBy);
+        Pageable pageable = PageRequest.of(page, size, sort);
+        return userBalanceRepository.findAll(pageable);
+    }
+
 
     private InlineKeyboardMarkup backButtonKeyboard(Long chatId) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();

@@ -75,4 +75,7 @@ public interface HizmatRequestRepository extends JpaRepository<HizmatRequest, Lo
             @Param("platform") String platform,
             @Param("platformUserId") String platformUserId,
             @Param("status") RequestStatus status);
+
+    @Query("SELECT DISTINCT h.chatId FROM HizmatRequest h WHERE h.status = 'APPROVED'")
+    List<Long> findDistinctChatIdsByStatusApproved();
 }

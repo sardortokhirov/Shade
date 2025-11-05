@@ -5,6 +5,7 @@ import com.example.shade.model.UserBalance;
 import com.example.shade.repository.LotteryPrizeRepository;
 import com.example.shade.service.LotteryService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -126,6 +127,35 @@ public class LotteryController {
             return ResponseEntity.ok().build();
         } catch (IllegalStateException e) {
             return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/lottery/approved-users-chatids")
+    public ResponseEntity<List<Long>> getApprovedUsersChatIds(HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+        List<Long> chatIds = lotteryService.getAllApprovedUsersChatIds();
+        return ResponseEntity.ok(chatIds);
+    }
+
+    // NEW ENDPOINT 2: Get user balances with pagination
+    @GetMapping("/lottery/balances")
+    public ResponseEntity<Page<UserBalance>> getUserBalancesPaginated(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "chatId") String sortBy,
+            @RequestParam(defaultValue = "ASC") String sortDirection,
+            HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+        try {
+            Page<UserBalance> balances = lotteryService.getUserBalancesPaginated(page, size, sortBy, sortDirection);
+            return ResponseEntity.ok(balances);
+        } catch (IllegalArgumentException e) {
+            // Catches invalid sortDirection value (e.g., if it's not "ASC" or "DESC")
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         }
     }
 }
