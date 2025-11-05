@@ -25,7 +25,7 @@ public class HumoService {
     private final RestTemplate restTemplate  = new RestTemplate();
 
     public ResponseEntity<Object> forwardRequest(String path, HttpMethod method, HttpServletRequest request) {
-        String targetUrl = "http://localhost:2806" + path;
+        String targetUrl = "http://localhost:2805" + path;
         HttpHeaders headers = new HttpHeaders();
         Enumeration<String> headerNames = request.getHeaderNames();
         while (headerNames.hasMoreElements()) {
@@ -58,7 +58,7 @@ public class HumoService {
     }
 
     public boolean verifyPaymentAmount(Long uniqueAmount) {
-        String targetUrl = "http://localhost:2806/last_transactions?amount=" + uniqueAmount;
+        String targetUrl = "http://localhost:2805/last_transactions?amount=" + uniqueAmount;
         try {
             ResponseEntity<Map> response = restTemplate.getForEntity(targetUrl, Map.class);
             Map<String, Object> body = response.getBody();
