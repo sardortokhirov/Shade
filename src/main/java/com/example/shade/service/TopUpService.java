@@ -527,7 +527,7 @@ public class TopUpService {
             if (platform.getType().equals("mostbet")){
                 transferSuccessful=mostbetService.transferToPlatform(request);
             }else {
-                 transferToPlatform(request, adminCard);
+                transferSuccessful=transferToPlatform(request, adminCard);
             }
             if (transferSuccessful != null) {
                 UserBalance balance = userBalanceRepository.findById(chatId)
@@ -721,7 +721,7 @@ public class TopUpService {
             if (platform.getType().equals("mostbet")){
                 transferSuccessful=mostbetService.transferToPlatform(request);
             }else {
-                transferToPlatform(request, adminCard);
+                transferSuccessful=transferToPlatform(request, adminCard);
             }
             if (transferSuccessful != null) {
                 UserBalance balance = userBalanceRepository.findById(request.getChatId())
@@ -872,7 +872,7 @@ public class TopUpService {
                     throw new RuntimeException(e);
                 }
             }else {
-                transferToPlatform(request, adminCard);
+                transferSuccessful= transferToPlatform(request, adminCard);
             }
             if (transferSuccessful != null) {
                 UserBalance balance = userBalanceRepository.findById(requestId)
