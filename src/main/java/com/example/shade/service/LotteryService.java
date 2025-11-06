@@ -2,10 +2,7 @@ package com.example.shade.service;
 
 import com.example.shade.bot.AdminTelegramMessageSender;
 import com.example.shade.bot.MessageSender;
-import com.example.shade.model.HizmatRequest;
-import com.example.shade.model.LotteryPrize;
-import com.example.shade.model.RequestStatus;
-import com.example.shade.model.UserBalance;
+import com.example.shade.model.*;
 import com.example.shade.repository.BlockedUserRepository;
 import com.example.shade.repository.HizmatRequestRepository;
 import com.example.shade.repository.LotteryPrizeRepository;
@@ -27,12 +24,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -251,38 +243,49 @@ public class LotteryService {
 
         // Update balances and send notifications
         for (Long chatId : selectedChatIds) {
-            UserBalance balance = userBalanceRepository.findById(chatId)
-                    .orElse(UserBalance.builder()
-                            .chatId(chatId)
-                            .tickets(0L)
-                            .balance(BigDecimal.ZERO)
-                            .build());
-            balance.setBalance(balance.getBalance().add(awardAmount));
-            userBalanceRepository.save(balance);
-            String messageText = String.format(
-                    languageSessionService.getTranslation(chatId, "lottery.message.award_notification"),
-                    amount, balance.getBalance().longValue(),
-                    LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-            );
+            try {
+                UserBalance balance = userBalanceRepository.findById(chatId)
+                        .orElseGet(() -> {
+                            UserBalance newBalance = UserBalance.builder()
+                                    .chatId(chatId)
+                                    .tickets(0L)
+                                    .balance(BigDecimal.ZERO)
+                                    .build();
+                            return userBalanceRepository.save(newBalance); // Save new if missing
+                        });
+                balance.setBalance(balance.getBalance().add(awardAmount));
+                userBalanceRepository.save(balance);
 
-            SendMessage message = new SendMessage();
-            message.setChatId(chatId);
-            message.setText(messageText);
-            message.setReplyMarkup(backButtonKeyboard(chatId));
-            messageSender.sendMessage(message, chatId);
-            String number = blockedUserRepository.findByChatId(chatId).get().getPhoneNumber();
+                String messageText = String.format(
+                        languageSessionService.getTranslation(chatId, "lottery.message.award_notification"),
+                        amount, balance.getBalance().longValue(),
+                        LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+                );
 
-            adminLogBotService.sendToAdmins("#Кунлик бонусда голиб болганлар\n\n" +
-                    "Kunlik bonus: " + amount + " \n" +
-                    "Balans: " + balance.getBalance().longValue() + "\n" +
-                    "User ID: " + chatId + "\n" +
-                    "Telefon nomer:" + number + "\n\n" +
-                    "\uD83D\uDCC5 " + LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-            );
-            logger.info("Awarded {} UZS to chatId {}", amount, chatId);
+                SendMessage message = new SendMessage();
+                message.setChatId(chatId);
+                message.setText(messageText);
+                message.setReplyMarkup(backButtonKeyboard(chatId));
+                messageSender.sendMessage(message, chatId);
+
+                // Safe phone fetch
+                Optional<BlockedUser> blockedUserOpt = blockedUserRepository.findByChatId(chatId);
+                String number = blockedUserOpt.map(BlockedUser::getPhoneNumber).orElse("N/A");
+
+                adminLogBotService.sendToAdmins("#Кунлик бонусда голиб болганлар\n\n" +
+                        "Kunlik bonus: " + amount + " \n" +
+                        "Balans: " + balance.getBalance().longValue() + "\n" +
+                        "User ID: " + chatId + "\n" +
+                        "Telefon nomer: " + number + "\n\n" +
+                        "\uD83D\uDCC5 " + LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+                );
+                logger.info("Awarded {} UZS to chatId {}", amount, chatId);
+            } catch (Exception e) { // Catch Telegram/DB errors
+                logger.error("Failed to award/notify chatId {}: {}", chatId, e.getMessage());
+                // Optionally: Retry logic or mark as failed in DB
+            }
         }
     }
-
 
     public List<Long> getAllApprovedUsersChatIds() {
         return hizmatRequestRepository.findDistinctChatIdsByStatusApproved();
