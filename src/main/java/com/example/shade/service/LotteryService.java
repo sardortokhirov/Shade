@@ -140,7 +140,7 @@ public class LotteryService {
         balance.setTickets(balance.getTickets() - numberOfPlays);
         balance.setBalance(balance.getBalance().add(totalWinnings));
         userBalanceRepository.save(balance);
-        if (totalWinnings.longValue() >= 20000) {
+        if (totalWinnings.longValue() >= 3600) {
             lottoBotService.logWin(numberOfPlays, chatId, totalWinnings.longValue());
         }
         logger.info("Played {} tickets for chatId {}, won {} times with total {} UZS", numberOfPlays, chatId, winnings.size(), totalWinnings);
