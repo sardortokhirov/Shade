@@ -33,7 +33,6 @@ public class LottoMessageSender {
         SendMessage message = new SendMessage();
         message.setChatId(chatId.toString());
         message.setText(text);
-        message.setParseMode("Markdown");
 
         InlineKeyboardMarkup inlineMarkup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
