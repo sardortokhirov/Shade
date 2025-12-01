@@ -575,7 +575,7 @@ public class TopUpService {
                                 "💸 Miqdor: %,d RUB\n" +
                                 "💳 Karta: `%s`\n" +
                                 "\uD83D\uDCB3 Bizniki: `%s`\n" +
-                                "🎟️ Chiptalar: %d\n\n" +
+                                "🎟️ Chiptalar: %d (+ %d )\n\n" +
                                 "\uD83C\uDFE6: %,d %s\n\n" +
                                 "📅 [%s]",
                         request.getId(),
@@ -587,6 +587,7 @@ public class TopUpService {
                         rubAmount,
                         request.getCardNumber(),
                         adminCard.getCardNumber(),
+                        balance.getTickets(),
                         tickets,
                         transferSuccessful.getLimit().longValue(),
                         request.getCurrency().toString(),
