@@ -74,3 +74,5 @@ message.admin_bot_turned_off=Админ-бот выключен.
 message.tickets_added_success=✅ Билеты успешно добавлены!
 message.balance_deleted_success=✅ Баланс успешно удален!
 message.tickets_deleted_success=✅ Билеты успешно удалены!
+
+button.lottery_play=Играть
