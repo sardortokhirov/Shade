@@ -48,9 +48,9 @@ public class BonusService {
     private final MostbetService mostbetService;
     private final LanguageSessionService languageSessionService; // Injected bean
     private final RestTemplate restTemplate = new RestTemplate();
-    private static final BigDecimal MINIMUM_TOPUP = new BigDecimal("10000");
+    private static final BigDecimal MINIMUM_TOPUP = new BigDecimal("3600");
     private static final BigDecimal MAXIMUM_TOPUP = new BigDecimal("10000000");
-    private static final long MINIMUM_TICKETS = 36L;
+    private static final long MINIMUM_TICKETS = 10L;
     private static final long MAXIMUM_TICKETS = 400L;
 
     public void startBonus(Long chatId) {
@@ -96,8 +96,8 @@ public class BonusService {
             sendTopUpPlatformMenu(chatId);
             return;
         }
-        if ("BONUS_TOPUP_AMOUNT_10000".equals(callback)) {
-            handleTopUpInput(chatId, "10000");
+        if ("BONUS_TOPUP_AMOUNT_3600".equals(callback)) {
+            handleTopUpInput(chatId, "3600");
             return;
         }
         if ("BONUS_TOPUP_AMOUNT_100000".equals(callback)) {
@@ -1023,7 +1023,7 @@ public class BonusService {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         rows.add(List.of(
-                createButton("10,000", "BONUS_TOPUP_AMOUNT_10000"),
+                createButton("3,600", "BONUS_TOPUP_AMOUNT_3600"),
                 createButton("100,000", "BONUS_TOPUP_AMOUNT_100000")
         ));
         rows.add(createNavigationButtons(chatId));
