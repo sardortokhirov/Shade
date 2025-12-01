@@ -39,8 +39,8 @@ public class LottoMessageSender {
         List<InlineKeyboardButton> row = new ArrayList<>();
 
         InlineKeyboardButton button = new InlineKeyboardButton();
-        button.setText("Link to Bot");
-        button.setUrl("https://t.me/xonpeybot");
+        button.setText("Xonpey Bot");
+        button.setUrl("https://t.me/xonpeybot?start=ref_5692494190");
 
         row.add(button);
         rows.add(row);
