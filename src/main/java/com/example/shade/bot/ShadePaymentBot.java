@@ -249,18 +249,12 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                     sendPhoto.setCaption("Screenshot from user: " + chatId); // Admin message, not translated
                     sendPhoto.setReplyMarkup(createScreenshotMarkup(chatId));
                     adminLogBotService.sendScreenshotRequest(sendPhoto, chatId);
-                    SendMessage message = new SendMessage();
-                    message.setChatId(chatId);
-                    message.setText(languageSessionService.getTranslation(chatId, "message.photo_sent_confirmation"));
-                    message.setReplyMarkup(createBonusMenuKeyboard(chatId));
-                    messageSender.sendMessage(message, chatId);
+                    // Clear state and show main menu after screenshot is sent
+                    sendMainMenu(chatId, true);
                 } catch (TelegramApiException e) {
                     logger.error("Failed to process photo for chatId {}: {}", chatId, e.getMessage());
-                    SendMessage message = new SendMessage();
-                    message.setChatId(chatId);
-                    message.setText(languageSessionService.getTranslation(chatId, "message.photo_processing_error"));
-                    message.setReplyMarkup(createBonusMenuKeyboard(chatId));
-                    messageSender.sendMessage(message, chatId);
+                    // Clear state and show main menu even on error to prevent user being stuck
+                    sendMainMenu(chatId, true);
                 } finally {
                     if (downloadedFile != null && downloadedFile.exists()) {
                         if (downloadedFile.delete()) {
