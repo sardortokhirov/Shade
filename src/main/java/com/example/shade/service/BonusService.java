@@ -49,7 +49,7 @@ public class BonusService {
     private final LanguageSessionService languageSessionService; // Injected bean
     private final RestTemplate restTemplate = new RestTemplate();
     private static final BigDecimal MINIMUM_TOPUP = new BigDecimal("3600");
-    private static final BigDecimal MAXIMUM_TOPUP = new BigDecimal("10000000");
+    private static final BigDecimal MAXIMUM_TOPUP = new BigDecimal("100000");
     private static final long MINIMUM_TICKETS = 10L;
     private static final long MAXIMUM_TICKETS = 400L;
 
