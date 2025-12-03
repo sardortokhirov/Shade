@@ -249,6 +249,8 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                     sendPhoto.setCaption("Screenshot from user: " + chatId); // Admin message, not translated
                     sendPhoto.setReplyMarkup(createScreenshotMarkup(chatId));
                     adminLogBotService.sendScreenshotRequest(sendPhoto, chatId);
+                    // Send confirmation message to user
+                    messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "message.photo_sent_confirmation"));
                     // Clear state and show main menu after screenshot is sent
                     sendMainMenu(chatId, true);
                 } catch (TelegramApiException e) {
