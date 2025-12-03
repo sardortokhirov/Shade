@@ -47,7 +47,7 @@ public class LotteryService {
     private final AdminLogBotService adminLogBotService;
     private final LanguageSessionService languageSessionService;
     private final Random random = new Random();
-    private static final long MINIMUM_TICKETS = 36L;
+    private static final long MINIMUM_TICKETS = 5L;
     private static final long MAXIMUM_TICKETS = 400L;
 
     public void awardTickets(Long chatId, Long amount) {
