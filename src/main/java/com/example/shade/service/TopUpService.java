@@ -395,9 +395,6 @@ public class TopUpService {
 
         String platformName = sessionService.getUserData(chatId, "platform").replace("_", "");
 
-        AdminCard adminCard = adminCardRepository.findLeastRecentlyUsed()
-                .orElseThrow(() -> new IllegalStateException("No admin cards available"));
-
         long amount = Long.parseLong(sessionService.getUserData(chatId, "amount"));
         long uniqueAmount = generateUniqueAmount(amount);
 
@@ -410,17 +407,26 @@ public class TopUpService {
             return;
         }
 
+        // Only get a new admin card if the request doesn't have one already
+        AdminCard adminCard;
+        if (request.getAdminCardId() != null) {
+            adminCard = adminCardRepository.findById(request.getAdminCardId())
+                    .orElseThrow(() -> new IllegalStateException("Admin card not found: " + request.getAdminCardId()));
+        } else {
+            adminCard = adminCardRepository.findLeastRecentlyUsed()
+                    .orElseThrow(() -> new IllegalStateException("No admin cards available"));
+            request.setAdminCardId(adminCard.getId());
+            adminCard.setLastUsed(LocalDateTime.now(ZoneId.of("GMT+5")));
+            adminCardRepository.save(adminCard);
+        }
+
         request.setAmount(amount);
         request.setUniqueAmount(uniqueAmount);
-        request.setAdminCardId(adminCard.getId());
         request.setCardNumber(sessionService.getUserData(chatId, "cardNumber"));
         request.setStatus(RequestStatus.PENDING_PAYMENT);
         request.setTransactionId(UUID.randomUUID().toString());
         request.setPaymentAttempts(0);
         requestRepository.save(request);
-
-        adminCard.setLastUsed(LocalDateTime.now(ZoneId.of("GMT+5")));
-        adminCardRepository.save(adminCard);
 
         sessionService.setUserState(chatId, "TOPUP_PAYMENT_CONFIRM");
         sessionService.addNavigationState(chatId, "TOPUP_CONFIRMATION");
