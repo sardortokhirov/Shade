@@ -45,7 +45,7 @@ public class TopUpService {
     private final MessageSender messageSender;
     private final AdminLogBotService adminLogBotService;
     private final RestTemplate restTemplate = new RestTemplate();
-    private static final long MIN_AMOUNT = 10_000;
+    private static final long MIN_AMOUNT = 5_000;
     private static final long MAX_AMOUNT = 10_000_000;
     private static final String PAYMENT_MESSAGE_KEY = "payment_message_id";
     private static final String PAYMENT_ATTEMPTS_KEY = "payment_attempts";
@@ -110,8 +110,8 @@ public class TopUpService {
                 sessionService.addNavigationState(chatId, "TOPUP_CARD_INPUT");
                 sendAmountInput(chatId);
             }
-            case "TOPUP_AMOUNT_10000" -> {
-                sessionService.setUserData(chatId, "amount", "10000");
+            case "TOPUP_AMOUNT_5000" -> {
+                sessionService.setUserData(chatId, "amount", "5000");
                 sessionService.setUserState(chatId, "TOPUP_CONFIRMATION");
                 sessionService.addNavigationState(chatId, "TOPUP_AMOUNT_INPUT");
                 initiateTopUpRequest(chatId);
@@ -1335,7 +1335,7 @@ public class TopUpService {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         rows.add(List.of(
-                createButton(languageSessionService.getTranslation(chatId, "topup.button.amount_10000"), "TOPUP_AMOUNT_10000"),
+                createButton(languageSessionService.getTranslation(chatId, "topup.button.amount_5000"), "TOPUP_AMOUNT_5000"),
                 createButton(languageSessionService.getTranslation(chatId, "topup.button.amount_10000000"), "TOPUP_AMOUNT_10000000")
         ));
         rows.add(createNavigationButtons(chatId));
