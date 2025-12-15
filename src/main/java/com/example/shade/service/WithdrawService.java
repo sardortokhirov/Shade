@@ -600,7 +600,7 @@ public class WithdrawService {
 
             BigDecimal netAmount = paidAmount;
             if (!request.getCurrency().equals(Currency.RUB)) {
-                netAmount = paidAmount.setScale(2, RoundingMode.DOWN);
+                netAmount = paidAmount.multiply(BigDecimal.valueOf(0.98)).setScale(2, RoundingMode.DOWN);
             } else {
                 ExchangeRate latest = exchangeRateRepository.findLatest()
                         .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
