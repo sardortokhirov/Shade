@@ -545,7 +545,7 @@ public class TopUpService {
                                     .build();
                             return userBalanceRepository.save(newBalance);
                         });
-                long tickets = request.getAmount() / 30_000;
+                long tickets = request.getAmount() / 10_000;
                 if (tickets > 0) {
                     lotteryService.awardTickets(chatId, tickets);
                 }
@@ -741,7 +741,7 @@ public class TopUpService {
                                     .build();
                             return userBalanceRepository.save(newBalance);
                         });
-                long tickets = request.getAmount() / 30_000;
+                long tickets = request.getAmount() / 10_000;
                 if (tickets > 0) {
                     lotteryService.awardTickets(requestId, tickets);
                 }
@@ -893,7 +893,7 @@ public class TopUpService {
                                     .build();
                             return userBalanceRepository.save(newBalance);
                         });
-                long tickets = request.getAmount() / 30_000;
+                long tickets = request.getAmount() / 10_000;
                 if (tickets > 0) {
                     lotteryService.awardTickets(requestId, tickets);
                 }
