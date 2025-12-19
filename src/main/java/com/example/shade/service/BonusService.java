@@ -48,10 +48,7 @@ public class BonusService {
     private final MostbetService mostbetService;
     private final LanguageSessionService languageSessionService; // Injected bean
     private final RestTemplate restTemplate = new RestTemplate();
-    private static final BigDecimal MINIMUM_TOPUP = new BigDecimal("3600");
-    private static final BigDecimal MAXIMUM_TOPUP = new BigDecimal("100000");
-    private static final long MINIMUM_TICKETS = 10L;
-    private static final long MAXIMUM_TICKETS = 400L;
+    private final SystemConfigurationService configurationService;
 
     public void startBonus(Long chatId) {
         logger.info("Starting bonus section for chatId: {}", chatId);
@@ -240,8 +237,10 @@ public class BonusService {
                 .orElse(UserBalance.builder().chatId(chatId).tickets(0L).balance(BigDecimal.ZERO).build());
         SendMessage message = new SendMessage();
         message.setChatId(chatId);
+        Long minTickets = configurationService.getMinTickets();
+        Long maxTickets = configurationService.getMaxTickets();
         message.setText(String.format(languageSessionService.getTranslation(chatId, "message.lottery_menu"),
-                balance.getTickets(), MINIMUM_TICKETS, MAXIMUM_TICKETS));
+                balance.getTickets(), minTickets, maxTickets));
         message.setReplyMarkup(createLotteryKeyboard(chatId, balance.getTickets()));
         messageSender.sendMessage(message, chatId);
     }
@@ -272,8 +271,9 @@ public class BonusService {
         BigDecimal balance = getReferralBalance(chatId);
         SendMessage message = new SendMessage();
         message.setChatId(chatId);
+        BigDecimal minTopUp = configurationService.getBonusTopUpMinAmount();
         message.setText(String.format(languageSessionService.getTranslation(chatId, "message.topup_menu"),
-                balance.longValue()));
+                balance.longValue(), minTopUp.longValue()));
         message.setReplyMarkup(createTopUpPlatformKeyboard(chatId));
         messageSender.sendMessage(message, chatId);
     }
@@ -314,7 +314,10 @@ public class BonusService {
     private void sendTopUpInput(Long chatId, String platform) {
         SendMessage message = new SendMessage();
         message.setChatId(chatId);
-        message.setText(String.format(languageSessionService.getTranslation(chatId, "message.topup_input"), platform));
+        BigDecimal minTopUp = configurationService.getBonusTopUpMinAmount();
+        BigDecimal maxTopUp = configurationService.getBonusTopUpMaxAmount();
+        message.setText(String.format(languageSessionService.getTranslation(chatId, "message.topup_input"), 
+                platform, minTopUp.longValue(), maxTopUp.longValue()));
         message.setReplyMarkup(createAmountKeyboard(chatId));
         messageSender.sendMessage(message, chatId);
     }
@@ -468,8 +471,14 @@ public class BonusService {
         try {
             amount = new BigDecimal(amountStr);
 
-            if (amount.compareTo(MINIMUM_TOPUP) < 0 || amount.compareTo(MAXIMUM_TOPUP) > 0) {
-                messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "message.invalid_amount_range"));
+            BigDecimal minTopUp = configurationService.getBonusTopUpMinAmount();
+            BigDecimal maxTopUp = configurationService.getBonusTopUpMaxAmount();
+            if (amount.compareTo(minTopUp) < 0 || amount.compareTo(maxTopUp) > 0) {
+                String message = String.format(
+                    languageSessionService.getTranslation(chatId, "message.invalid_amount_range"),
+                    minTopUp.longValue(), maxTopUp.longValue()
+                );
+                messageSender.sendMessage(chatId, message);
                 sendTopUpInput(chatId, platform);
                 return;
             }
@@ -477,9 +486,12 @@ public class BonusService {
             UserBalance balance = userBalanceRepository.findById(chatId)
                     .orElse(UserBalance.builder().chatId(chatId).tickets(0L).balance(BigDecimal.ZERO).build());
 
-            if (balance.getBalance().compareTo(MINIMUM_TOPUP) < 0) {
-                messageSender.sendMessage(chatId, String.format(languageSessionService.getTranslation(chatId, "message.insufficient_minimum_balance"),
-                        balance.getBalance().longValue()));
+            if (balance.getBalance().compareTo(minTopUp) < 0) {
+                String message = String.format(
+                    languageSessionService.getTranslation(chatId, "message.insufficient_minimum_balance"),
+                    minTopUp.longValue(), balance.getBalance().longValue()
+                );
+                messageSender.sendMessage(chatId, message);
                 sendTopUpInput(chatId, platform);
                 return;
             }
@@ -821,14 +833,16 @@ public class BonusService {
             UserBalance balance = userBalanceRepository.findById(chatId)
                     .orElse(UserBalance.builder().chatId(chatId).tickets(0L).balance(BigDecimal.ZERO).build());
             Long availableTickets = balance.getTickets();
-            if (availableTickets < MINIMUM_TICKETS) {
+            Long minTickets = configurationService.getMinTickets();
+            Long maxTickets = configurationService.getMaxTickets();
+            if (availableTickets < minTickets) {
                 messageSender.sendMessage(chatId, String.format(languageSessionService.getTranslation(chatId, "message.insufficient_tickets"),
-                        MINIMUM_TICKETS, availableTickets));
+                        minTickets, availableTickets));
                 sendLotteryMenu(chatId);
                 return;
             }
 
-            Long numberOfPlays = Math.min(availableTickets, MAXIMUM_TICKETS);
+            Long numberOfPlays = Math.min(availableTickets, maxTickets);
             Map<Long, BigDecimal> ticketWinnings = lotteryService.playLotteryWithDetails(chatId, numberOfPlays);
 
             balance.setTickets(balance.getTickets() - numberOfPlays);
@@ -878,7 +892,8 @@ public class BonusService {
         }
 
         Long referrerChatId = referral.getReferrerChatId();
-        BigDecimal commission = new BigDecimal(topUpAmount).multiply(new BigDecimal("0.001")).setScale(2, RoundingMode.DOWN);
+        BigDecimal referralPercentage = configurationService.getReferralCommissionPercentage();
+        BigDecimal commission = new BigDecimal(topUpAmount).multiply(referralPercentage).setScale(2, RoundingMode.DOWN);
         UserBalance referrerBalance = userBalanceRepository.findById(referrerChatId)
                 .orElse(UserBalance.builder().chatId(referrerChatId).tickets(0L).balance(BigDecimal.ZERO).build());
         referrerBalance.setBalance(referrerBalance.getBalance().add(commission));
@@ -939,7 +954,8 @@ public class BonusService {
     private InlineKeyboardMarkup createLotteryKeyboard(Long chatId, long ticketCount) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-        if (ticketCount >= MINIMUM_TICKETS) {
+        Long minTickets = configurationService.getMinTickets();
+        if (ticketCount >= minTickets) {
             rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.lottery_play"), "BONUS_LOTTERY_PLAY")));
         }
         rows.add(createNavigationButtons(chatId));

@@ -45,14 +45,13 @@ public class TopUpService {
     private final MessageSender messageSender;
     private final AdminLogBotService adminLogBotService;
     private final RestTemplate restTemplate = new RestTemplate();
-    private static final long MIN_AMOUNT = 10_000;
-    private static final long MAX_AMOUNT = 10_000_000;
     private static final String PAYMENT_MESSAGE_KEY = "payment_message_id";
     private static final String PAYMENT_ATTEMPTS_KEY = "payment_attempts";
     private final BlockedUserRepository blockedUserRepository;
     private final HumoService humoService;
     private final LanguageSessionService languageSessionService;
     private final MostbetService mostbetService;
+    private final SystemConfigurationService configurationService;
 
     public void startTopUp(Long chatId) {
         logger.info("Starting top-up for chatId: {}", chatId);
@@ -110,8 +109,9 @@ public class TopUpService {
                 sessionService.addNavigationState(chatId, "TOPUP_CARD_INPUT");
                 sendAmountInput(chatId);
             }
-            case "TOPUP_AMOUNT_10000" -> {
-                sessionService.setUserData(chatId, "amount", "10000");
+            case "TOPUP_AMOUNT_MIN" -> {
+                long minAmount = configurationService.getTopUpMinAmount();
+                sessionService.setUserData(chatId, "amount", String.valueOf(minAmount));
                 sessionService.setUserState(chatId, "TOPUP_CONFIRMATION");
                 sessionService.addNavigationState(chatId, "TOPUP_AMOUNT_INPUT");
                 initiateTopUpRequest(chatId);
@@ -366,8 +366,14 @@ public class TopUpService {
         sessionService.clearMessageIds(chatId);
         try {
             long amount = Long.parseLong(amountText.replaceAll("[^\\d]", ""));
-            if (amount < MIN_AMOUNT || amount > MAX_AMOUNT) {
-                sendMessageWithNavigation(chatId, languageSessionService.getTranslation(chatId, "topup.message.invalid_amount_range"));
+            long minAmount = configurationService.getTopUpMinAmount();
+            long maxAmount = configurationService.getTopUpMaxAmount();
+            if (amount < minAmount || amount > maxAmount) {
+                String message = String.format(
+                    languageSessionService.getTranslation(chatId, "topup.message.invalid_amount_range"),
+                    minAmount, maxAmount
+                );
+                sendMessageWithNavigation(chatId, message);
                 return;
             }
             sessionService.setUserData(chatId, "amount", String.valueOf(amount));
@@ -545,7 +551,8 @@ public class TopUpService {
                                     .build();
                             return userBalanceRepository.save(newBalance);
                         });
-                long tickets = request.getAmount() / 50_000;
+                long ticketCalculationAmount = configurationService.getTicketCalculationAmount();
+                long tickets = request.getAmount() / ticketCalculationAmount;
                 if (tickets > 0) {
                     lotteryService.awardTickets(chatId, tickets);
                 }
@@ -741,7 +748,8 @@ public class TopUpService {
                                     .build();
                             return userBalanceRepository.save(newBalance);
                         });
-                long tickets = request.getAmount() / 50_000;
+                long ticketCalculationAmount = configurationService.getTicketCalculationAmount();
+                long tickets = request.getAmount() / ticketCalculationAmount;
                 if (tickets > 0) {
                     lotteryService.awardTickets(requestId, tickets);
                 }
@@ -893,7 +901,8 @@ public class TopUpService {
                                     .build();
                             return userBalanceRepository.save(newBalance);
                         });
-                long tickets = request.getAmount() / 50_000;
+                long ticketCalculationAmount = configurationService.getTicketCalculationAmount();
+                long tickets = request.getAmount() / ticketCalculationAmount;
                 if (tickets > 0) {
                     lotteryService.awardTickets(requestId, tickets);
                 }
@@ -1227,7 +1236,13 @@ public class TopUpService {
     private void sendAmountInput(Long chatId) {
         SendMessage message = new SendMessage();
         message.setChatId(chatId);
-        message.setText(languageSessionService.getTranslation(chatId, "topup.message.enter_amount"));
+        long minAmount = configurationService.getTopUpMinAmount();
+        long maxAmount = configurationService.getTopUpMaxAmount();
+        String messageText = String.format(
+            languageSessionService.getTranslation(chatId, "topup.message.enter_amount"),
+            minAmount, maxAmount
+        );
+        message.setText(messageText);
         message.setReplyMarkup(createAmountKeyboard(chatId));
         messageSender.sendMessage(message, chatId);
     }
@@ -1340,9 +1355,13 @@ public class TopUpService {
     private InlineKeyboardMarkup createAmountKeyboard(Long chatId) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        long minAmount = configurationService.getTopUpMinAmount();
+        long maxAmount = configurationService.getTopUpMaxAmount();
+        String minButtonText = String.format("%,d сум", minAmount);
+        String maxButtonText = String.format("%,d сум", maxAmount);
         rows.add(List.of(
-                createButton(languageSessionService.getTranslation(chatId, "topup.button.amount_10000"), "TOPUP_AMOUNT_10000"),
-                createButton(languageSessionService.getTranslation(chatId, "topup.button.amount_10000000"), "TOPUP_AMOUNT_10000000")
+                createButton(minButtonText, "TOPUP_AMOUNT_MIN"),
+                createButton(maxButtonText, "TOPUP_AMOUNT_10000000")
         ));
         rows.add(createNavigationButtons(chatId));
         markup.setKeyboard(rows);

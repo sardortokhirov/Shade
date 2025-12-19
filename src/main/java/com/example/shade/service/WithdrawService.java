@@ -46,6 +46,7 @@ public class WithdrawService {
     private final RestTemplate restTemplate = new RestTemplate();
     private final BlockedUserRepository blockedUserRepository;
     private final MostbetService mostbetService;
+    private final SystemConfigurationService configurationService;
 
     public void startWithdrawal(Long chatId) {
         logger.info("Starting withdrawal for chatId: {}", chatId);
@@ -600,11 +601,23 @@ public class WithdrawService {
 
             BigDecimal netAmount = paidAmount;
             if (!request.getCurrency().equals(Currency.RUB)) {
-                netAmount = paidAmount.multiply(BigDecimal.valueOf(0.98)).setScale(2, RoundingMode.DOWN);
+                BigDecimal commissionPercentage = configurationService.getWithdrawalCommissionPercentage();
+                if (commissionPercentage.compareTo(BigDecimal.ZERO) > 0) {
+                    BigDecimal multiplier = BigDecimal.ONE.subtract(commissionPercentage);
+                    netAmount = paidAmount.multiply(multiplier).setScale(2, RoundingMode.DOWN);
+                } else {
+                    netAmount = paidAmount.setScale(2, RoundingMode.DOWN);
+                }
             } else {
                 ExchangeRate latest = exchangeRateRepository.findLatest()
                         .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
-                netAmount = paidAmount.multiply(latest.getRubToUzs()).setScale(2, RoundingMode.DOWN);
+                BigDecimal commissionPercentage = configurationService.getWithdrawalCommissionPercentage();
+                if (commissionPercentage.compareTo(BigDecimal.ZERO) > 0) {
+                    BigDecimal multiplier = BigDecimal.ONE.subtract(commissionPercentage);
+                    netAmount = paidAmount.multiply(latest.getRubToUzs()).multiply(multiplier).setScale(2, RoundingMode.DOWN);
+                } else {
+                    netAmount = paidAmount.multiply(latest.getRubToUzs()).setScale(2, RoundingMode.DOWN);
+                }
             }
 
             String escapedCardNumber = cardNumber
