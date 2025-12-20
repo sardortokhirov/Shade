@@ -52,6 +52,7 @@ public class TopUpService {
     private final LanguageSessionService languageSessionService;
     private final MostbetService mostbetService;
     private final SystemConfigurationService configurationService;
+    private final DailyStatsService dailyStatsService;
 
     public void startTopUp(Long chatId) {
         logger.info("Starting top-up for chatId: {}", chatId);
@@ -755,6 +756,8 @@ public class TopUpService {
                 }
 
                 bonusService.creditReferral(request.getChatId(), request.getAmount());
+                
+                dailyStatsService.addTopUpAmount(request.getChatId(), request.getAmount());
 
                 String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
                 String logMessage = String.format(
@@ -908,6 +911,8 @@ public class TopUpService {
                 }
 
                 bonusService.creditReferral(request.getChatId(), request.getAmount());
+                
+                dailyStatsService.addTopUpAmount(request.getChatId(), request.getAmount());
 
                 String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
                 String logMessage = String.format(

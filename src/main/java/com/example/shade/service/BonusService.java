@@ -49,6 +49,7 @@ public class BonusService {
     private final LanguageSessionService languageSessionService; // Injected bean
     private final RestTemplate restTemplate = new RestTemplate();
     private final SystemConfigurationService configurationService;
+    private final DailyStatsService dailyStatsService;
 
     public void startBonus(Long chatId) {
         logger.info("Starting bonus section for chatId: {}", chatId);
@@ -224,10 +225,11 @@ public class BonusService {
     private void sendBonusMenu(Long chatId) {
         UserBalance balance = userBalanceRepository.findById(chatId)
                 .orElse(UserBalance.builder().chatId(chatId).tickets(0L).balance(BigDecimal.ZERO).build());
+        Long availableLimit = dailyStatsService.getAvailableLimit(chatId);
         SendMessage message = new SendMessage();
         message.setChatId(chatId);
         message.setText(String.format(languageSessionService.getTranslation(chatId, "message.bonus_menu"),
-                balance.getTickets(), balance.getBalance().longValue()));
+                balance.getTickets(), balance.getBalance().longValue(), availableLimit));
         message.setReplyMarkup(createBonusMenuKeyboard(chatId));
         messageSender.sendMessage(message, chatId);
     }
@@ -503,6 +505,18 @@ public class BonusService {
                 return;
             }
 
+            // Check daily bonus transfer limit
+            Long availableLimit = dailyStatsService.getAvailableLimit(chatId);
+            if (amount.longValue() > availableLimit) {
+                String errorMessage = String.format(
+                    languageSessionService.getTranslation(chatId, "message.daily_limit_exceeded"),
+                    availableLimit
+                );
+                messageSender.sendMessage(chatId, errorMessage);
+                sendTopUpInput(chatId, platform);
+                return;
+            }
+
         } catch (NumberFormatException e) {
             logger.warn("Invalid amount format for chatId {}: {}", chatId, amountStr);
             messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "message.invalid_amount_format"));
@@ -601,6 +615,7 @@ public class BonusService {
                 request.setStatus(RequestStatus.BONUS_APPROVED);
                 request.setTransactionId(UUID.randomUUID().toString());
                 requestRepository.save(request);
+                dailyStatsService.addTransferAmount(request.getChatId(), request.getAmount());
 //                messageSender.animateAndDeleteMessages(request.getChatId(), sessionService.getMessageIds(request.getChatId()), "OPEN");
                 sessionService.clearMessageIds(request.getChatId());
                 String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
@@ -679,6 +694,7 @@ public class BonusService {
                     request.setStatus(RequestStatus.BONUS_APPROVED);
                     request.setTransactionId(UUID.randomUUID().toString());
                     requestRepository.save(request);
+                    dailyStatsService.addTransferAmount(request.getChatId(), request.getAmount());
                     logger.info("✅ Platform transfer completed: chatId={}, userId={}, amount={}", request.getChatId(), userId, amount);
 //                    messageSender.animateAndDeleteMessages(request.getChatId(), sessionService.getMessageIds(request.getChatId()), "OPEN");
                     sessionService.clearMessageIds(request.getChatId());

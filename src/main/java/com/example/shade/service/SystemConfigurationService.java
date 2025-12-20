@@ -30,6 +30,7 @@ public class SystemConfigurationService {
     private static final BigDecimal DEFAULT_WITHDRAWAL_COMMISSION = BigDecimal.ZERO;
     private static final BigDecimal DEFAULT_REFERRAL_COMMISSION = new BigDecimal("0.001");
     private static final Long DEFAULT_TICKET_CALCULATION = 10_000L;
+    private static final Long DEFAULT_DAILY_BONUS_TRANSFER_LIMIT = 100_000L;
 
     @Transactional
     public SystemConfiguration getConfiguration() {
@@ -45,6 +46,7 @@ public class SystemConfigurationService {
                     config.setWithdrawalCommissionPercentage(DEFAULT_WITHDRAWAL_COMMISSION);
                     config.setReferralCommissionPercentage(DEFAULT_REFERRAL_COMMISSION);
                     config.setTicketCalculationAmount(DEFAULT_TICKET_CALCULATION);
+                    config.setDailyBonusTransferLimit(DEFAULT_DAILY_BONUS_TRANSFER_LIMIT);
                     config.setCreatedAt(LocalDateTime.now());
                     return configurationRepository.save(config);
                 });
@@ -107,5 +109,12 @@ public class SystemConfigurationService {
         return config.getTicketCalculationAmount() != null 
                 ? config.getTicketCalculationAmount() 
                 : DEFAULT_TICKET_CALCULATION;
+    }
+
+    public Long getDailyBonusTransferLimit() {
+        SystemConfiguration config = getConfiguration();
+        return config.getDailyBonusTransferLimit() != null 
+                ? config.getDailyBonusTransferLimit() 
+                : DEFAULT_DAILY_BONUS_TRANSFER_LIMIT;
     }
 }

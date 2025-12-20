@@ -46,6 +46,9 @@ public class SystemConfiguration {
     @Column(name = "ticket_calculation_amount", nullable = false)
     private Long ticketCalculationAmount = 10_000L;
 
+    @Column(name = "daily_bonus_transfer_limit", nullable = false)
+    private Long dailyBonusTransferLimit = 100_000L;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 }
