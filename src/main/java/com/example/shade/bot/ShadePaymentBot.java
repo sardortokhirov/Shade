@@ -169,7 +169,7 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                         sendLanguageSelection(chatId);
                         return;
                     }
-                    if (update.hasCallbackQuery() && sessionService.getUserState(chatId).equals("AWAITING_LANGUAGE")) {
+                    if (update.hasCallbackQuery() && "AWAITING_LANGUAGE".equals(sessionService.getUserState(chatId))) {
                         handleLanguageSelection(update.getCallbackQuery().getData(), chatId);
                         return;
                     }
