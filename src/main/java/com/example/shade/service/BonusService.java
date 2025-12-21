@@ -27,6 +27,8 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import com.example.shade.repository.*;
+import java.util.Optional;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -52,6 +54,7 @@ public class BonusService {
     private final SystemConfigurationService configurationService;
     private final DailyStatsService dailyStatsService;
     private final FeatureService featureService;
+    private final UserPlatformPermissionRepository permissionRepository;
 
     public void startBonus(Long chatId) {
         logger.info("Starting bonus section for chatId: {}", chatId);
@@ -462,6 +465,15 @@ public class BonusService {
                 messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "message.api_error"));
                 sendUserIdInput(chatId, platformName);
             }
+        }
+
+        // --- Granular Permission Check ---
+        Optional<UserPlatformPermission> permission = permissionRepository.findByUserId(userId);
+        if (permission.isPresent() && !permission.get().isCanBonusTopUp()) {
+            messageSender.sendMessage(chatId,
+                    languageSessionService.getTranslation(chatId, "message.permission_denied_bonus"));
+            sessionService.setUserState(chatId, "BONUS_TOPUP_USER_ID");
+            return;
         }
 
         // --- NEW PROMO LOGIC START ---

@@ -3,10 +3,8 @@ package com.example.shade.service;
 import com.example.shade.bot.MessageSender;
 import com.example.shade.model.*;
 import com.example.shade.model.Currency;
-import com.example.shade.repository.BlockedUserRepository;
-import com.example.shade.repository.ExchangeRateRepository;
-import com.example.shade.repository.HizmatRequestRepository;
-import com.example.shade.repository.PlatformRepository;
+import com.example.shade.repository.*;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,6 +45,7 @@ public class WithdrawService {
     private final BlockedUserRepository blockedUserRepository;
     private final MostbetService mostbetService;
     private final SystemConfigurationService configurationService;
+    private final UserPlatformPermissionRepository permissionRepository;
 
     public void startWithdrawal(Long chatId) {
         logger.info("Starting withdrawal for chatId: {}", chatId);
@@ -67,7 +66,8 @@ public class WithdrawService {
             case "WITHDRAW_CARD_INPUT" -> handleCardInput(chatId, text);
             case "WITHDRAW_CODE_INPUT" -> handleCodeInput(chatId, text);
             default ->
-                    backMenuMessage(chatId, languageSessionService.getTranslation(chatId, "withdraw.message.select_from_menu"));
+                backMenuMessage(chatId,
+                        languageSessionService.getTranslation(chatId, "withdraw.message.select_from_menu"));
         }
     }
 
@@ -81,7 +81,8 @@ public class WithdrawService {
 
     public void handleCallback(Long chatId, String callback) {
         logger.info("Callback received for chatId {}: {}", chatId, callback);
-//        messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
+        // messageSender.animateAndDeleteMessages(chatId,
+        // sessionService.getMessageIds(chatId), "OPEN");
         sessionService.clearMessageIds(chatId);
 
         if (callback.startsWith("APPROVE_WITHDRAW:") || callback.startsWith("REJECT_WITHDRAW:")) {
@@ -93,7 +94,7 @@ public class WithdrawService {
 
         switch (callback) {
             case "WITHDRAW_USE_SAVED_ID" ->
-                    validateUserId(chatId, sessionService.getUserData(chatId, "platformUserId"));
+                validateUserId(chatId, sessionService.getUserData(chatId, "platformUserId"));
             case "WITHDRAW_APPROVE_USER" -> handleApproveUser(chatId);
             case "WITHDRAW_REJECT_USER" -> {
                 sessionService.setUserState(chatId, "WITHDRAW_USER_ID_INPUT");
@@ -181,7 +182,8 @@ public class WithdrawService {
 
         if (!request.getStatus().equals(RequestStatus.PENDING_ADMIN)) {
             logger.warn("Invalid request status for requestId {}: {}", requestId, request.getStatus());
-            adminLogBotService.sendToAdmins("❌ Xatolik: So‘rov allaqachon ko‘rib chiqilgan yoki noto‘g‘ri holatda for requestId " + requestId);
+            adminLogBotService.sendToAdmins(
+                    "❌ Xatolik: So‘rov allaqachon ko‘rib chiqilgan yoki noto‘g‘ri holatda for requestId " + requestId);
             return;
         }
 
@@ -209,15 +211,13 @@ public class WithdrawService {
                     platform, userId,
                     cardNumber, code,
                     request.getUniqueAmount(),
-                    LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-            );
+                    LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
             adminLogBotService.sendLog(logMessage);
 
             String message = String.format(
                     languageSessionService.getTranslation(chatId, "withdraw.message.withdraw_approved"),
                     request.getId(), platform, userId, cardNumber, code, request.getUniqueAmount(),
-                    LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-            );
+                    LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
             messageSender.sendMessage(chatId, message);
             sendMainMenu(chatId);
@@ -236,21 +236,21 @@ public class WithdrawService {
                             "📅 [%s]",
                     request.getId(), chatId, number, platform, userId,
                     request.getUniqueAmount(), cardNumber, code,
-                    LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-            );
+                    LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
             adminLogBotService.sendLog(logMessage);
 
             messageSender.sendMessage(chatId, String.format(
                     languageSessionService.getTranslation(chatId, "withdraw.message.withdraw_rejected"),
                     request.getId(), request.getUniqueAmount(),
-                    LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-            ));
+                    LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))));
             sendMainMenu(chatId);
         }
-        logger.info("Admin chatId {} {} withdraw requestId {}", adminChatId, approve ? "approved" : "rejected", requestId);
+        logger.info("Admin chatId {} {} withdraw requestId {}", adminChatId, approve ? "approved" : "rejected",
+                requestId);
     }
 
-    private BigDecimal processPayout(Long chatId, String platformName, String userId, String code, Long requestId, String cardNumber)  {
+    private BigDecimal processPayout(Long chatId, String platformName, String userId, String code, Long requestId,
+            String cardNumber) {
         Platform platform = platformRepository.findByName(platformName.replace("_", ""))
                 .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
 
@@ -261,8 +261,7 @@ public class WithdrawService {
                         platform.getSecret(),
                         platform.getWorkplaceId(),
                         userId,
-                        code
-                );
+                        code);
 
                 // Check if the API call was successful and the transaction is completed
                 if (withdrawalResult != null && "COMPLETED".equalsIgnoreCase(withdrawalResult.status())) {
@@ -274,35 +273,41 @@ public class WithdrawService {
                     // Return the amount withdrawn, which is the successful outcome
                     return amountWithdrawn;
                 } else {
-                    // Handle cases where the transaction was created but not completed (e.g., status is 'NEW' or 'PROCESSING')
+                    // Handle cases where the transaction was created but not completed (e.g.,
+                    // status is 'NEW' or 'PROCESSING')
                     String status = (withdrawalResult != null) ? withdrawalResult.status() : "UNKNOWN";
-                    logger.warn("❌ Mostbet Payout for userId {} on platform {} did not complete. Final status: {}", userId, platformName, status);
+                    logger.warn("❌ Mostbet Payout for userId {} on platform {} did not complete. Final status: {}",
+                            userId, platformName, status);
 
                     // Fetch the request to format a detailed failure message for the user
                     HizmatRequest request = requestRepository.findById(requestId).orElse(null);
                     String errorMsg = "Platform returned status: " + status;
                     String cancelLogMessage = String.format(
                             languageSessionService.getTranslation(chatId, "withdraw.message.payout_failed"),
-                            request != null ? request.getId() : requestId, cardNumber, platform.getName(), userId, code, errorMsg,
-                            LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-                    );
+                            request != null ? request.getId() : requestId, cardNumber, platform.getName(), userId, code,
+                            errorMsg,
+                            LocalDateTime.now(ZoneId.of("GMT+5"))
+                                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                     messageSender.sendMessage(chatId, cancelLogMessage);
                     sendMainMenu(chatId);
                     return null;
                 }
 
             } catch (Exception e) {
-                // Handle any exceptions thrown by the service (e.g., user not found, signature error, network issues)
-                logger.error("❌ Mostbet Payout failed for userId {} on platform {} with an exception:", userId, platformName, e);
+                // Handle any exceptions thrown by the service (e.g., user not found, signature
+                // error, network issues)
+                logger.error("❌ Mostbet Payout failed for userId {} on platform {} with an exception:", userId,
+                        platformName, e);
 
                 // Re-use the existing detailed error message logic
                 HizmatRequest request = requestRepository.findById(requestId).orElse(null);
                 String errorMsg = e.getMessage(); // Get the specific error from the exception
                 String cancelLogMessage = String.format(
                         languageSessionService.getTranslation(chatId, "withdraw.message.payout_failed"),
-                        request != null ? request.getId() : requestId, cardNumber, platform.getName(), userId, code, errorMsg,
-                        LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-                );
+                        request != null ? request.getId() : requestId, cardNumber, platform.getName(), userId, code,
+                        errorMsg,
+                        LocalDateTime.now(ZoneId.of("GMT+5"))
+                                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
                 messageSender.sendMessage(chatId, cancelLogMessage);
                 sendMainMenu(chatId);
@@ -316,10 +321,12 @@ public class WithdrawService {
             String cashdeskId = platform.getWorkplaceId();
             String lng = "uz";
 
-            if (hash == null || cashierPass == null || cashdeskId == null || hash.isEmpty() || cashierPass.isEmpty() || cashdeskId.isEmpty()) {
+            if (hash == null || cashierPass == null || cashdeskId == null || hash.isEmpty() || cashierPass.isEmpty()
+                    || cashdeskId.isEmpty()) {
                 logger.error("Invalid platform credentials for platform {}: hash={}, cashierPass={}, cashdeskId={}",
                         platformName, hash, cashierPass, cashdeskId);
-                messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "withdraw.message.platform_credentials_error"));
+                messageSender.sendMessage(chatId,
+                        languageSessionService.getTranslation(chatId, "withdraw.message.platform_credentials_error"));
                 return null;
             }
 
@@ -327,7 +334,8 @@ public class WithdrawService {
                 Integer.parseInt(cashdeskId);
             } catch (NumberFormatException e) {
                 logger.error("Invalid cashdeskId format for platform {}: {}", platformName, cashdeskId);
-                messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "withdraw.message.platform_credentials_error"));
+                messageSender.sendMessage(chatId,
+                        languageSessionService.getTranslation(chatId, "withdraw.message.platform_credentials_error"));
                 return null;
             }
 
@@ -368,8 +376,8 @@ public class WithdrawService {
                 String cancelLogMessage = String.format(
                         languageSessionService.getTranslation(chatId, "withdraw.message.payout_failed"),
                         request.getId(), cardNumber, platform.getName(), userId, code, errorMsg,
-                        LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-                );
+                        LocalDateTime.now(ZoneId.of("GMT+5"))
+                                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                 if (response.getStatusCode().is2xxSuccessful() && Boolean.TRUE.equals(successObj)) {
                     Object summaObj = responseBody.get("Summa");
                     BigDecimal summa = null;
@@ -381,25 +389,30 @@ public class WithdrawService {
                         }
                     }
 
-                    logger.info("✅ Payout successful for userId {} on platform {}, summa={}, requestId: {}", userId, platformName, summa, requestId);
+                    logger.info("✅ Payout successful for userId {} on platform {}, summa={}, requestId: {}", userId,
+                            platformName, summa, requestId);
                     return summa;
                 } else {
-                    logger.warn("❌ Payout failed for userId {} on platform {}, response: {}", userId, platformName, responseBody);
+                    logger.warn("❌ Payout failed for userId {} on platform {}, response: {}", userId, platformName,
+                            responseBody);
                     messageSender.sendMessage(chatId, cancelLogMessage);
                     sendMainMenu(chatId);
                     return null;
                 }
             } catch (HttpClientErrorException e) {
-                String errorMsg = e.getStatusCode().value() == 401 ? "Invalid signature" :
-                        e.getStatusCode().value() == 403 ? "Invalid confirm" : "API xatosi: " + e.getMessage();
+                String errorMsg = e.getStatusCode().value() == 401 ? "Invalid signature"
+                        : e.getStatusCode().value() == 403 ? "Invalid confirm" : "API xatosi: " + e.getMessage();
                 logger.error("Payout API error for userId {} on platform {}: {}", userId, platformName, e.getMessage());
-                messageSender.sendMessage(chatId, String.format(languageSessionService.getTranslation(chatId, "withdraw.message.api_error"), errorMsg));
+                messageSender.sendMessage(chatId, String
+                        .format(languageSessionService.getTranslation(chatId, "withdraw.message.api_error"), errorMsg));
                 adminLogBotService.sendToAdmins("❌ Payout API error: " + errorMsg + " for requestId " + requestId);
                 sendMainMenu(chatId);
                 return null;
             } catch (Exception e) {
-                logger.error("Unexpected error during payout for userId {} on platform {}: {}", userId, platformName, e.getMessage());
-                messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "withdraw.message.unknown_error"));
+                logger.error("Unexpected error during payout for userId {} on platform {}: {}", userId, platformName,
+                        e.getMessage());
+                messageSender.sendMessage(chatId,
+                        languageSessionService.getTranslation(chatId, "withdraw.message.unknown_error"));
                 adminLogBotService.sendToAdmins("❌ Payout API error: Unexpected error for requestId " + requestId);
                 sendMainMenu(chatId);
                 return null;
@@ -409,14 +422,26 @@ public class WithdrawService {
     }
 
     private void handleUserIdInput(Long chatId, String userId) {
-//        messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
+        // messageSender.animateAndDeleteMessages(chatId,
+        // sessionService.getMessageIds(chatId), "OPEN");
         sessionService.clearMessageIds(chatId);
 
         if (!isValidUserId(userId)) {
             logger.warn("Invalid user ID format for chatId {}: {}", chatId, userId);
-            sendMessageWithNavigation(chatId, languageSessionService.getTranslation(chatId, "withdraw.message.invalid_user_id"));
+            sendMessageWithNavigation(chatId,
+                    languageSessionService.getTranslation(chatId, "withdraw.message.invalid_user_id"));
             return;
         }
+
+        // --- Granular Permission Check ---
+        Optional<UserPlatformPermission> permission = permissionRepository.findByUserId(userId);
+        if (permission.isPresent() && !permission.get().isCanWithdraw()) {
+            messageSender.sendMessage(chatId,
+                    languageSessionService.getTranslation(chatId, "message.permission_denied_withdraw"));
+            sessionService.setUserState(chatId, "WITHDRAW_USER_ID_INPUT");
+            return;
+        }
+
         validateUserId(chatId, userId);
     }
 
@@ -445,17 +470,18 @@ public class WithdrawService {
             sessionService.setUserState(chatId, "WITHDRAW_CARD_INPUT");
 
             handleApproveUser(chatId);
-        }
-        else {
+        } else {
 
             String hash = platform.getApiKey();
             String cashierPass = platform.getPassword();
             String cashdeskId = platform.getWorkplaceId();
 
-            if (hash == null || cashierPass == null || cashdeskId == null || hash.isEmpty() || cashierPass.isEmpty() || cashdeskId.isEmpty()) {
+            if (hash == null || cashierPass == null || cashdeskId == null || hash.isEmpty() || cashierPass.isEmpty()
+                    || cashdeskId.isEmpty()) {
                 logger.error("Invalid platform credentials for platform {}: hash={}, cashierPass={}, cashdeskId={}",
                         platformName, hash, cashierPass, cashdeskId);
-                messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "withdraw.message.platform_credentials_error"));
+                messageSender.sendMessage(chatId,
+                        languageSessionService.getTranslation(chatId, "withdraw.message.platform_credentials_error"));
                 return;
             }
 
@@ -463,7 +489,8 @@ public class WithdrawService {
                 Integer.parseInt(cashdeskId);
             } catch (NumberFormatException e) {
                 logger.error("Invalid cashdeskId format for platform {}: {}", platformName, cashdeskId);
-                messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "withdraw.message.platform_credentials_error"));
+                messageSender.sendMessage(chatId,
+                        languageSessionService.getTranslation(chatId, "withdraw.message.platform_credentials_error"));
                 return;
             }
 
@@ -475,19 +502,23 @@ public class WithdrawService {
             String md5Result = DigestUtils.md5DigestAsHex(md5Input.getBytes(StandardCharsets.UTF_8));
             String finalSignature = sha256Hex(sha256Result1 + md5Result);
 
-            String apiUrl = String.format("https://partners.servcul.com/CashdeskBotAPI/Users/%s?confirm=%s&cashdeskId=%s",
+            String apiUrl = String.format(
+                    "https://partners.servcul.com/CashdeskBotAPI/Users/%s?confirm=%s&cashdeskId=%s",
                     userId, confirm, cashdeskId);
-            logger.info("Validating user ID {} for platform {} (chatId: {}), URL: {}", userId, platformName, chatId, apiUrl);
+            logger.info("Validating user ID {} for platform {} (chatId: {}), URL: {}", userId, platformName, chatId,
+                    apiUrl);
 
             try {
                 HttpHeaders headers = new HttpHeaders();
                 headers.set("sign", finalSignature);
                 HttpEntity<String> entity = new HttpEntity<>(headers);
 
-                ResponseEntity<UserProfile> response = restTemplate.exchange(apiUrl, HttpMethod.GET, entity, UserProfile.class);
+                ResponseEntity<UserProfile> response = restTemplate.exchange(apiUrl, HttpMethod.GET, entity,
+                        UserProfile.class);
                 UserProfile profile = response.getBody();
 
-                if (response.getStatusCode().is2xxSuccessful() && profile != null && profile.getUserId() != null && !profile.getName().isEmpty()) {
+                if (response.getStatusCode().is2xxSuccessful() && profile != null && profile.getUserId() != null
+                        && !profile.getName().isEmpty()) {
                     String fullName = profile.getName();
                     sessionService.setUserData(chatId, "platformUserId", userId);
                     sessionService.setUserData(chatId, "fullName", fullName);
@@ -510,18 +541,24 @@ public class WithdrawService {
                     sessionService.setUserState(chatId, "WITHDRAW_APPROVE_USER");
                     sendUserApproval(chatId, fullName, userId);
                 } else {
-                    logger.warn("Invalid user profile for ID {} on platform {}. Response: {}", userId, platformName, profile);
+                    logger.warn("Invalid user profile for ID {} on platform {}. Response: {}", userId, platformName,
+                            profile);
                     sendNoUserFound(chatId);
                 }
             } catch (HttpClientErrorException e) {
-                String errorMsg = e.getStatusCode().value() == 400 ? "Invalid cashdeskId or parameters: " + e.getResponseBodyAsString() :
-                        e.getStatusCode().value() == 401 ? "Invalid signature" :
-                                e.getStatusCode().value() == 403 ? "Invalid confirm" : "API xatosi: " + e.getMessage();
+                String errorMsg = e.getStatusCode().value() == 400
+                        ? "Invalid cashdeskId or parameters: " + e.getResponseBodyAsString()
+                        : e.getStatusCode().value() == 401 ? "Invalid signature"
+                                : e.getStatusCode().value() == 403 ? "Invalid confirm"
+                                        : "API xatosi: " + e.getMessage();
                 logger.error("Error calling API for user ID {} on platform {}: {}", userId, platformName, errorMsg);
-                sendMessageWithNavigation(chatId, String.format(languageSessionService.getTranslation(chatId, "withdraw.message.api_error"), errorMsg));
+                sendMessageWithNavigation(chatId, String
+                        .format(languageSessionService.getTranslation(chatId, "withdraw.message.api_error"), errorMsg));
             } catch (Exception e) {
-                logger.error("Unexpected error calling API for user ID {} on platform {}: {}", userId, platformName, e.getMessage());
-                sendMessageWithNavigation(chatId, languageSessionService.getTranslation(chatId, "withdraw.message.unknown_error"));
+                logger.error("Unexpected error calling API for user ID {} on platform {}: {}", userId, platformName,
+                        e.getMessage());
+                sendMessageWithNavigation(chatId,
+                        languageSessionService.getTranslation(chatId, "withdraw.message.unknown_error"));
             }
         }
     }
@@ -532,7 +569,8 @@ public class WithdrawService {
         String fullName = sessionService.getUserData(chatId, "fullName");
         if (fullName == null) {
             logger.error("FullName is null for chatId {}", chatId);
-            messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "withdraw.message.user_data_not_found"));
+            messageSender.sendMessage(chatId,
+                    languageSessionService.getTranslation(chatId, "withdraw.message.user_data_not_found"));
             sessionService.setUserState(chatId, "WITHDRAW_USER_ID_INPUT");
             sendUserIdInput(chatId, sessionService.getUserData(chatId, "platform"));
         } else {
@@ -541,12 +579,14 @@ public class WithdrawService {
     }
 
     private void handleCardInput(Long chatId, String card) {
-//        messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
+        // messageSender.animateAndDeleteMessages(chatId,
+        // sessionService.getMessageIds(chatId), "OPEN");
         sessionService.clearMessageIds(chatId);
 
         if (!isValidCard(card)) {
             logger.warn("Invalid card format for chatId {}: {}", chatId, card);
-            sendMessageWithNavigation(chatId, languageSessionService.getTranslation(chatId, "withdraw.message.invalid_card_format"));
+            sendMessageWithNavigation(chatId,
+                    languageSessionService.getTranslation(chatId, "withdraw.message.invalid_card_format"));
             return;
         }
         String cardNumber = card.replaceAll("\\s+", "");
@@ -567,12 +607,14 @@ public class WithdrawService {
     }
 
     private void handleCodeInput(Long chatId, String code) throws Exception {
-//        messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
+        // messageSender.animateAndDeleteMessages(chatId,
+        // sessionService.getMessageIds(chatId), "OPEN");
         sessionService.clearMessageIds(chatId);
 
         if (!isValidCode(code)) {
             logger.warn("Invalid code format for chatId {}: {}", chatId, code);
-            sendMessageWithNavigation(chatId, languageSessionService.getTranslation(chatId, "withdraw.message.invalid_code_format"));
+            sendMessageWithNavigation(chatId,
+                    languageSessionService.getTranslation(chatId, "withdraw.message.invalid_code_format"));
             return;
         }
 
@@ -583,7 +625,8 @@ public class WithdrawService {
                 chatId, platform, userId).orElse(null);
         if (request == null) {
             logger.error("No pending request found for chatId {}, platform: {}, userId: {}", chatId, platform, userId);
-            messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "withdraw.message.request_not_found"));
+            messageSender.sendMessage(chatId,
+                    languageSessionService.getTranslation(chatId, "withdraw.message.request_not_found"));
             sendMainMenu(chatId);
             return;
         }
@@ -592,7 +635,8 @@ public class WithdrawService {
         request.setStatus(RequestStatus.PENDING_ADMIN);
         requestRepository.save(request);
 
-        BigDecimal paidAmount = processPayout(chatId, platform, userId, code, request.getId(), cardNumber).setScale(2, RoundingMode.DOWN);
+        BigDecimal paidAmount = processPayout(chatId, platform, userId, code, request.getId(), cardNumber).setScale(2,
+                RoundingMode.DOWN);
         if (paidAmount != null) {
             if (paidAmount.longValue() < 0) {
                 paidAmount = paidAmount.multiply(BigDecimal.valueOf(-1));
@@ -614,9 +658,10 @@ public class WithdrawService {
                 BigDecimal commissionPercentage = configurationService.getWithdrawalCommissionPercentage();
                 if (commissionPercentage.compareTo(BigDecimal.ZERO) > 0) {
                     BigDecimal multiplier = BigDecimal.ONE.subtract(commissionPercentage);
-                    netAmount = paidAmount.multiply(latest.getRubToUzs()).multiply(multiplier).setScale(2, RoundingMode.DOWN);
+                    netAmount = paidAmount.multiply(latest.getRubToUzs()).multiply(multiplier).setScale(2,
+                            RoundingMode.DOWN);
                 } else {
-                netAmount = paidAmount.multiply(latest.getRubToUzs()).setScale(2, RoundingMode.DOWN);
+                    netAmount = paidAmount.multiply(latest.getRubToUzs()).setScale(2, RoundingMode.DOWN);
                 }
             }
 
@@ -641,23 +686,22 @@ public class WithdrawService {
                     escapeMarkdown(escapedCardNumber),
                     escapeMarkdown(code),
                     netAmount.toPlainString(),
-                    LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-            );
+                    LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
             request.setUniqueAmount(netAmount.longValue());
             requestRepository.save(request);
             messageSender.sendMessage(chatId, String.format(
                     languageSessionService.getTranslation(chatId, "withdraw.message.payout_success"),
                     paidAmount.toPlainString(), netAmount.toPlainString(), request.getId(),
-                    LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-            ));
+                    LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))));
 
             adminLogBotService.sendWithdrawRequestToAdmins(chatId, logMessage, request.getId());
         }
     }
 
     private String escapeMarkdown(String text) {
-        if (text == null) return "";
+        if (text == null)
+            return "";
         return text.replace("_", "\\_")
                 .replace("*", "\\*")
                 .replace("`", "\\`")
@@ -676,7 +720,8 @@ public class WithdrawService {
     }
 
     private void sendUserIdInput(Long chatId, String platform) {
-        List<HizmatRequest> recentRequests = requestRepository.findTop3ByChatIdAndPlatformOrderByCreatedAtDesc(chatId, platform);
+        List<HizmatRequest> recentRequests = requestRepository.findTop3ByChatIdAndPlatformOrderByCreatedAtDesc(chatId,
+                platform);
         SendMessage message = new SendMessage();
         message.setChatId(chatId.toString());
         if (!recentRequests.isEmpty()) {
@@ -685,7 +730,8 @@ public class WithdrawService {
             message.setText(languageSessionService.getTranslation(chatId, "withdraw.message.user_id_with_recent"));
             message.setReplyMarkup(createSavedIdKeyboard(chatId, recentRequests));
         } else {
-            message.setText(String.format(languageSessionService.getTranslation(chatId, "withdraw.message.user_id_input"), platform));
+            message.setText(String
+                    .format(languageSessionService.getTranslation(chatId, "withdraw.message.user_id_input"), platform));
             message.setReplyMarkup(createNavigationKeyboard(chatId));
         }
         messageSender.sendMessage(message, chatId);
@@ -694,13 +740,15 @@ public class WithdrawService {
     private void sendUserApproval(Long chatId, String fullName, String userId) {
         SendMessage message = new SendMessage();
         message.setChatId(chatId.toString());
-        message.setText(String.format(languageSessionService.getTranslation(chatId, "withdraw.message.user_approval"), fullName, userId));
+        message.setText(String.format(languageSessionService.getTranslation(chatId, "withdraw.message.user_approval"),
+                fullName, userId));
         message.setReplyMarkup(createApprovalKeyboard(chatId));
         messageSender.sendMessage(message, chatId);
     }
 
     private void sendNoUserFound(Long chatId) {
-        sendMessageWithNavigation(chatId, languageSessionService.getTranslation(chatId, "withdraw.message.no_user_found"));
+        sendMessageWithNavigation(chatId,
+                languageSessionService.getTranslation(chatId, "withdraw.message.no_user_found"));
     }
 
     private void sendCardInput(Long chatId, String fullName) {
@@ -713,7 +761,8 @@ public class WithdrawService {
             message.setText(languageSessionService.getTranslation(chatId, "withdraw.message.card_input_with_recent"));
             message.setReplyMarkup(createSavedCardKeyboard(chatId, recentRequests));
         } else {
-            message.setText(String.format(languageSessionService.getTranslation(chatId, "withdraw.message.card_input"), fullName));
+            message.setText(String.format(languageSessionService.getTranslation(chatId, "withdraw.message.card_input"),
+                    fullName));
             message.setReplyMarkup(createNavigationKeyboard(chatId));
         }
         messageSender.sendMessage(message, chatId);
@@ -753,7 +802,8 @@ public class WithdrawService {
 
         if ((uzsPlatforms == null || uzsPlatforms.isEmpty()) && (rubPlatforms == null || rubPlatforms.isEmpty())) {
             logger.error("No platforms found in database for keyboard creation");
-            messageSender.sendMessage(null, languageSessionService.getTranslation(chatId, "withdraw.message.no_platforms_found"));
+            messageSender.sendMessage(null,
+                    languageSessionService.getTranslation(chatId, "withdraw.message.no_platforms_found"));
             rows.add(createNavigationButtons(chatId));
         } else {
             int maxRows = Math.max(uzsPlatforms.size(), rubPlatforms.size());
@@ -762,7 +812,8 @@ public class WithdrawService {
                 if (i < uzsPlatforms.size()) {
                     Platform uzsPlatform = uzsPlatforms.get(i);
                     if (uzsPlatform != null && uzsPlatform.getName() != null && !uzsPlatform.getName().isEmpty()) {
-                        row.add(createButton("🇺🇿 " + uzsPlatform.getName(), "WITHDRAW_PLATFORM:" + uzsPlatform.getName()));
+                        row.add(createButton("🇺🇿 " + uzsPlatform.getName(),
+                                "WITHDRAW_PLATFORM:" + uzsPlatform.getName()));
                     } else {
                         logger.warn("Skipping invalid UZS platform: {}", uzsPlatform);
                     }
@@ -770,7 +821,8 @@ public class WithdrawService {
                 if (i < rubPlatforms.size()) {
                     Platform rubPlatform = rubPlatforms.get(i);
                     if (rubPlatform != null && rubPlatform.getName() != null && !rubPlatform.getName().isEmpty()) {
-                        row.add(createButton("🇷🇺 " + rubPlatform.getName(), "WITHDRAW_PLATFORM:" + rubPlatform.getName()));
+                        row.add(createButton("🇷🇺 " + rubPlatform.getName(),
+                                "WITHDRAW_PLATFORM:" + rubPlatform.getName()));
                     } else {
                         logger.warn("Skipping invalid RUB platform: {}", rubPlatform);
                     }
@@ -778,7 +830,8 @@ public class WithdrawService {
                     i++;
                     if (i < maxRows) {
                         Platform uzsPlatform = uzsPlatforms.get(i);
-                        row.add(createButton("🇺🇿 " + uzsPlatform.getName(), "WITHDRAW_PLATFORM:" + uzsPlatform.getName()));
+                        row.add(createButton("🇺🇿 " + uzsPlatform.getName(),
+                                "WITHDRAW_PLATFORM:" + uzsPlatform.getName()));
                     }
                 }
                 if (!row.isEmpty()) {
@@ -787,7 +840,8 @@ public class WithdrawService {
             }
             if (rows.isEmpty()) {
                 logger.error("No valid platforms with non-empty names found");
-                messageSender.sendMessage(null, languageSessionService.getTranslation(chatId, "withdraw.message.no_valid_platforms"));
+                messageSender.sendMessage(null,
+                        languageSessionService.getTranslation(chatId, "withdraw.message.no_valid_platforms"));
                 rows.add(createNavigationButtons(chatId));
             } else {
                 rows.add(createNavigationButtons(chatId));
@@ -841,9 +895,10 @@ public class WithdrawService {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         rows.add(List.of(
-                createButton(languageSessionService.getTranslation(chatId, "withdraw.button.approve"), "WITHDRAW_APPROVE_USER"),
-                createButton(languageSessionService.getTranslation(chatId, "withdraw.button.reject"), "WITHDRAW_REJECT_USER")
-        ));
+                createButton(languageSessionService.getTranslation(chatId, "withdraw.button.approve"),
+                        "WITHDRAW_APPROVE_USER"),
+                createButton(languageSessionService.getTranslation(chatId, "withdraw.button.reject"),
+                        "WITHDRAW_REJECT_USER")));
         rows.add(createNavigationButtons(chatId));
         markup.setKeyboard(rows);
         return markup;
@@ -852,10 +907,14 @@ public class WithdrawService {
     private InlineKeyboardMarkup createMainMenuKeyboard(Long chatId) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "withdraw.button.topup"), "TOPUP")));
-        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "withdraw.button.withdraw"), "WITHDRAW")));
-        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "withdraw.button.bonus"), "BONUS")));
-        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "withdraw.button.contact"), "CONTACT")));
+        rows.add(
+                List.of(createButton(languageSessionService.getTranslation(chatId, "withdraw.button.topup"), "TOPUP")));
+        rows.add(List.of(
+                createButton(languageSessionService.getTranslation(chatId, "withdraw.button.withdraw"), "WITHDRAW")));
+        rows.add(
+                List.of(createButton(languageSessionService.getTranslation(chatId, "withdraw.button.bonus"), "BONUS")));
+        rows.add(List
+                .of(createButton(languageSessionService.getTranslation(chatId, "withdraw.button.contact"), "CONTACT")));
         markup.setKeyboard(rows);
         return markup;
     }
@@ -901,7 +960,8 @@ public class WithdrawService {
             StringBuilder hexString = new StringBuilder();
             for (byte b : hashBytes) {
                 String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1) hexString.append('0');
+                if (hex.length() == 1)
+                    hexString.append('0');
                 hexString.append(hex);
             }
             return hexString.toString();
