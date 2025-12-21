@@ -92,15 +92,15 @@ public class LotteryController {
         }
         try {
             lotteryService.deleteTickets(chatId);
-            messageSender.sendTextMessage(chatId, languageSessionService.getTranslation(chatId, "message.tickets_deleted_success"));
+            messageSender.sendTextMessage(chatId,
+                    languageSessionService.getTranslation(chatId, "message.tickets_deleted_success"));
 
             String logMessage = String.format(
                     "Biletlar o'chirildi ✅\n" +
                             "👤 User ID [%d]\n" +
                             "📅 [%s] ",
                     chatId,
-                    LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-            );
+                    LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
             adminLogBotService.sendLog(logMessage);
 
             return ResponseEntity.noContent().build();
@@ -116,15 +116,15 @@ public class LotteryController {
         }
         try {
             lotteryService.deleteBalance(chatId);
-            messageSender.sendTextMessage(chatId, languageSessionService.getTranslation(chatId, "message.balance_deleted_success"));
+            messageSender.sendTextMessage(chatId,
+                    languageSessionService.getTranslation(chatId, "message.balance_deleted_success"));
 
             String logMessage = String.format(
                     "Balans o'chirildi ✅\n" +
                             "👤 User ID [%d]\n" +
                             "📅 [%s] ",
                     chatId,
-                    LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-            );
+                    LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
             adminLogBotService.sendLog(logMessage);
 
             return ResponseEntity.noContent().build();
@@ -134,14 +134,16 @@ public class LotteryController {
     }
 
     @PostMapping("/lottery/tickets/{chatId}")
-    public ResponseEntity<UserBalance> addTickets(@PathVariable Long chatId, @RequestParam Long amount, HttpServletRequest request) {
+    public ResponseEntity<UserBalance> addTickets(@PathVariable Long chatId, @RequestParam Long amount,
+            HttpServletRequest request) {
         if (!authenticate(request)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
         }
         try {
             lotteryService.awardTickets(chatId, amount);
             UserBalance balance = lotteryService.getBalance(chatId);
-            messageSender.sendTextMessage(chatId, languageSessionService.getTranslation(chatId, "message.tickets_added_success"));
+            messageSender.sendTextMessage(chatId,
+                    languageSessionService.getTranslation(chatId, "message.tickets_added_success"));
             String logMessage = String.format(
                     "Biletlar qo'shildi ✅\n" +
                             "👤 User ID [%d]\n" +
@@ -151,11 +153,10 @@ public class LotteryController {
                             "📅 [%s] ",
                     chatId,
                     amount,
-                    balance.getTickets(),  // assume getTickets()
-                    balance.getBalance(),  // adjust field
-                    LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-            );
-            adminLogBotService.sendLog(logMessage);  // pass message
+                    balance.getTickets(), // assume getTickets()
+                    balance.getBalance(), // adjust field
+                    LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+            adminLogBotService.sendLog(logMessage); // pass message
 
             return ResponseEntity.ok(balance);
         } catch (IllegalStateException e) {
@@ -174,6 +175,23 @@ public class LotteryController {
         }
         try {
             lotteryService.awardRandomUsers(totalUsers, randomUsers, amount);
+            return ResponseEntity.ok().build();
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PostMapping("/lottery/award-referral")
+    public ResponseEntity<Void> awardRandomUsersFromReferrer(
+            @RequestParam Long referrerId,
+            @RequestParam Long randomUsers,
+            @RequestParam Long amount,
+            HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        try {
+            lotteryService.awardRandomUsersFromReferrer(referrerId, randomUsers, amount);
             return ResponseEntity.ok().build();
         } catch (IllegalStateException e) {
             return ResponseEntity.badRequest().build();

@@ -6,6 +6,7 @@ import com.example.shade.model.*;
 import com.example.shade.repository.BlockedUserRepository;
 import com.example.shade.repository.HizmatRequestRepository;
 import com.example.shade.repository.LotteryPrizeRepository;
+import com.example.shade.repository.ReferralRepository;
 import com.example.shade.repository.UserBalanceRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -33,6 +34,7 @@ public class LotteryService {
     private static final Logger logger = LoggerFactory.getLogger(LotteryService.class);
     private final UserBalanceRepository userBalanceRepository;
     private final LotteryPrizeRepository lotteryPrizeRepository;
+    private final ReferralRepository referralRepository;
     private final HizmatRequestRepository hizmatRequestRepository;
     private final LottoBotService lottoBotService;
     private final BlockedUserRepository blockedUserRepository;
@@ -80,7 +82,8 @@ public class LotteryService {
         Long minTickets = configurationService.getMinTickets();
         Long maxTickets = configurationService.getMaxTickets();
         if (balance.getTickets() < numberOfPlays || numberOfPlays < minTickets || numberOfPlays > maxTickets) {
-            throw new IllegalStateException(String.format("Invalid ticket count: %d. Must be between %d and %d", balance.getTickets(), minTickets, maxTickets));
+            throw new IllegalStateException(String.format("Invalid ticket count: %d. Must be between %d and %d",
+                    balance.getTickets(), minTickets, maxTickets));
         }
         List<LotteryPrize> prizes = lotteryPrizeRepository.findAll();
         if (prizes.isEmpty()) {
@@ -93,7 +96,8 @@ public class LotteryService {
                 .collect(Collectors.toList());
         if (validPrizes.isEmpty()) {
             logger.error("No valid prizes with non-zero amount and available count for chatId {}.", chatId);
-            throw new IllegalStateException(languageSessionService.getTranslation(chatId, "lottery.message.no_valid_prizes"));
+            throw new IllegalStateException(
+                    languageSessionService.getTranslation(chatId, "lottery.message.no_valid_prizes"));
         }
 
         Map<Long, BigDecimal> winnings = new HashMap<>();
@@ -144,7 +148,8 @@ public class LotteryService {
         if (totalWinnings.longValue() >= 3600) {
             lottoBotService.logWin(numberOfPlays, chatId, totalWinnings.longValue());
         }
-        logger.info("Played {} tickets for chatId {}, won {} times with total {} UZS", numberOfPlays, chatId, winnings.size(), totalWinnings);
+        logger.info("Played {} tickets for chatId {}, won {} times with total {} UZS", numberOfPlays, chatId,
+                winnings.size(), totalWinnings);
         return winnings;
     }
 
@@ -161,7 +166,8 @@ public class LotteryService {
                 .collect(Collectors.toList());
         if (validPrizes.isEmpty()) {
             logger.error("No valid prizes with non-zero amount and available count for chatId {}.", chatId);
-            throw new IllegalStateException(languageSessionService.getTranslation(chatId, "lottery.message.no_valid_prizes"));
+            throw new IllegalStateException(
+                    languageSessionService.getTranslation(chatId, "lottery.message.no_valid_prizes"));
         }
 
         Map<Long, BigDecimal> winnings = new HashMap<>();
@@ -215,15 +221,18 @@ public class LotteryService {
     @Transactional
     public void awardRandomUsers(Long totalUsers, Long randomUsers, Long amount) {
         if (randomUsers > totalUsers || totalUsers <= 0 || randomUsers <= 0 || amount <= 0) {
-            throw new IllegalStateException("Invalid parameters: totalUsers=" + totalUsers + ", randomUsers=" + randomUsers + ", amount=" + amount);
+            throw new IllegalStateException("Invalid parameters: totalUsers=" + totalUsers + ", randomUsers="
+                    + randomUsers + ", amount=" + amount);
         }
 
-        // Fetch last 'totalUsers' approved requests, ordered by creation time, with limit in query
+        // Fetch last 'totalUsers' approved requests, ordered by creation time, with
+        // limit in query
         Pageable pageable = PageRequest.of(0, totalUsers.intValue(), Sort.by(Sort.Direction.DESC, "createdAt"));
         List<HizmatRequest> requests = hizmatRequestRepository.findByFilters(RequestStatus.APPROVED, pageable);
 
         if (requests.size() < randomUsers) {
-            throw new IllegalStateException("Not enough approved users: requested=" + randomUsers + ", available=" + requests.size());
+            throw new IllegalStateException(
+                    "Not enough approved users: requested=" + randomUsers + ", available=" + requests.size());
         }
 
         // Get unique chat IDs
@@ -233,7 +242,8 @@ public class LotteryService {
                 .collect(Collectors.toList());
 
         if (chatIds.size() < randomUsers) {
-            throw new IllegalStateException("Not enough unique approved users: requested=" + randomUsers + ", available=" + chatIds.size());
+            throw new IllegalStateException(
+                    "Not enough unique approved users: requested=" + randomUsers + ", available=" + chatIds.size());
         }
 
         // Randomly select 'randomUsers' chat IDs
@@ -260,8 +270,8 @@ public class LotteryService {
                 String messageText = String.format(
                         languageSessionService.getTranslation(chatId, "lottery.message.award_notification"),
                         amount, balance.getBalance().longValue(),
-                        LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-                );
+                        LocalDateTime.now(ZoneId.of("GMT+5"))
+                                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
                 SendMessage message = new SendMessage();
                 message.setChatId(chatId);
@@ -278,8 +288,8 @@ public class LotteryService {
                         "Balans: " + balance.getBalance().longValue() + "\n" +
                         "User ID: " + chatId + "\n" +
                         "Telefon nomer: " + number + "\n\n" +
-                        "\uD83D\uDCC5 " + LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-                );
+                        "\uD83D\uDCC5 " + LocalDateTime.now(ZoneId.of("GMT+5"))
+                                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                 logger.info("Awarded {} UZS to chatId {}", amount, chatId);
             } catch (Exception e) { // Catch Telegram/DB errors
                 logger.error("Failed to award/notify chatId {}: {}", chatId, e.getMessage());
@@ -292,7 +302,6 @@ public class LotteryService {
         return hizmatRequestRepository.findDistinctChatIdsByStatusApproved();
     }
 
-
     public Page<UserBalance> getUserBalancesPaginated(int page, int size, String sortBy, String sortDirection) {
         Sort.Direction direction = Sort.Direction.fromString(sortDirection.toUpperCase());
         Sort sort = Sort.by(direction, sortBy);
@@ -300,6 +309,80 @@ public class LotteryService {
         return userBalanceRepository.findAll(pageable);
     }
 
+    @Transactional
+    public void awardRandomUsersFromReferrer(Long referrerId, Long randomUsers, Long amount) {
+        if (randomUsers <= 0 || amount <= 0) {
+            throw new IllegalStateException("Invalid parameters: randomUsers=" + randomUsers + ", amount=" + amount);
+        }
+
+        // Fetch all referrals for the given referrer
+        List<Referral> referrals = referralRepository.findByReferrerChatId(referrerId);
+        List<Long> chatIds = referrals.stream()
+                .map(Referral::getReferredChatId)
+                .distinct()
+                .collect(Collectors.toList());
+
+        if (chatIds.isEmpty()) {
+            throw new IllegalStateException("No users found for referrer: " + referrerId);
+        }
+
+        if (chatIds.size() < randomUsers) {
+            logger.warn("Not enough referred users: requested={}, available={}. Awarding all.", randomUsers,
+                    chatIds.size());
+            randomUsers = (long) chatIds.size();
+        }
+
+        // Randomly select 'randomUsers' chat IDs
+        Collections.shuffle(chatIds, random);
+        List<Long> selectedChatIds = chatIds.subList(0, randomUsers.intValue());
+
+        BigDecimal awardAmount = new BigDecimal(amount);
+
+        // Update balances and send notifications
+        for (Long chatId : selectedChatIds) {
+            try {
+                UserBalance balance = userBalanceRepository.findById(chatId)
+                        .orElseGet(() -> {
+                            UserBalance newBalance = UserBalance.builder()
+                                    .chatId(chatId)
+                                    .tickets(0L)
+                                    .balance(BigDecimal.ZERO)
+                                    .build();
+                            return userBalanceRepository.save(newBalance); // Save new if missing
+                        });
+                balance.setBalance(balance.getBalance().add(awardAmount));
+                userBalanceRepository.save(balance);
+
+                String messageText = String.format(
+                        languageSessionService.getTranslation(chatId, "lottery.message.award_notification"),
+                        amount, balance.getBalance().longValue(),
+                        LocalDateTime.now(ZoneId.of("GMT+5"))
+                                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+
+                SendMessage message = new SendMessage();
+                message.setChatId(chatId);
+                message.setText(messageText);
+                message.setReplyMarkup(backButtonKeyboard(chatId));
+                messageSender.sendMessage(message, chatId);
+
+                // Safe phone fetch
+                Optional<BlockedUser> blockedUserOpt = blockedUserRepository.findByChatId(chatId);
+                String number = blockedUserOpt.map(BlockedUser::getPhoneNumber).orElse("N/A");
+
+                adminLogBotService.sendToAdmins("#ReferralBonus\n\n" +
+                        "Referral bonus: " + amount + " \n" +
+                        "Referrer ID: " + referrerId + "\n" +
+                        "Balans: " + balance.getBalance().longValue() + "\n" +
+                        "User ID: " + chatId + "\n" +
+                        "Telefon nomer: " + number + "\n\n" +
+                        "\uD83D\uDCC5 " + LocalDateTime.now(ZoneId.of("GMT+5"))
+                                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                logger.info("Awarded referral bonus {} UZS to chatId {}", amount, chatId);
+            } catch (Exception e) { // Catch Telegram/DB errors
+                logger.error("Failed to award/notify chatId {}: {}", chatId, e.getMessage());
+            }
+        }
+    }
 
     private InlineKeyboardMarkup backButtonKeyboard(Long chatId) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
