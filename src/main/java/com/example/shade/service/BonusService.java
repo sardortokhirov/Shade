@@ -94,12 +94,14 @@ public class BonusService {
             sendTopUpPlatformMenu(chatId);
             return;
         }
-        if ("BONUS_TOPUP_AMOUNT_3600".equals(callback)) {
-            handleTopUpInput(chatId, "3600");
+        if ("BONUS_TOPUP_AMOUNT_MIN".equals(callback)) {
+            BigDecimal minAmount = configurationService.getBonusTopUpMinAmount();
+            handleTopUpInput(chatId, minAmount.toPlainString());
             return;
         }
-        if ("BONUS_TOPUP_AMOUNT_100000".equals(callback)) {
-            handleTopUpInput(chatId, "100000");
+        if ("BONUS_TOPUP_AMOUNT_MAX".equals(callback)) {
+            BigDecimal maxAmount = configurationService.getBonusTopUpMaxAmount();
+            handleTopUpInput(chatId, maxAmount.toPlainString());
             return;
         }
         if (callback.startsWith("ADMIN_APPROVE_TRANSFER:")) {
@@ -1054,9 +1056,11 @@ public class BonusService {
     private InlineKeyboardMarkup createAmountKeyboard(Long chatId) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        BigDecimal minAmount = configurationService.getBonusTopUpMinAmount();
+        BigDecimal maxAmount = configurationService.getBonusTopUpMaxAmount();
         rows.add(List.of(
-                createButton("3,600", "BONUS_TOPUP_AMOUNT_3600"),
-                createButton("100,000", "BONUS_TOPUP_AMOUNT_100000")
+                createButton(String.format("%,d", minAmount.longValue()), "BONUS_TOPUP_AMOUNT_MIN"),
+                createButton(String.format("%,d", maxAmount.longValue()), "BONUS_TOPUP_AMOUNT_MAX")
         ));
         rows.add(createNavigationButtons(chatId));
         markup.setKeyboard(rows);

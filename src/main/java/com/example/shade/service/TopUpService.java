@@ -559,6 +559,9 @@ public class TopUpService {
                 }
 
                 bonusService.creditReferral(request.getChatId(), request.getAmount());
+                
+                dailyStatsService.addTopUpAmount(request.getChatId(), request.getAmount());
+
                 String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
                 String logMessage = String.format(
                         "🆔: %d  To‘lov yakunlandi ✅\n" +

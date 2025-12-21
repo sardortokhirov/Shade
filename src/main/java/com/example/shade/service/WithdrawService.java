@@ -616,7 +616,7 @@ public class WithdrawService {
                     BigDecimal multiplier = BigDecimal.ONE.subtract(commissionPercentage);
                     netAmount = paidAmount.multiply(latest.getRubToUzs()).multiply(multiplier).setScale(2, RoundingMode.DOWN);
                 } else {
-                    netAmount = paidAmount.multiply(latest.getRubToUzs()).setScale(2, RoundingMode.DOWN);
+                netAmount = paidAmount.multiply(latest.getRubToUzs()).setScale(2, RoundingMode.DOWN);
                 }
             }
 
