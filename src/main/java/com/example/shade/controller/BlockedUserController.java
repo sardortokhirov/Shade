@@ -49,8 +49,9 @@ public class BlockedUserController {
         if (!authenticate(request)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("❌ Autentifikatsiya xatosi");
         }
-        if (!blockedUserRepository.existsById(chatId)) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("❌ Foydalanuvchi topilmadi");
+        com.example.shade.model.BlockedUser user = blockedUserRepository.findByChatId(chatId).orElse(null);
+        if (user == null || !"BLOCKED".equals(user.getPhoneNumber())) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("❌ Foydalanuvchi bloklanganlar ro‘yxatida emas");
         }
         blockedUserRepository.deleteById(chatId);
         return ResponseEntity.ok("✅ Foydalanuvchi blokdan chiqarildi: " + chatId);
