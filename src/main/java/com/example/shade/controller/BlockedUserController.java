@@ -20,6 +20,7 @@ import java.util.Base64;
 public class BlockedUserController {
 
     private final BlockedUserRepository blockedUserRepository;
+    private final com.example.shade.repository.UserRepository userRepository;
 
     private boolean authenticate(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
@@ -32,7 +33,7 @@ public class BlockedUserController {
     }
 
     @GetMapping
-    public ResponseEntity<Page<BlockedUser>> getAllBlockedUsers(
+    public ResponseEntity<Page<com.example.shade.dto.UserStatusDTO>> getAllUsers(
             HttpServletRequest request,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
@@ -40,7 +41,7 @@ public class BlockedUserController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         Pageable pageable = PageRequest.of(page, size);
-        return ResponseEntity.ok(blockedUserRepository.findAll(pageable));
+        return ResponseEntity.ok(userRepository.findAllWithBlockedStatus(pageable));
     }
 
     @PostMapping("/unblock")
