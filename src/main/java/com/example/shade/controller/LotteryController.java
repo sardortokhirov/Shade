@@ -181,23 +181,6 @@ public class LotteryController {
         }
     }
 
-    @PostMapping("/lottery/award-referral")
-    public ResponseEntity<Void> awardRandomUsersFromReferrer(
-            @RequestParam Long referrerId,
-            @RequestParam Long randomUsers,
-            @RequestParam Long amount,
-            HttpServletRequest request) {
-        if (!authenticate(request)) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        try {
-            lotteryService.awardRandomUsersFromReferrer(referrerId, randomUsers, amount);
-            return ResponseEntity.ok().build();
-        } catch (IllegalStateException e) {
-            return ResponseEntity.badRequest().build();
-        }
-    }
-
     @GetMapping("/lottery/approved-users-chatids")
     public ResponseEntity<List<Long>> getApprovedUsersChatIds(HttpServletRequest request) {
         if (!authenticate(request)) {
