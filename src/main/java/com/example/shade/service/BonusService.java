@@ -42,6 +42,7 @@ public class BonusService {
     private final BlockedUserRepository blockedUserRepository;
     private final AdminChatRepository adminChatRepository;
     private final ExchangeRateRepository exchangeRateRepository;
+    private final AllowedPromoUserRepository allowedPromoUserRepository;
     private final LotteryService lotteryService;
     private final MessageSender messageSender;
     private final AdminLogBotService adminLogBotService;
@@ -54,34 +55,17 @@ public class BonusService {
 
     public void startBonus(Long chatId) {
         logger.info("Starting bonus section for chatId: {}", chatId);
-        
-        // Check promo access
-        if (!canAccessBonus(chatId)) {
-            messageSender.sendMessage(chatId, 
-                languageSessionService.getTranslation(chatId, "message.promo_bonus_restricted"));
-            return;
-        }
-        
+
+        // Usage of promo logic moved to validation
         sessionService.setUserState(chatId, "BONUS_MENU");
         sessionService.addNavigationState(chatId, "MAIN_MENU");
         sendBonusMenu(chatId);
     }
 
-    private boolean canAccessBonus(Long chatId) {
-        // Check if promo mode is enabled
-        if (!featureService.isPromoEnabled()) {
-            return true; // Promo not active, everyone can access
-        }
-        
-        // Promo is active - check if user came from ref_5692494190
-        return referralRepository.findByReferredChatId(chatId)
-            .map(referral -> referral.getReferrerChatId().equals(5692494190L))
-            .orElse(false); // User has no referral or wrong referral
-    }
-
     public void handleCallback(Long chatId, String callback) throws Exception {
         logger.info("Bonus callback for chatId {}: {}", chatId, callback);
-//        messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
+        // messageSender.animateAndDeleteMessages(chatId,
+        // sessionService.getMessageIds(chatId), "OPEN");
         sessionService.clearMessageIds(chatId);
 
         if (callback.startsWith("BONUS_TOPUP_PLATFORM:")) {
@@ -177,7 +161,8 @@ public class BonusService {
                 }
             }
             default ->
-                    messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "message.invalid_command"));
+                messageSender.sendMessage(chatId,
+                        languageSessionService.getTranslation(chatId, "message.invalid_command"));
         }
     }
 
@@ -304,7 +289,8 @@ public class BonusService {
     }
 
     private void sendUserIdInput(Long chatId, String platform) {
-        List<HizmatRequest> recentRequests = requestRepository.findTop3ByChatIdAndPlatformOrderByCreatedAtDesc(chatId, platform);
+        List<HizmatRequest> recentRequests = requestRepository.findTop3ByChatIdAndPlatformOrderByCreatedAtDesc(chatId,
+                platform);
         SendMessage message = new SendMessage();
         message.setChatId(chatId);
         if (!recentRequests.isEmpty()) {
@@ -313,7 +299,8 @@ public class BonusService {
             message.setText(languageSessionService.getTranslation(chatId, "message.user_id_with_recent"));
             message.setReplyMarkup(createSavedIdKeyboard(chatId, recentRequests));
         } else {
-            message.setText(String.format(languageSessionService.getTranslation(chatId, "message.user_id_input"), platform));
+            message.setText(
+                    String.format(languageSessionService.getTranslation(chatId, "message.user_id_input"), platform));
             message.setReplyMarkup(createNavigationKeyboard(chatId));
         }
         messageSender.sendMessage(message, chatId);
@@ -341,7 +328,7 @@ public class BonusService {
         message.setChatId(chatId);
         BigDecimal minTopUp = configurationService.getBonusTopUpMinAmount();
         BigDecimal maxTopUp = configurationService.getBonusTopUpMaxAmount();
-        message.setText(String.format(languageSessionService.getTranslation(chatId, "message.topup_input"), 
+        message.setText(String.format(languageSessionService.getTranslation(chatId, "message.topup_input"),
                 platform, minTopUp.longValue(), maxTopUp.longValue()));
         message.setReplyMarkup(createAmountKeyboard(chatId));
         messageSender.sendMessage(message, chatId);
@@ -359,7 +346,8 @@ public class BonusService {
     }
 
     private void handleUserIdInput(Long chatId, String userId) {
-//        messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
+        // messageSender.animateAndDeleteMessages(chatId,
+        // sessionService.getMessageIds(chatId), "OPEN");
         sessionService.clearMessageIds(chatId);
 
         if (!isValidUserId(userId)) {
@@ -377,7 +365,7 @@ public class BonusService {
         Platform platform = platformRepository.findByName(platformName)
                 .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
 
-        if (platform.getType().equals("mostbet")){
+        if (platform.getType().equals("mostbet")) {
             Currency currency = platform.getCurrency();
             HizmatRequest request = HizmatRequest.builder()
                     .chatId(chatId)
@@ -397,87 +385,107 @@ public class BonusService {
             sessionService.setUserData(chatId, "platformUserId", userId);
             sessionService.setUserData(chatId, "fullName", "MOSTBET");
             sendTopUpInput(chatId, platformName);
-        }
-        else {
-        String hash = platform.getApiKey();
-        String cashierPass = platform.getPassword();
-        String cashdeskId = platform.getWorkplaceId();
+        } else {
+            String hash = platform.getApiKey();
+            String cashierPass = platform.getPassword();
+            String cashdeskId = platform.getWorkplaceId();
 
-        String confirmInput = userId + ":" + hash;
-        String confirm = DigestUtils.md5DigestAsHex(confirmInput.getBytes(StandardCharsets.UTF_8));
+            String confirmInput = userId + ":" + hash;
+            String confirm = DigestUtils.md5DigestAsHex(confirmInput.getBytes(StandardCharsets.UTF_8));
 
-        String sha256Input1 = "hash=" + hash + "&userid=" + userId + "&cashdeskid=" + cashdeskId;
-        String sha256Result1 = sha256Hex(sha256Input1);
-        String md5Input = "userid=" + userId + "&cashierpass=" + cashierPass + "&hash=" + hash;
-        String md5Result = DigestUtils.md5DigestAsHex(md5Input.getBytes(StandardCharsets.UTF_8));
-        String finalSignature = sha256Hex(sha256Result1 + md5Result);
+            String sha256Input1 = "hash=" + hash + "&userid=" + userId + "&cashdeskid=" + cashdeskId;
+            String sha256Result1 = sha256Hex(sha256Input1);
+            String md5Input = "userid=" + userId + "&cashierpass=" + cashierPass + "&hash=" + hash;
+            String md5Result = DigestUtils.md5DigestAsHex(md5Input.getBytes(StandardCharsets.UTF_8));
+            String finalSignature = sha256Hex(sha256Result1 + md5Result);
 
-        String apiUrl = String.format("https://partners.servcul.com/CashdeskBotAPI/Users/%s?confirm=%s&cashdeskId=%s",
-                userId, confirm, cashdeskId);
-        logger.info("Validating user ID {} for platform {} (chatId: {}), URL: {}", userId, platformName, chatId, apiUrl);
+            String apiUrl = String.format(
+                    "https://partners.servcul.com/CashdeskBotAPI/Users/%s?confirm=%s&cashdeskId=%s",
+                    userId, confirm, cashdeskId);
+            logger.info("Validating user ID {} for platform {} (chatId: {}), URL: {}", userId, platformName, chatId,
+                    apiUrl);
 
-        try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("sign", finalSignature);
-            HttpEntity<String> entity = new HttpEntity<>(headers);
+            try {
+                HttpHeaders headers = new HttpHeaders();
+                headers.set("sign", finalSignature);
+                HttpEntity<String> entity = new HttpEntity<>(headers);
 
-            ResponseEntity<UserProfile> response = restTemplate.exchange(apiUrl, HttpMethod.GET, entity, UserProfile.class);
-            UserProfile profile = response.getBody();
+                ResponseEntity<UserProfile> response = restTemplate.exchange(apiUrl, HttpMethod.GET, entity,
+                        UserProfile.class);
+                UserProfile profile = response.getBody();
 
-            if (response.getStatusCode().is2xxSuccessful() && profile != null && profile.getUserId() != null && !profile.getName().isEmpty()) {
-                String fullName = profile.getName();
-                sessionService.setUserData(chatId, "platformUserId", userId);
-                sessionService.setUserData(chatId, "fullName", fullName);
-                Currency currency = Currency.UZS;
-                if (profile.getCurrencyId() == 1L) {
-                    currency = Currency.RUB;
+                if (response.getStatusCode().is2xxSuccessful() && profile != null && profile.getUserId() != null
+                        && !profile.getName().isEmpty()) {
+                    String fullName = profile.getName();
+                    sessionService.setUserData(chatId, "platformUserId", userId);
+                    sessionService.setUserData(chatId, "fullName", fullName);
+                    Currency currency = Currency.UZS;
+                    if (profile.getCurrencyId() == 1L) {
+                        currency = Currency.RUB;
+                    }
+                    HizmatRequest request = HizmatRequest.builder()
+                            .chatId(chatId)
+                            .platform(platformName)
+                            .platformUserId(userId)
+                            .fullName(fullName)
+                            .status(RequestStatus.PENDING)
+                            .createdAt(LocalDateTime.now(ZoneId.of("GMT+5")))
+                            .amount(0L)
+                            .currency(currency)
+                            .type(RequestType.TOP_UP)
+                            .build();
+                    requestRepository.save(request);
+
+                    sessionService.setUserState(chatId, "BONUS_TOPUP_INPUT");
+                    sessionService.addNavigationState(chatId, "BONUS_TOPUP_APPROVE_USER");
+                    sendTopUpInput(chatId, platformName);
+                } else {
+                    logger.warn("Invalid user profile for ID {} on platform {}. Response: {}", userId, platformName,
+                            profile);
+                    sendNoUserFound(chatId);
                 }
-                HizmatRequest request = HizmatRequest.builder()
-                        .chatId(chatId)
-                        .platform(platformName)
-                        .platformUserId(userId)
-                        .fullName(fullName)
-                        .status(RequestStatus.PENDING)
-                        .createdAt(LocalDateTime.now(ZoneId.of("GMT+5")))
-                        .amount(0L)
-                        .currency(currency)
-                        .type(RequestType.TOP_UP)
-                        .build();
-                requestRepository.save(request);
-
-                sessionService.setUserState(chatId, "BONUS_TOPUP_INPUT");
-                sessionService.addNavigationState(chatId, "BONUS_TOPUP_APPROVE_USER");
-                sendTopUpInput(chatId, platformName);
-            } else {
-                logger.warn("Invalid user profile for ID {} on platform {}. Response: {}", userId, platformName, profile);
+            } catch (HttpClientErrorException.NotFound e) {
+                logger.warn("User not found for ID {} on platform {}: {}", userId, platformName, e.getMessage());
                 sendNoUserFound(chatId);
+            } catch (HttpClientErrorException e) {
+                logger.error("API error for user ID {} on platform {}: {}", userId, platformName, e.getMessage());
+                String errorMessage = e.getStatusCode().value() == 401
+                        ? languageSessionService.getTranslation(chatId, "message.api_error_invalid_signature")
+                        : e.getStatusCode().value() == 403
+                                ? languageSessionService.getTranslation(chatId, "message.api_error_invalid_confirm")
+                                : languageSessionService.getTranslation(chatId, "message.api_error");
+                messageSender.sendMessage(chatId, errorMessage);
+                sendUserIdInput(chatId, platformName);
+            } catch (Exception e) {
+                logger.error("Error calling API for user ID {} on platform {}: {}", userId, platformName,
+                        e.getMessage());
+                messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "message.api_error"));
+                sendUserIdInput(chatId, platformName);
             }
-        } catch (HttpClientErrorException.NotFound e) {
-            logger.warn("User not found for ID {} on platform {}: {}", userId, platformName, e.getMessage());
-            sendNoUserFound(chatId);
-        } catch (HttpClientErrorException e) {
-            logger.error("API error for user ID {} on platform {}: {}", userId, platformName, e.getMessage());
-            String errorMessage = e.getStatusCode().value() == 401
-                    ? languageSessionService.getTranslation(chatId, "message.api_error_invalid_signature")
-                    : e.getStatusCode().value() == 403
-                    ? languageSessionService.getTranslation(chatId, "message.api_error_invalid_confirm")
-                    : languageSessionService.getTranslation(chatId, "message.api_error");
-            messageSender.sendMessage(chatId, errorMessage);
-            sendUserIdInput(chatId, platformName);
-        } catch (Exception e) {
-            logger.error("Error calling API for user ID {} on platform {}: {}", userId, platformName, e.getMessage());
-            messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "message.api_error"));
-            sendUserIdInput(chatId, platformName);
-        }}
+        }
+
+        // --- NEW PROMO LOGIC START ---
+        if (featureService.isPromoEnabled()) {
+            boolean isAllowed = allowedPromoUserRepository.existsByUserId(userId);
+            if (!isAllowed) {
+                messageSender.sendMessage(chatId,
+                        languageSessionService.getTranslation(chatId, "message.promo_restriction"));
+                // Reset state to ID input so they can try another ID or go back
+                sessionService.setUserState(chatId, "BONUS_TOPUP_USER_ID");
+                return;
+            }
+        }
+        // --- NEW PROMO LOGIC END ---
     }
 
     private void handleApproveUser(Long chatId) {
         sessionService.setUserState(chatId, "BONUS_TOPUP_INPUT");
         sessionService.addNavigationState(chatId, "BONUS_TOPUP_APPROVE_USER");
         String platform = sessionService.getUserData(chatId, "platform");
-        if (platform == null&&!platform.equals("mostbet")) {
+        if (platform == null && !platform.equals("mostbet")) {
             logger.error("FullName is null for chatId {}", chatId);
-            messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "topup.message.user_data_not_found"));
+            messageSender.sendMessage(chatId,
+                    languageSessionService.getTranslation(chatId, "topup.message.user_data_not_found"));
             sessionService.setUserState(chatId, "TOPUP_USER_ID_INPUT");
             sendUserIdInput(chatId, sessionService.getUserData(chatId, "platform"));
         } else {
@@ -486,7 +494,8 @@ public class BonusService {
     }
 
     private void handleTopUpInput(Long chatId, String input) {
-//        messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
+        // messageSender.animateAndDeleteMessages(chatId,
+        // sessionService.getMessageIds(chatId), "OPEN");
         sessionService.clearMessageIds(chatId);
 
         String amountStr = input.trim();
@@ -500,9 +509,8 @@ public class BonusService {
             BigDecimal maxTopUp = configurationService.getBonusTopUpMaxAmount();
             if (amount.compareTo(minTopUp) < 0 || amount.compareTo(maxTopUp) > 0) {
                 String message = String.format(
-                    languageSessionService.getTranslation(chatId, "message.invalid_amount_range"),
-                    minTopUp.longValue(), maxTopUp.longValue()
-                );
+                        languageSessionService.getTranslation(chatId, "message.invalid_amount_range"),
+                        minTopUp.longValue(), maxTopUp.longValue());
                 messageSender.sendMessage(chatId, message);
                 sendTopUpInput(chatId, platform);
                 return;
@@ -513,17 +521,17 @@ public class BonusService {
 
             if (balance.getBalance().compareTo(minTopUp) < 0) {
                 String message = String.format(
-                    languageSessionService.getTranslation(chatId, "message.insufficient_minimum_balance"),
-                    minTopUp.longValue(), balance.getBalance().longValue()
-                );
+                        languageSessionService.getTranslation(chatId, "message.insufficient_minimum_balance"),
+                        minTopUp.longValue(), balance.getBalance().longValue());
                 messageSender.sendMessage(chatId, message);
                 sendTopUpInput(chatId, platform);
                 return;
             }
 
             if (balance.getBalance().compareTo(amount) < 0) {
-                messageSender.sendMessage(chatId, String.format(languageSessionService.getTranslation(chatId, "message.insufficient_balance"),
-                        balance.getBalance().longValue()));
+                messageSender.sendMessage(chatId,
+                        String.format(languageSessionService.getTranslation(chatId, "message.insufficient_balance"),
+                                balance.getBalance().longValue()));
                 sendTopUpInput(chatId, platform);
                 return;
             }
@@ -532,9 +540,8 @@ public class BonusService {
             Long availableLimit = dailyStatsService.getAvailableLimit(chatId);
             if (amount.longValue() > availableLimit) {
                 String errorMessage = String.format(
-                    languageSessionService.getTranslation(chatId, "message.daily_limit_exceeded"),
-                    availableLimit
-                );
+                        languageSessionService.getTranslation(chatId, "message.daily_limit_exceeded"),
+                        availableLimit);
                 messageSender.sendMessage(chatId, errorMessage);
                 sendTopUpInput(chatId, platform);
                 return;
@@ -542,7 +549,8 @@ public class BonusService {
 
         } catch (NumberFormatException e) {
             logger.warn("Invalid amount format for chatId {}: {}", chatId, amountStr);
-            messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "message.invalid_amount_format"));
+            messageSender.sendMessage(chatId,
+                    languageSessionService.getTranslation(chatId, "message.invalid_amount_format"));
             sendTopUpInput(chatId, platform);
             return;
         }
@@ -564,17 +572,22 @@ public class BonusService {
                 .orElse(UserBalance.builder().chatId(chatId).tickets(0L).balance(BigDecimal.ZERO).build());
 
         if (balance.getBalance().compareTo(amount) < 0) {
-            logger.warn("Insufficient balance for chatId {}: requested {}, available {}", chatId, amount, balance.getBalance());
-            messageSender.sendMessage(chatId, String.format(languageSessionService.getTranslation(chatId, "message.topup_insufficient_balance"),
-                    balance.getBalance().longValue()));
+            logger.warn("Insufficient balance for chatId {}: requested {}, available {}", chatId, amount,
+                    balance.getBalance());
+            messageSender.sendMessage(chatId,
+                    String.format(languageSessionService.getTranslation(chatId, "message.topup_insufficient_balance"),
+                            balance.getBalance().longValue()));
             sendTopUpInput(chatId, platform);
             return;
         }
-        HizmatRequest request = requestRepository.findTopByChatIdAndPlatformAndPlatformUserIdAndStatusOrderByCreatedAtDesc(
-                chatId, platform, userId, RequestStatus.PENDING).orElse(null);
+        HizmatRequest request = requestRepository
+                .findTopByChatIdAndPlatformAndPlatformUserIdAndStatusOrderByCreatedAtDesc(
+                        chatId, platform, userId, RequestStatus.PENDING)
+                .orElse(null);
         if (request == null) {
             logger.error("No pending request found for chatId {}, platform: {}, userId: {}", chatId, platform, userId);
-            messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "message.request_not_found"));
+            messageSender.sendMessage(chatId,
+                    languageSessionService.getTranslation(chatId, "message.request_not_found"));
             sendMainMenu(chatId);
             return;
         }
@@ -608,63 +621,81 @@ public class BonusService {
                 escapeMarkdown(request.getPlatformUserId()),
                 request.getAmount(),
                 chatId,
-                escapeMarkdown(number)
-        );
+                escapeMarkdown(number));
 
-        adminLogBotService.sendWithdrawRequestToAdmins(chatId, message, request.getId(), createAdminApprovalKeyboard(chatId, request.getId(), request.getChatId()));
+        adminLogBotService.sendWithdrawRequestToAdmins(chatId, message, request.getId(),
+                createAdminApprovalKeyboard(chatId, request.getId(), request.getChatId()));
     }
 
     private String escapeMarkdown(String text) {
-        if (text == null) return "";
+        if (text == null)
+            return "";
         return text.replace("_", "\\_")
                 .replace("*", "\\*")
                 .replace("`", "\\`")
                 .replace("[", "\\[");
     }
 
-    public void handleAdminApproveTransfer(Long chatId, Long requestId)  {
+    public void handleAdminApproveTransfer(Long chatId, Long requestId) {
         HizmatRequest request = requestRepository.findById(requestId)
                 .orElseThrow(() -> new IllegalStateException("Request not found: " + requestId));
 
-//        creditReferral(request.getChatId(), request.getAmount());
+        // creditReferral(request.getChatId(), request.getAmount());
 
         String platformName = request.getPlatform();
         Platform platformData = platformRepository.findByName(platformName)
                 .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
 
-        if (platformData.getType().equals("mostbet")){
+        if (platformData.getType().equals("mostbet")) {
             try {
-                BalanceLimit transferSuccessful =mostbetService.transferToPlatform(request);
+                BalanceLimit transferSuccessful = mostbetService.transferToPlatform(request);
                 request.setStatus(RequestStatus.BONUS_APPROVED);
                 request.setTransactionId(UUID.randomUUID().toString());
                 requestRepository.save(request);
                 dailyStatsService.addTransferAmount(request.getChatId(), request.getAmount());
-//                messageSender.animateAndDeleteMessages(request.getChatId(), sessionService.getMessageIds(request.getChatId()), "OPEN");
+                // messageSender.animateAndDeleteMessages(request.getChatId(),
+                // sessionService.getMessageIds(request.getChatId()), "OPEN");
                 sessionService.clearMessageIds(request.getChatId());
                 String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
 
                 if (transferSuccessful == null) {
-                    String message = String.format("🆔: %d #Bonus tasdiqlandi ✅ \n\uD83C\uDF10 %s :  %s\n💰 Bonus: %,d so‘m\n\uD83D\uDC64 Foydalanuvchi: `%d` \n\uD83D\uDCDE %s \n\n 📅 [%s]",
-                            request.getId(), request.getPlatform(), request.getPlatformUserId(), request.getAmount(), request.getChatId(), number, LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                    String bonusMessage = String.format(languageSessionService.getTranslation(request.getChatId(), "message.bonus_approved"),
-                            request.getId(), request.getPlatform(), request.getPlatformUserId(), request.getAmount(), LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                    String message = String.format(
+                            "🆔: %d #Bonus tasdiqlandi ✅ \n\uD83C\uDF10 %s :  %s\n💰 Bonus: %,d so‘m\n\uD83D\uDC64 Foydalanuvchi: `%d` \n\uD83D\uDCDE %s \n\n 📅 [%s]",
+                            request.getId(), request.getPlatform(), request.getPlatformUserId(), request.getAmount(),
+                            request.getChatId(), number, LocalDateTime.now(ZoneId.of("GMT+5"))
+                                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                    String bonusMessage = String.format(
+                            languageSessionService.getTranslation(request.getChatId(), "message.bonus_approved"),
+                            request.getId(), request.getPlatform(), request.getPlatformUserId(), request.getAmount(),
+                            LocalDateTime.now(ZoneId.of("GMT+5"))
+                                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                     messageSender.sendMessage(request.getChatId(), bonusMessage);
                     adminLogBotService.sendToAdmins(message);
                 } else {
-                    String message = String.format("🆔: %d #Bonus tasdiqlandi ✅\n\uD83C\uDF10 %s :  %s\n💰 Bonus: %,d so‘m\n Foydalanuvchi: `%d` \n \uD83D\uDCDE %s \n\n  \uD83C\uDFE6: %,d %s \n\n 📅 [%s]",
-                            request.getId(), request.getPlatform(), request.getPlatformUserId(), request.getAmount(), request.getChatId(), number, transferSuccessful.getLimit().longValue(), platformData.getCurrency().toString(), LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                    String bonusMessage = String.format(languageSessionService.getTranslation(request.getChatId(), "message.bonus_approved"),
-                            request.getId(), request.getPlatform(), request.getPlatformUserId(), request.getAmount(), LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                    String message = String.format(
+                            "🆔: %d #Bonus tasdiqlandi ✅\n\uD83C\uDF10 %s :  %s\n💰 Bonus: %,d so‘m\n Foydalanuvchi: `%d` \n \uD83D\uDCDE %s \n\n  \uD83C\uDFE6: %,d %s \n\n 📅 [%s]",
+                            request.getId(), request.getPlatform(), request.getPlatformUserId(), request.getAmount(),
+                            request.getChatId(), number, transferSuccessful.getLimit().longValue(),
+                            platformData.getCurrency().toString(), LocalDateTime.now(ZoneId.of("GMT+5"))
+                                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                    String bonusMessage = String.format(
+                            languageSessionService.getTranslation(request.getChatId(), "message.bonus_approved"),
+                            request.getId(), request.getPlatform(), request.getPlatformUserId(), request.getAmount(),
+                            LocalDateTime.now(ZoneId.of("GMT+5"))
+                                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                     messageSender.sendMessage(request.getChatId(), bonusMessage);
                     adminLogBotService.sendToAdmins(message);
                 }
             } catch (Exception e) {
-                logger.error("❌ Error transferring top-up to platform for chatId {}: {}", request.getChatId(), e.getMessage());
-                messageSender.sendMessage(request.getChatId(), languageSessionService.getTranslation(request.getChatId(), "message.transfer_failed"));
-                adminLogBotService.sendToAdmins("So‘rov tasdiqlandi, lekin kontorada xatolik yuz berdi: " + e.getMessage() + " (Foydalanuvchi: " + request.getChatId() + ")");
+                logger.error("❌ Error transferring top-up to platform for chatId {}: {}", request.getChatId(),
+                        e.getMessage());
+                messageSender.sendMessage(request.getChatId(),
+                        languageSessionService.getTranslation(request.getChatId(), "message.transfer_failed"));
+                adminLogBotService.sendToAdmins("So‘rov tasdiqlandi, lekin kontorada xatolik yuz berdi: "
+                        + e.getMessage() + " (Foydalanuvchi: " + request.getChatId() + ")");
             }
 
-        }else {
+        } else {
 
             String hash = platformData.getApiKey();
             String cashierPass = platformData.getPassword();
@@ -674,14 +705,14 @@ public class BonusService {
             String cardNumber = request.getCardNumber();
             ExchangeRate latest = exchangeRateRepository.findLatest()
                     .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
-            long amount = request.getCurrency().equals(Currency.RUB) ?
-                    BigDecimal.valueOf(request.getAmount())
-                            .multiply(latest.getUzsToRub())
-                            .longValue() / 1000 : request.getAmount();
+            long amount = request.getCurrency().equals(Currency.RUB) ? BigDecimal.valueOf(request.getAmount())
+                    .multiply(latest.getUzsToRub())
+                    .longValue() / 1000 : request.getAmount();
             if (hash == null || cashierPass == null || cashdeskId == null ||
                     hash.isEmpty() || cashierPass.isEmpty() || cashdeskId.isEmpty()) {
                 logger.error("Invalid platform credentials for transfer {}", platformName);
-                messageSender.sendMessage(request.getChatId(), languageSessionService.getTranslation(request.getChatId(), "message.platform_credentials_error"));
+                messageSender.sendMessage(request.getChatId(), languageSessionService
+                        .getTranslation(request.getChatId(), "message.platform_credentials_error"));
                 sendMainMenu(request.getChatId());
                 return;
             }
@@ -711,31 +742,48 @@ public class BonusService {
                 Map<String, Object> responseBody = response.getBody();
 
                 Object successObj = responseBody != null ? responseBody.get("success") : null;
-                if (successObj == null && responseBody != null) successObj = responseBody.get("Success");
+                if (successObj == null && responseBody != null)
+                    successObj = responseBody.get("Success");
 
                 if (Boolean.TRUE.equals(successObj)) {
                     request.setStatus(RequestStatus.BONUS_APPROVED);
                     request.setTransactionId(UUID.randomUUID().toString());
                     requestRepository.save(request);
                     dailyStatsService.addTransferAmount(request.getChatId(), request.getAmount());
-                    logger.info("✅ Platform transfer completed: chatId={}, userId={}, amount={}", request.getChatId(), userId, amount);
-//                    messageSender.animateAndDeleteMessages(request.getChatId(), sessionService.getMessageIds(request.getChatId()), "OPEN");
+                    logger.info("✅ Platform transfer completed: chatId={}, userId={}, amount={}", request.getChatId(),
+                            userId, amount);
+                    // messageSender.animateAndDeleteMessages(request.getChatId(),
+                    // sessionService.getMessageIds(request.getChatId()), "OPEN");
                     sessionService.clearMessageIds(request.getChatId());
                     String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
 
                     BalanceLimit cashdeskBalance = getCashdeskBalance(hash, cashierPass, cashdeskId);
                     if (cashdeskBalance == null) {
-                        String message = String.format("🆔: %d #Bonus tasdiqlandi ✅ \n\uD83C\uDF10 %s :  %s\n💰 Bonus: %,d so‘m\n\uD83D\uDC64 Foydalanuvchi: `%d` \n\uD83D\uDCDE %s \n\n 📅 [%s]",
-                                request.getId(), request.getPlatform(), request.getPlatformUserId(), request.getAmount(), request.getChatId(), number, LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                        String bonusMessage = String.format(languageSessionService.getTranslation(request.getChatId(), "message.bonus_approved"),
-                                request.getId(), request.getPlatform(), request.getPlatformUserId(), request.getAmount(), LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                        String message = String.format(
+                                "🆔: %d #Bonus tasdiqlandi ✅ \n\uD83C\uDF10 %s :  %s\n💰 Bonus: %,d so‘m\n\uD83D\uDC64 Foydalanuvchi: `%d` \n\uD83D\uDCDE %s \n\n 📅 [%s]",
+                                request.getId(), request.getPlatform(), request.getPlatformUserId(),
+                                request.getAmount(), request.getChatId(), number, LocalDateTime.now(ZoneId.of("GMT+5"))
+                                        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                        String bonusMessage = String.format(
+                                languageSessionService.getTranslation(request.getChatId(), "message.bonus_approved"),
+                                request.getId(), request.getPlatform(), request.getPlatformUserId(),
+                                request.getAmount(), LocalDateTime.now(ZoneId.of("GMT+5"))
+                                        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                         messageSender.sendMessage(request.getChatId(), bonusMessage);
                         adminLogBotService.sendToAdmins(message);
                     } else {
-                        String message = String.format("🆔: %d #Bonus tasdiqlandi ✅\n\uD83C\uDF10 %s :  %s\n💰 Bonus: %,d so‘m\n Foydalanuvchi: `%d` \n \uD83D\uDCDE %s \n\n  \uD83C\uDFE6: %,d %s \n\n 📅 [%s]",
-                                request.getId(), request.getPlatform(), request.getPlatformUserId(), request.getAmount(), request.getChatId(), number, cashdeskBalance.getLimit().longValue(), platformData.getCurrency().toString(), LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                        String bonusMessage = String.format(languageSessionService.getTranslation(request.getChatId(), "message.bonus_approved"),
-                                request.getId(), request.getPlatform(), request.getPlatformUserId(), request.getAmount(), LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                        String message = String.format(
+                                "🆔: %d #Bonus tasdiqlandi ✅\n\uD83C\uDF10 %s :  %s\n💰 Bonus: %,d so‘m\n Foydalanuvchi: `%d` \n \uD83D\uDCDE %s \n\n  \uD83C\uDFE6: %,d %s \n\n 📅 [%s]",
+                                request.getId(), request.getPlatform(), request.getPlatformUserId(),
+                                request.getAmount(), request.getChatId(), number,
+                                cashdeskBalance.getLimit().longValue(), platformData.getCurrency().toString(),
+                                LocalDateTime.now(ZoneId.of("GMT+5"))
+                                        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                        String bonusMessage = String.format(
+                                languageSessionService.getTranslation(request.getChatId(), "message.bonus_approved"),
+                                request.getId(), request.getPlatform(), request.getPlatformUserId(),
+                                request.getAmount(), LocalDateTime.now(ZoneId.of("GMT+5"))
+                                        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                         messageSender.sendMessage(request.getChatId(), bonusMessage);
                         adminLogBotService.sendToAdmins(message);
                     }
@@ -744,13 +792,17 @@ public class BonusService {
                             ? responseBody.get("Message").toString()
                             : "Platform javob bermadi.";
                     logger.error("❌ Transfer failed for chatId {}: {}", request.getChatId(), error);
-                    adminLogBotService.sendToAdmins("So‘rov tasdiqlandi, lekin kontorada xatolik yuz berdi: " + error + " (Foydalanuvchi: " + request.getChatId() + ")");
+                    adminLogBotService.sendToAdmins("So‘rov tasdiqlandi, lekin kontorada xatolik yuz berdi: " + error
+                            + " (Foydalanuvchi: " + request.getChatId() + ")");
                     handleTransferFailure(chatId, request);
                 }
             } catch (Exception e) {
-                logger.error("❌ Error transferring top-up to platform for chatId {}: {}", request.getChatId(), e.getMessage());
-                messageSender.sendMessage(request.getChatId(), languageSessionService.getTranslation(request.getChatId(), "message.transfer_failed"));
-                adminLogBotService.sendToAdmins("So‘rov tasdiqlandi, lekin kontorada xatolik yuz berdi: " + e.getMessage() + " (Foydalanuvchi: " + request.getChatId() + ")");
+                logger.error("❌ Error transferring top-up to platform for chatId {}: {}", request.getChatId(),
+                        e.getMessage());
+                messageSender.sendMessage(request.getChatId(),
+                        languageSessionService.getTranslation(request.getChatId(), "message.transfer_failed"));
+                adminLogBotService.sendToAdmins("So‘rov tasdiqlandi, lekin kontorada xatolik yuz berdi: "
+                        + e.getMessage() + " (Foydalanuvchi: " + request.getChatId() + ")");
             }
 
             sendMainMenu(request.getChatId());
@@ -760,10 +812,9 @@ public class BonusService {
     private void handleTransferFailure(Long chatId, HizmatRequest request) {
         ExchangeRate latest = exchangeRateRepository.findLatest()
                 .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
-        long amount = request.getCurrency().equals(Currency.RUB) ?
-                BigDecimal.valueOf(request.getUniqueAmount())
-                        .multiply(latest.getUzsToRub())
-                        .longValue() / 1000 : request.getUniqueAmount();
+        long amount = request.getCurrency().equals(Currency.RUB) ? BigDecimal.valueOf(request.getUniqueAmount())
+                .multiply(latest.getUzsToRub())
+                .longValue() / 1000 : request.getUniqueAmount();
         String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
         long rubAmount = BigDecimal.valueOf(request.getUniqueAmount())
                 .multiply(latest.getUzsToRub())
@@ -779,19 +830,18 @@ public class BonusService {
                 request.getId(),
                 request.getChatId(), number, request.getPlatform(), request.getPlatformUserId(),
                 request.getUniqueAmount(), rubAmount, request.getCardNumber(),
-                LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-        );
+                LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         rows.add(List.of(
                 createButton("✅ Qabul qilish", "ADMIN_APPROVE_TRANSFER:" + request.getId()),
-                createButton("❌ Rad etish", "ADMIN_DECLINE_TRANSFER:" + request.getId())
-        ));
+                createButton("❌ Rad etish", "ADMIN_DECLINE_TRANSFER:" + request.getId())));
         markup.setKeyboard(rows);
 
         adminLogBotService.sendToAdmins(errorLogMessage, markup);
-        messageSender.sendMessage(request.getChatId(), languageSessionService.getTranslation(request.getChatId(), "message.transfer_failure"));
+        messageSender.sendMessage(request.getChatId(),
+                languageSessionService.getTranslation(request.getChatId(), "message.transfer_failure"));
     }
 
     public void handleAdminDeclineTransfer(Long chatId, Long requestId) {
@@ -810,11 +860,13 @@ public class BonusService {
                         "💰 Balans: %s so‘m\n" +
                         "📅 [%s] ",
                 request.getId(),
-                request.getChatId(), number, request.getPlatform(), request.getPlatformUserId(), request.getUniqueAmount(), balance.getBalance().longValue(),
-                LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-        );
-        String userErrorLogMessage = String.format(languageSessionService.getTranslation(request.getChatId(), "message.bonus_declined"),
-                request.getId(), request.getPlatform(), request.getPlatformUserId(), request.getUniqueAmount(), balance.getBalance().longValue(),
+                request.getChatId(), number, request.getPlatform(), request.getPlatformUserId(),
+                request.getUniqueAmount(), balance.getBalance().longValue(),
+                LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        String userErrorLogMessage = String.format(
+                languageSessionService.getTranslation(request.getChatId(), "message.bonus_declined"),
+                request.getId(), request.getPlatform(), request.getPlatformUserId(), request.getUniqueAmount(),
+                balance.getBalance().longValue(),
                 LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         SendMessage message = new SendMessage();
         message.setChatId(chatId);
@@ -827,7 +879,8 @@ public class BonusService {
     public void handleAdminRemoveTickets(Long chatId, Long userChatId) {
         AdminChat adminChat = adminChatRepository.findById(chatId).orElse(null);
         if (adminChat == null || !adminChat.isReceiveNotifications()) {
-            messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "message.no_admin_permission"));
+            messageSender.sendMessage(chatId,
+                    languageSessionService.getTranslation(chatId, "message.no_admin_permission"));
             return;
         }
         UserBalance balance = userBalanceRepository.findById(userChatId)
@@ -835,14 +888,16 @@ public class BonusService {
         balance.setTickets(0L);
         userBalanceRepository.save(balance);
 
-        messageSender.sendMessage(userChatId, languageSessionService.getTranslation(userChatId, "message.tickets_removed"));
+        messageSender.sendMessage(userChatId,
+                languageSessionService.getTranslation(userChatId, "message.tickets_removed"));
         adminLogBotService.sendToAdmins("Chiptalar o‘chirildi: Foydalanuvchi: " + userChatId);
     }
 
     public void handleAdminRemoveBonus(Long chatId, Long userChatId) {
         AdminChat adminChat = adminChatRepository.findById(chatId).orElse(null);
         if (adminChat == null || !adminChat.isReceiveNotifications()) {
-            messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "message.no_admin_permission"));
+            messageSender.sendMessage(chatId,
+                    languageSessionService.getTranslation(chatId, "message.no_admin_permission"));
             return;
         }
         UserBalance balance = userBalanceRepository.findById(userChatId)
@@ -850,20 +905,23 @@ public class BonusService {
         balance.setBalance(BigDecimal.ZERO);
         userBalanceRepository.save(balance);
 
-        messageSender.sendMessage(userChatId, languageSessionService.getTranslation(userChatId, "message.bonus_removed"));
+        messageSender.sendMessage(userChatId,
+                languageSessionService.getTranslation(userChatId, "message.bonus_removed"));
         adminLogBotService.sendToAdmins("Bonus balansi o‘chirildi: Foydalanuvchi: " + userChatId);
     }
 
     public void handleAdminBlockUser(Long chatId, Long userChatId) {
         AdminChat adminChat = adminChatRepository.findById(chatId).orElse(null);
         if (adminChat == null || !adminChat.isReceiveNotifications()) {
-            messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "message.no_admin_permission"));
+            messageSender.sendMessage(chatId,
+                    languageSessionService.getTranslation(chatId, "message.no_admin_permission"));
             return;
         }
         BlockedUser blockedUser = BlockedUser.builder().chatId(userChatId).phoneNumber("BLOCKED").build();
         blockedUserRepository.save(blockedUser);
 
-        messageSender.sendMessage(userChatId, languageSessionService.getTranslation(userChatId, "message.user_blocked"));
+        messageSender.sendMessage(userChatId,
+                languageSessionService.getTranslation(userChatId, "message.user_blocked"));
         adminLogBotService.sendToAdmins("Foydalanuvchi bloklandi: Foydalanuvchi: " + userChatId);
     }
 
@@ -875,8 +933,9 @@ public class BonusService {
             Long minTickets = configurationService.getMinTickets();
             Long maxTickets = configurationService.getMaxTickets();
             if (availableTickets < minTickets) {
-                messageSender.sendMessage(chatId, String.format(languageSessionService.getTranslation(chatId, "message.insufficient_tickets"),
-                        minTickets, availableTickets));
+                messageSender.sendMessage(chatId,
+                        String.format(languageSessionService.getTranslation(chatId, "message.insufficient_tickets"),
+                                minTickets, availableTickets));
                 sendLotteryMenu(chatId);
                 return;
             }
@@ -891,8 +950,8 @@ public class BonusService {
             userBalanceRepository.save(balance);
 
             StringBuilder winningsLog = new StringBuilder();
-            ticketWinnings.forEach((ticketNumber, amount) ->
-                    winningsLog.append(String.format("%,d so‘m\n", amount.longValue())));
+            ticketWinnings.forEach(
+                    (ticketNumber, amount) -> winningsLog.append(String.format("%,d so‘m\n", amount.longValue())));
             winningsLog.append(String.format(languageSessionService.getTranslation(chatId, "message.lottery_results"),
                     "", totalWinnings.longValue(), balance.getBalance().longValue()));
             messageSender.sendMessage(chatId, winningsLog.toString());
@@ -912,7 +971,8 @@ public class BonusService {
             sendLotteryMenu(chatId);
         } catch (IllegalStateException e) {
             logger.error("Lottery play failed for chatId {}: {}", chatId, e.getMessage());
-            messageSender.sendMessage(chatId, String.format(languageSessionService.getTranslation(chatId, "message.lottery_error"), e.getMessage()));
+            messageSender.sendMessage(chatId, String
+                    .format(languageSessionService.getTranslation(chatId, "message.lottery_error"), e.getMessage()));
             sendLotteryMenu(chatId);
         }
     }
@@ -955,7 +1015,8 @@ public class BonusService {
         sessionService.setUserState(chatId, "MAIN_MENU");
         SendMessage message = new SendMessage();
         message.setChatId(chatId);
-        message.setText(languageSessionService.getTranslation(chatId, "message.main_menu_welcome")); // From ShadePaymentBot
+        message.setText(languageSessionService.getTranslation(chatId, "message.main_menu_welcome")); // From
+                                                                                                     // ShadePaymentBot
         message.setReplyMarkup(createMainMenuKeyboard(chatId));
         messageSender.sendMessage(message, chatId);
     }
@@ -974,9 +1035,12 @@ public class BonusService {
     private InlineKeyboardMarkup createBonusMenuKeyboard(Long chatId) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.lottery"), "BONUS_LOTTERY")));
-        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.referral"), "BONUS_REFERRAL")));
-        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.topup_bonus"), "BONUS_TOPUP")));
+        rows.add(List
+                .of(createButton(languageSessionService.getTranslation(chatId, "button.lottery"), "BONUS_LOTTERY")));
+        rows.add(List
+                .of(createButton(languageSessionService.getTranslation(chatId, "button.referral"), "BONUS_REFERRAL")));
+        rows.add(List
+                .of(createButton(languageSessionService.getTranslation(chatId, "button.topup_bonus"), "BONUS_TOPUP")));
         rows.add(createNavigationButtons(chatId));
         markup.setKeyboard(rows);
         return markup;
@@ -995,7 +1059,8 @@ public class BonusService {
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         Long minTickets = configurationService.getMinTickets();
         if (ticketCount >= minTickets) {
-            rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.lottery_play"), "BONUS_LOTTERY_PLAY")));
+            rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.lottery_play"),
+                    "BONUS_LOTTERY_PLAY")));
         }
         rows.add(createNavigationButtons(chatId));
         markup.setKeyboard(rows);
@@ -1005,7 +1070,8 @@ public class BonusService {
     private InlineKeyboardMarkup createReferralKeyboard(Long chatId) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.referral_link"), "BONUS_REFERRAL_LINK")));
+        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.referral_link"),
+                "BONUS_REFERRAL_LINK")));
         rows.add(createNavigationButtons(chatId));
         markup.setKeyboard(rows);
         return markup;
@@ -1031,7 +1097,8 @@ public class BonusService {
                 i++;
                 if (i < uzsPlatforms.size() && i < maxRows) {
                     Platform uzsPlatform = uzsPlatforms.get(i);
-                    row.add(createButton("🇺🇿 " + uzsPlatform.getName(), "BONUS_TOPUP_PLATFORM:" + uzsPlatform.getName()));
+                    row.add(createButton("🇺🇿 " + uzsPlatform.getName(),
+                            "BONUS_TOPUP_PLATFORM:" + uzsPlatform.getName()));
                 }
             }
             if (!row.isEmpty()) {
@@ -1066,9 +1133,10 @@ public class BonusService {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         rows.add(List.of(
-                createButton(languageSessionService.getTranslation(chatId, "button.approve"), "BONUS_TOPUP_APPROVE_USER"),
-                createButton(languageSessionService.getTranslation(chatId, "button.reject"), "BONUS_TOPUP_REJECT_USER")
-        ));
+                createButton(languageSessionService.getTranslation(chatId, "button.approve"),
+                        "BONUS_TOPUP_APPROVE_USER"),
+                createButton(languageSessionService.getTranslation(chatId, "button.reject"),
+                        "BONUS_TOPUP_REJECT_USER")));
         rows.add(createNavigationButtons(chatId));
         markup.setKeyboard(rows);
         return markup;
@@ -1081,8 +1149,7 @@ public class BonusService {
         BigDecimal maxAmount = configurationService.getBonusTopUpMaxAmount();
         rows.add(List.of(
                 createButton(String.format("%,d", minAmount.longValue()), "BONUS_TOPUP_AMOUNT_MIN"),
-                createButton(String.format("%,d", maxAmount.longValue()), "BONUS_TOPUP_AMOUNT_MAX")
-        ));
+                createButton(String.format("%,d", maxAmount.longValue()), "BONUS_TOPUP_AMOUNT_MAX")));
         rows.add(createNavigationButtons(chatId));
         markup.setKeyboard(rows);
         return markup;
@@ -1093,8 +1160,7 @@ public class BonusService {
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         rows.add(List.of(
                 createButton(languageSessionService.getTranslation(chatId, "button.yes"), "BONUS_TOPUP_CONFIRM_YES"),
-                createButton(languageSessionService.getTranslation(chatId, "button.no"), "BONUS_TOPUP_CONFIRM_NO")
-        ));
+                createButton(languageSessionService.getTranslation(chatId, "button.no"), "BONUS_TOPUP_CONFIRM_NO")));
         rows.add(createNavigationButtons(chatId));
         markup.setKeyboard(rows);
         return markup;
@@ -1104,14 +1170,17 @@ public class BonusService {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         rows.add(List.of(
-                createButton(languageSessionService.getTranslation(chatId, "button.approve_transfer"), "ADMIN_APPROVE_TRANSFER:" + requestId),
-                createButton(languageSessionService.getTranslation(chatId, "button.decline_transfer"), "ADMIN_DECLINE_TRANSFER:" + requestId)
-        ));
+                createButton(languageSessionService.getTranslation(chatId, "button.approve_transfer"),
+                        "ADMIN_APPROVE_TRANSFER:" + requestId),
+                createButton(languageSessionService.getTranslation(chatId, "button.decline_transfer"),
+                        "ADMIN_DECLINE_TRANSFER:" + requestId)));
         rows.add(List.of(
-                createButton(languageSessionService.getTranslation(chatId, "button.remove_tickets"), "ADMIN_REMOVE_TICKETS:" + userChatId),
-                createButton(languageSessionService.getTranslation(chatId, "button.remove_bonus"), "ADMIN_REMOVE_BONUS:" + userChatId)
-        ));
-        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.block_user"), "ADMIN_BLOCK_USER:" + userChatId)));
+                createButton(languageSessionService.getTranslation(chatId, "button.remove_tickets"),
+                        "ADMIN_REMOVE_TICKETS:" + userChatId),
+                createButton(languageSessionService.getTranslation(chatId, "button.remove_bonus"),
+                        "ADMIN_REMOVE_BONUS:" + userChatId)));
+        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.block_user"),
+                "ADMIN_BLOCK_USER:" + userChatId)));
         markup.setKeyboard(rows);
         return markup;
     }
@@ -1170,6 +1239,8 @@ public class BonusService {
         Map<String, Object> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class).getBody();
         Object balanceObj = response != null ? response.get("Balance") : null;
         Object limitObj = response != null ? response.get("Limit") : null;
-        return balanceObj != null ? new BalanceLimit(new BigDecimal(balanceObj.toString()), new BigDecimal(limitObj.toString())) : null;
+        return balanceObj != null
+                ? new BalanceLimit(new BigDecimal(balanceObj.toString()), new BigDecimal(limitObj.toString()))
+                : null;
     }
 }
