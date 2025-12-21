@@ -6,7 +6,6 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -33,6 +32,7 @@ public class FeatureService {
                     settings.setTopUpEnabled(true);
                     settings.setWithdrawEnabled(true);
                     settings.setBonusEnabled(true);
+                    settings.setPromoEnabled(false);
                     settings.setCreatedAt(LocalDateTime.now());
                     return featureSettingsRepository.save(settings);
                 });
@@ -45,6 +45,7 @@ public class FeatureService {
         settings.setTopUpEnabled(enabled);
         settings.setWithdrawEnabled(current.getWithdrawEnabled());
         settings.setBonusEnabled(current.getBonusEnabled());
+        settings.setPromoEnabled(current.getPromoEnabled());
         settings.setCreatedAt(LocalDateTime.now());
         featureSettingsRepository.save(settings);
         logger.info("Top-up {} globally", enabled ? "enabled" : "disabled");
@@ -57,6 +58,7 @@ public class FeatureService {
         settings.setTopUpEnabled(current.getTopUpEnabled());
         settings.setWithdrawEnabled(enabled);
         settings.setBonusEnabled(current.getBonusEnabled());
+        settings.setPromoEnabled(current.getPromoEnabled());
         settings.setCreatedAt(LocalDateTime.now());
         featureSettingsRepository.save(settings);
         logger.info("Withdraw {} globally", enabled ? "enabled" : "disabled");
@@ -69,6 +71,7 @@ public class FeatureService {
         settings.setTopUpEnabled(current.getTopUpEnabled());
         settings.setWithdrawEnabled(current.getWithdrawEnabled());
         settings.setBonusEnabled(enabled);
+        settings.setPromoEnabled(current.getPromoEnabled());
         settings.setCreatedAt(LocalDateTime.now());
         featureSettingsRepository.save(settings);
         logger.info("Bonus {} globally", enabled ? "enabled" : "disabled");
@@ -84,5 +87,22 @@ public class FeatureService {
 
     public boolean canPerformBonus() {
         return getGlobalSettings().getBonusEnabled();
+    }
+
+    @Transactional
+    public void togglePromo(boolean enabled) {
+        FeatureSettings current = getGlobalSettings();
+        FeatureSettings settings = new FeatureSettings();
+        settings.setTopUpEnabled(current.getTopUpEnabled());
+        settings.setWithdrawEnabled(current.getWithdrawEnabled());
+        settings.setBonusEnabled(current.getBonusEnabled());
+        settings.setPromoEnabled(enabled);
+        settings.setCreatedAt(LocalDateTime.now());
+        featureSettingsRepository.save(settings);
+        logger.info("Promo {} globally", enabled ? "enabled" : "disabled");
+    }
+
+    public boolean isPromoEnabled() {
+        return getGlobalSettings().getPromoEnabled();
     }
 }

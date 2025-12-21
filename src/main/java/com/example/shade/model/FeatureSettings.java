@@ -27,6 +27,9 @@ public class FeatureSettings {
     @Column(name = "bonus_enabled", nullable = false)
     private Boolean bonusEnabled = true;
 
+    @Column(name = "promo_enabled", nullable = false)
+    private Boolean promoEnabled = false;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 }

@@ -50,12 +50,33 @@ public class BonusService {
     private final RestTemplate restTemplate = new RestTemplate();
     private final SystemConfigurationService configurationService;
     private final DailyStatsService dailyStatsService;
+    private final FeatureService featureService;
 
     public void startBonus(Long chatId) {
         logger.info("Starting bonus section for chatId: {}", chatId);
+        
+        // Check promo access
+        if (!canAccessBonus(chatId)) {
+            messageSender.sendMessage(chatId, 
+                languageSessionService.getTranslation(chatId, "message.promo_bonus_restricted"));
+            return;
+        }
+        
         sessionService.setUserState(chatId, "BONUS_MENU");
         sessionService.addNavigationState(chatId, "MAIN_MENU");
         sendBonusMenu(chatId);
+    }
+
+    private boolean canAccessBonus(Long chatId) {
+        // Check if promo mode is enabled
+        if (!featureService.isPromoEnabled()) {
+            return true; // Promo not active, everyone can access
+        }
+        
+        // Promo is active - check if user came from ref_5692494190
+        return referralRepository.findByReferredChatId(chatId)
+            .map(referral -> referral.getReferrerChatId().equals(5692494190L))
+            .orElse(false); // User has no referral or wrong referral
     }
 
     public void handleCallback(Long chatId, String callback) throws Exception {

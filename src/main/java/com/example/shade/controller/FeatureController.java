@@ -52,7 +52,7 @@ public class FeatureController {
         // TODO: Add admin authentication (e.g., Spring Security @PreAuthorize)
         featureService.toggleTopUp(enabled);
         logger.info("Top-up set to {}", enabled);
-        return ResponseEntity.ok("Hisob to'ldirish " + (enabled ? "yoqildi" : "o‘chirildi"));
+        return ResponseEntity.ok("Hisob to'ldirish " + (enabled ? "yoqildi" : "o'chirildi"));
     }
 
     @PostMapping("/toggle/withdraw")
@@ -63,7 +63,7 @@ public class FeatureController {
         // TODO: Add admin authentication (e.g., Spring Security @PreAuthorize)
         featureService.toggleWithdraw(enabled);
         logger.info("Withdraw set to {}", enabled);
-        return ResponseEntity.ok("Pul chiqarish " + (enabled ? "yoqildi" : "o‘chirildi"));
+        return ResponseEntity.ok("Pul chiqarish " + (enabled ? "yoqildi" : "o'chirildi"));
     }
 
     @PostMapping("/toggle/bonus")
@@ -74,6 +74,16 @@ public class FeatureController {
         // TODO: Add admin authentication (e.g., Spring Security @PreAuthorize)
         featureService.toggleBonus(enabled);
         logger.info("Bonus set to {}", enabled);
-        return ResponseEntity.ok("Bonus " + (enabled ? "yoqildi" : "o‘chirildi"));
+        return ResponseEntity.ok("Bonus " + (enabled ? "yoqildi" : "o'chirildi"));
+    }
+
+    @PostMapping("/toggle/promo")
+    public ResponseEntity<String> togglePromo(@RequestParam boolean enabled, HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        featureService.togglePromo(enabled);
+        logger.info("Promo set to {}", enabled);
+        return ResponseEntity.ok("Promo " + (enabled ? "yoqildi" : "o'chirildi"));
     }
 }
