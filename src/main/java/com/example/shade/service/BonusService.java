@@ -593,6 +593,8 @@ public class BonusService {
         }
         balance.setBalance(balance.getBalance().subtract(new BigDecimal(amount.longValue())));
         userBalanceRepository.save(balance);
+        dailyStatsService.addTransferAmount(chatId, amount.longValue());
+
         request.setAmount(amount.longValue());
         request.setUniqueAmount(amount.longValue());
         request.setStatus(RequestStatus.PENDING_ADMIN);
@@ -652,7 +654,8 @@ public class BonusService {
                 request.setStatus(RequestStatus.BONUS_APPROVED);
                 request.setTransactionId(UUID.randomUUID().toString());
                 requestRepository.save(request);
-                dailyStatsService.addTransferAmount(request.getChatId(), request.getAmount());
+                // dailyStatsService.addTransferAmount(request.getChatId(),
+                // request.getAmount()); // MOVED to initiateTopUpRequest
                 // messageSender.animateAndDeleteMessages(request.getChatId(),
                 // sessionService.getMessageIds(request.getChatId()), "OPEN");
                 sessionService.clearMessageIds(request.getChatId());
@@ -749,7 +752,8 @@ public class BonusService {
                     request.setStatus(RequestStatus.BONUS_APPROVED);
                     request.setTransactionId(UUID.randomUUID().toString());
                     requestRepository.save(request);
-                    dailyStatsService.addTransferAmount(request.getChatId(), request.getAmount());
+                    // dailyStatsService.addTransferAmount(request.getChatId(),
+                    // request.getAmount()); // MOVED to initiateTopUpRequest
                     logger.info("✅ Platform transfer completed: chatId={}, userId={}, amount={}", request.getChatId(),
                             userId, amount);
                     // messageSender.animateAndDeleteMessages(request.getChatId(),
@@ -849,9 +853,16 @@ public class BonusService {
                 .orElseThrow(() -> new IllegalStateException("Request not found: " + requestId));
         request.setStatus(RequestStatus.CANCELED);
         requestRepository.save(request);
-        String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
+
+        // Refund balance and daily limit
         UserBalance balance = userBalanceRepository.findById(request.getChatId())
-                .orElse(UserBalance.builder().chatId(requestId).tickets(0L).balance(BigDecimal.ZERO).build());
+                .orElse(UserBalance.builder().chatId(request.getChatId()).tickets(0L).balance(BigDecimal.ZERO).build());
+        balance.setBalance(balance.getBalance().add(BigDecimal.valueOf(request.getAmount())));
+        userBalanceRepository.save(balance);
+
+        dailyStatsService.subtractTransferAmount(request.getChatId(), request.getAmount());
+
+        String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
         String errorLogMessage = String.format(
                 "🆔: %d \n Bonus rad etildi ❌\n" +
                         "👤 User ID [%s] %s\n" +

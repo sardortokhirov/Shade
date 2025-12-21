@@ -62,7 +62,8 @@ public class DailyStatsService {
     }
 
     /**
-     * Adds transfer amount to today's stats (called when bonus transfer is approved)
+     * Adds transfer amount to today's stats (called when bonus transfer is
+     * approved)
      */
     @Transactional
     public void addTransferAmount(Long chatId, Long amount) {
@@ -74,6 +75,19 @@ public class DailyStatsService {
     }
 
     /**
+     * Subtracts transfer amount from today's stats (called when bonus transfer is
+     * canceled/declined)
+     */
+    @Transactional
+    public void subtractTransferAmount(Long chatId, Long amount) {
+        DailyUserStats stats = getOrCreateTodayStats(chatId);
+        stats.setDailyTransferAmount(Math.max(0L, stats.getDailyTransferAmount() - amount));
+        stats.setLastUpdated(LocalDateTime.now(GMT_PLUS_5));
+        statsRepository.save(stats);
+        logger.info("Subtracted transfer amount {} for chatId {} on date {}", amount, chatId, stats.getDate());
+    }
+
+    /**
      * Calculates available limit: min(dailyLimit, dailyTopUps) - dailyTransfers
      */
     public Long getAvailableLimit(Long chatId) {
@@ -81,7 +95,7 @@ public class DailyStatsService {
         Long dailyLimit = configurationService.getDailyBonusTransferLimit();
         Long dailyTopUps = stats.getDailyTopUpAmount();
         Long dailyTransfers = stats.getDailyTransferAmount();
-        
+
         Long available = Math.min(dailyLimit, dailyTopUps) - dailyTransfers;
         return Math.max(0L, available); // Ensure non-negative
     }
