@@ -365,6 +365,30 @@ public class BonusService {
 
     private void validateUserId(Long chatId, String userId) {
         String platformName = sessionService.getUserData(chatId, "platform");
+
+        // --- Granular Permission Check ---
+        String trimmedUserId = userId != null ? userId.trim() : "";
+        Optional<UserPlatformPermission> permission = permissionRepository.findByUserId(trimmedUserId);
+        if (permission.isPresent() && !permission.get().isCanBonusTopUp()) {
+            messageSender.sendMessage(chatId,
+                    languageSessionService.getTranslation(chatId, "message.permission_denied_bonus"));
+            sessionService.setUserState(chatId, "BONUS_TOPUP_USER_ID");
+            sendUserIdInput(chatId, platformName);
+            return;
+        }
+
+        // --- NEW PROMO LOGIC START ---
+        if (featureService.isPromoEnabled()) {
+            boolean isAllowed = allowedPromoUserRepository.existsByUserId(trimmedUserId);
+            if (!isAllowed) {
+                messageSender.sendMessage(chatId,
+                        languageSessionService.getTranslation(chatId, "message.promo_restriction"));
+                sessionService.setUserState(chatId, "BONUS_TOPUP_USER_ID");
+                sendUserIdInput(chatId, platformName);
+                return;
+            }
+        }
+        // --- NEW PROMO LOGIC END ---
         Platform platform = platformRepository.findByName(platformName)
                 .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
 
@@ -466,40 +490,17 @@ public class BonusService {
                 sendUserIdInput(chatId, platformName);
             }
         }
-
-        // --- Granular Permission Check ---
-        Optional<UserPlatformPermission> permission = permissionRepository.findByUserId(userId);
-        if (permission.isPresent() && !permission.get().isCanBonusTopUp()) {
-            messageSender.sendMessage(chatId,
-                    languageSessionService.getTranslation(chatId, "message.permission_denied_bonus"));
-            sessionService.setUserState(chatId, "BONUS_TOPUP_USER_ID");
-            return;
-        }
-
-        // --- NEW PROMO LOGIC START ---
-        if (featureService.isPromoEnabled()) {
-            boolean isAllowed = allowedPromoUserRepository.existsByUserId(userId);
-            if (!isAllowed) {
-                messageSender.sendMessage(chatId,
-                        languageSessionService.getTranslation(chatId, "message.promo_restriction"));
-                // Reset state to ID input so they can try another ID or go back
-                sessionService.setUserState(chatId, "BONUS_TOPUP_USER_ID");
-                return;
-            }
-        }
-        // --- NEW PROMO LOGIC END ---
     }
 
     private void handleApproveUser(Long chatId) {
         sessionService.setUserState(chatId, "BONUS_TOPUP_INPUT");
         sessionService.addNavigationState(chatId, "BONUS_TOPUP_APPROVE_USER");
         String platform = sessionService.getUserData(chatId, "platform");
-        if (platform == null && !platform.equals("mostbet")) {
-            logger.error("FullName is null for chatId {}", chatId);
+        if (platform == null) {
+            logger.error("Platform is null for chatId {}", chatId);
             messageSender.sendMessage(chatId,
-                    languageSessionService.getTranslation(chatId, "topup.message.user_data_not_found"));
-            sessionService.setUserState(chatId, "TOPUP_USER_ID_INPUT");
-            sendUserIdInput(chatId, sessionService.getUserData(chatId, "platform"));
+                    languageSessionService.getTranslation(chatId, "message.request_not_found"));
+            sendUserIdInput(chatId, null);
         } else {
             sendTopUpInput(chatId, platform);
         }

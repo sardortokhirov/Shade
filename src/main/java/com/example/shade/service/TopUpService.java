@@ -219,19 +219,20 @@ public class TopUpService {
             return;
         }
 
+        validateUserId(chatId, userId);
+    }
+
+    private void validateUserId(Long chatId, String userId) {
         // --- Granular Permission Check ---
-        Optional<UserPlatformPermission> permission = permissionRepository.findByUserId(userId);
+        String trimmedUserId = userId != null ? userId.trim() : "";
+        Optional<UserPlatformPermission> permission = permissionRepository.findByUserId(trimmedUserId);
         if (permission.isPresent() && !permission.get().isCanTopUp()) {
-            messageSender.sendMessage(chatId,
+            sendMessageWithNavigation(chatId,
                     languageSessionService.getTranslation(chatId, "message.permission_denied_topup"));
             sessionService.setUserState(chatId, "TOPUP_USER_ID_INPUT");
             return;
         }
 
-        validateUserId(chatId, userId);
-    }
-
-    private void validateUserId(Long chatId, String userId) {
         String platformName = sessionService.getUserData(chatId, "platform").replace("_", "");
         Platform platform = platformRepository.findByName(platformName)
                 .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
