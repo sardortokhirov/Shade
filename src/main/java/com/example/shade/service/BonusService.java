@@ -599,8 +599,9 @@ public class BonusService {
         request.setUniqueAmount(amount.longValue());
         request.setStatus(RequestStatus.PENDING_ADMIN);
         requestRepository.save(request);
+        String now = LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         String userMessage = String.format(languageSessionService.getTranslation(chatId, "message.topup_request_sent"),
-                request.getId(), request.getPlatform(), request.getPlatformUserId(), request.getAmount());
+                request.getId(), request.getPlatform(), request.getPlatformUserId(), request.getAmount(), now);
         messageSender.sendMessage(chatId, userMessage);
 
         sendAdminApprovalRequest(chatId, request);
