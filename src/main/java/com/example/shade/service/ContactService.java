@@ -29,7 +29,7 @@ public class ContactService {
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
         // 1 - Admin button
-        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "contact.button.admin"), "https://t.me/Boss9w")));
+        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "contact.button.admin"), "https://t.me/@Misterpay1")));
 
         // 2 - Chat button
         rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "contact.button.chat"), "https://t.me/Abadiy_Kassa")));
