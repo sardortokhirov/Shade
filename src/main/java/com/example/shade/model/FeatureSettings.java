@@ -1,4 +1,5 @@
 package com.example.shade.model;
+
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -29,6 +30,9 @@ public class FeatureSettings {
 
     @Column(name = "promo_enabled", nullable = false)
     private Boolean promoEnabled = false;
+
+    @Column(name = "bonus_limit_enabled", nullable = false)
+    private Boolean bonusLimitEnabled = true;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;

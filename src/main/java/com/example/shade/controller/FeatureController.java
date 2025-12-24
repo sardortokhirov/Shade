@@ -45,7 +45,7 @@ public class FeatureController {
     }
 
     @PostMapping("/toggle/topup")
-    public ResponseEntity<String> toggleTopUp(@RequestParam boolean enabled,HttpServletRequest request) {
+    public ResponseEntity<String> toggleTopUp(@RequestParam boolean enabled, HttpServletRequest request) {
         if (!authenticate(request)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
@@ -56,7 +56,7 @@ public class FeatureController {
     }
 
     @PostMapping("/toggle/withdraw")
-    public ResponseEntity<String> toggleWithdraw(@RequestParam boolean enabled,HttpServletRequest request) {
+    public ResponseEntity<String> toggleWithdraw(@RequestParam boolean enabled, HttpServletRequest request) {
         if (!authenticate(request)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
@@ -67,7 +67,7 @@ public class FeatureController {
     }
 
     @PostMapping("/toggle/bonus")
-    public ResponseEntity<String> toggleBonus(@RequestParam boolean enabled,HttpServletRequest request) {
+    public ResponseEntity<String> toggleBonus(@RequestParam boolean enabled, HttpServletRequest request) {
         if (!authenticate(request)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
@@ -85,5 +85,15 @@ public class FeatureController {
         featureService.togglePromo(enabled);
         logger.info("Promo set to {}", enabled);
         return ResponseEntity.ok("Promo " + (enabled ? "yoqildi" : "o'chirildi"));
+    }
+
+    @PostMapping("/toggle/bonus-limit")
+    public ResponseEntity<String> toggleBonusLimit(@RequestParam boolean enabled, HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        featureService.toggleBonusLimit(enabled);
+        logger.info("Bonus limit set to {}", enabled);
+        return ResponseEntity.ok("Bonus limiti " + (enabled ? "yoqildi" : "o'chirildi"));
     }
 }

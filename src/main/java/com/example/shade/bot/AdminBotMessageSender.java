@@ -26,6 +26,7 @@ public class AdminBotMessageSender {
     public AdminBotMessageSender(@Lazy ShadePaymentBot shadePaymentBot) {
         this.shadePaymentBot = shadePaymentBot;
     }
+
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
 
     public void sendTextMessage(Long chatId, String text) {
@@ -78,6 +79,7 @@ public class AdminBotMessageSender {
         rows.add(createRow("💰 To'ldirish yoq/o'chir", "toggle_topup"));
         rows.add(createRow("💸 Yechib olish yoq/o'chir", "toggle_withdraw"));
         rows.add(createRow("🎁 Bonus yoq/o'chir", "toggle_bonus"));
+        rows.add(createRow("📊 Bonus Limiti yoq/o'chir", "toggle_bonus_limit"));
         rows.add(createRow("🔙 Ortga", "main_menu"));
 
         keyboard.setKeyboard(rows);

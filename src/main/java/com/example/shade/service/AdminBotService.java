@@ -112,6 +112,21 @@ public class AdminBotService {
         }
     }
 
+    @Transactional
+    public void toggleBonusLimit(Long chatId) {
+        try {
+            boolean currentStatus = featureService.isBonusLimitEnabled();
+            featureService.toggleBonusLimit(!currentStatus);
+            boolean newStatus = !currentStatus;
+            String status = newStatus ? "Yoqildi ✅" : "O'chirildi ❌";
+            messageSender.sendTextMessage(chatId, "Bonus limiti " + status);
+            sendFeaturesMenu(chatId);
+        } catch (Exception e) {
+            log.error("Error toggling bonus limit", e);
+            messageSender.sendTextMessage(chatId, "❌ Xatolik yuz berdi: " + e.getMessage());
+        }
+    }
+
     // ========== ADMIN CARDS ==========
     public void sendCardsMenu(Long chatId) {
         messageSender.sendCardsMenu(chatId);

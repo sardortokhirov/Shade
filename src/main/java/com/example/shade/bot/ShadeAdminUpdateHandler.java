@@ -26,13 +26,14 @@ public class ShadeAdminUpdateHandler {
     }
 
     public void setUserInAdminState(Long chatId) {
-        userStates.put(chatId,null);
+        userStates.put(chatId, null);
     }
 
     public void clearAdminSession(Long chatId) {
         userStates.remove(chatId);
         userContext.remove(chatId);
     }
+
     public boolean handleUpdate(Update update) {
         try {
             if (update.hasMessage()) {
@@ -47,18 +48,19 @@ public class ShadeAdminUpdateHandler {
         return false;
     }
 
-
-    private boolean  handleMessage(Update update) {
+    private boolean handleMessage(Update update) {
         Long chatId = update.getMessage().getChatId();
 
-        if (update.getMessage().hasText() && ("/admin".equals(update.getMessage().getText()) || "/kassa".equals(update.getMessage().getText()))) {
+        if (update.getMessage().hasText()
+                && ("/admin".equals(update.getMessage().getText()) || "/kassa".equals(update.getMessage().getText()))) {
             return false;
         }
 
         BotState state = userStates.get(chatId);
 
         // FIX: If state is null, and it's a text message (but not /admin or /kassa),
-        // we assume the user typed something unexpected. Send them back to the main menu.
+        // we assume the user typed something unexpected. Send them back to the main
+        // menu.
         if (state == null) {
             if (update.getMessage().hasText()) {
                 // Clear any leftover state just in case
@@ -69,7 +71,6 @@ public class ShadeAdminUpdateHandler {
             }
             return false;
         }
-
 
         if (state == BotState.WAITING_FORWARD_MESSAGE) {
             Map<String, Object> context = userContext.getOrDefault(chatId, new HashMap<>());
@@ -84,7 +85,8 @@ public class ShadeAdminUpdateHandler {
             String text = update.getMessage().getText();
             handleStateInput(chatId, text, state);
         } else {
-            // If in a state (not WAITING_FORWARD_MESSAGE) and received non-text, prompt for text
+            // If in a state (not WAITING_FORWARD_MESSAGE) and received non-text, prompt for
+            // text
             adminBotService.requestInput(chatId, "❌ Iltimos, matn kiriting.");
         }
         return true;
@@ -104,6 +106,7 @@ public class ShadeAdminUpdateHandler {
             case "toggle_topup" -> adminBotService.toggleTopUp(chatId);
             case "toggle_withdraw" -> adminBotService.toggleWithdraw(chatId);
             case "toggle_bonus" -> adminBotService.toggleBonus(chatId);
+            case "toggle_bonus_limit" -> adminBotService.toggleBonusLimit(chatId);
 
             // Admin Cards
             case "cards_menu" -> adminBotService.sendCardsMenu(chatId);

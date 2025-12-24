@@ -550,14 +550,16 @@ public class BonusService {
             }
 
             // Check daily bonus transfer limit
-            Long availableLimit = dailyStatsService.getAvailableLimit(chatId);
-            if (amount.longValue() > availableLimit) {
-                String errorMessage = String.format(
-                        languageSessionService.getTranslation(chatId, "message.daily_limit_exceeded"),
-                        availableLimit);
-                messageSender.sendMessage(chatId, errorMessage);
-                sendTopUpInput(chatId, platform);
-                return;
+            if (featureService.isBonusLimitEnabled()) {
+                Long availableLimit = dailyStatsService.getAvailableLimit(chatId);
+                if (amount.longValue() > availableLimit) {
+                    String errorMessage = String.format(
+                            languageSessionService.getTranslation(chatId, "message.daily_limit_exceeded"),
+                            availableLimit);
+                    messageSender.sendMessage(chatId, errorMessage);
+                    sendTopUpInput(chatId, platform);
+                    return;
+                }
             }
 
         } catch (NumberFormatException e) {

@@ -16,8 +16,6 @@ import java.time.LocalDateTime;
  * Time-4:45 AM (GMT+5)
  */
 
-
-
 @Service
 @RequiredArgsConstructor
 public class FeatureService {
@@ -33,6 +31,7 @@ public class FeatureService {
                     settings.setWithdrawEnabled(true);
                     settings.setBonusEnabled(true);
                     settings.setPromoEnabled(false);
+                    settings.setBonusLimitEnabled(true);
                     settings.setCreatedAt(LocalDateTime.now());
                     return featureSettingsRepository.save(settings);
                 });
@@ -46,6 +45,7 @@ public class FeatureService {
         settings.setWithdrawEnabled(current.getWithdrawEnabled());
         settings.setBonusEnabled(current.getBonusEnabled());
         settings.setPromoEnabled(current.getPromoEnabled());
+        settings.setBonusLimitEnabled(current.getBonusLimitEnabled());
         settings.setCreatedAt(LocalDateTime.now());
         featureSettingsRepository.save(settings);
         logger.info("Top-up {} globally", enabled ? "enabled" : "disabled");
@@ -59,6 +59,7 @@ public class FeatureService {
         settings.setWithdrawEnabled(enabled);
         settings.setBonusEnabled(current.getBonusEnabled());
         settings.setPromoEnabled(current.getPromoEnabled());
+        settings.setBonusLimitEnabled(current.getBonusLimitEnabled());
         settings.setCreatedAt(LocalDateTime.now());
         featureSettingsRepository.save(settings);
         logger.info("Withdraw {} globally", enabled ? "enabled" : "disabled");
@@ -72,6 +73,7 @@ public class FeatureService {
         settings.setWithdrawEnabled(current.getWithdrawEnabled());
         settings.setBonusEnabled(enabled);
         settings.setPromoEnabled(current.getPromoEnabled());
+        settings.setBonusLimitEnabled(current.getBonusLimitEnabled());
         settings.setCreatedAt(LocalDateTime.now());
         featureSettingsRepository.save(settings);
         logger.info("Bonus {} globally", enabled ? "enabled" : "disabled");
@@ -97,6 +99,7 @@ public class FeatureService {
         settings.setWithdrawEnabled(current.getWithdrawEnabled());
         settings.setBonusEnabled(current.getBonusEnabled());
         settings.setPromoEnabled(enabled);
+        settings.setBonusLimitEnabled(current.getBonusLimitEnabled());
         settings.setCreatedAt(LocalDateTime.now());
         featureSettingsRepository.save(settings);
         logger.info("Promo {} globally", enabled ? "enabled" : "disabled");
@@ -104,5 +107,24 @@ public class FeatureService {
 
     public boolean isPromoEnabled() {
         return getGlobalSettings().getPromoEnabled();
+    }
+
+    @Transactional
+    public void toggleBonusLimit(boolean enabled) {
+        FeatureSettings current = getGlobalSettings();
+        FeatureSettings settings = new FeatureSettings();
+        settings.setTopUpEnabled(current.getTopUpEnabled());
+        settings.setWithdrawEnabled(current.getWithdrawEnabled());
+        settings.setBonusEnabled(current.getBonusEnabled());
+        settings.setPromoEnabled(current.getPromoEnabled());
+        settings.setBonusLimitEnabled(enabled);
+        settings.setCreatedAt(LocalDateTime.now());
+        featureSettingsRepository.save(settings);
+        logger.info("Bonus limit {} globally", enabled ? "enabled" : "disabled");
+    }
+
+    public boolean isBonusLimitEnabled() {
+        Boolean enabled = getGlobalSettings().getBonusLimitEnabled();
+        return enabled == null || enabled;
     }
 }
