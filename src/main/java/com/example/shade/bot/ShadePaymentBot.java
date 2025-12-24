@@ -227,6 +227,9 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                 String state = sessionService.getUserState(chatId);
                 if (!"TOPUP_AWAITING_SCREENSHOT".equals(state)) {
                     logger.warn("Photo received in wrong state for chatId {}: {}", chatId, state);
+                    if (update.getMessage().getMediaGroupId() != null) {
+                        return;
+                    }
                     messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId,
                             "message.please_confirm_payment_transaction"));
                     return;
