@@ -795,7 +795,7 @@ public class TopUpService {
                 long ticketCalculationAmount = configurationService.getTicketCalculationAmount();
                 long tickets = request.getAmount() / ticketCalculationAmount;
                 if (tickets > 0) {
-                    lotteryService.awardTickets(requestId, tickets);
+                    lotteryService.awardTickets(request.getChatId(), tickets);
                 }
 
                 bonusService.creditReferral(request.getChatId(), request.getAmount());
