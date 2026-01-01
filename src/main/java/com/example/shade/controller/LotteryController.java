@@ -174,7 +174,8 @@ public class LotteryController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         try {
-            lotteryService.awardRandomUsers(totalUsers, randomUsers, amount);
+            // REST API call - no admin chat ID or message sender, pass null
+            lotteryService.awardRandomUsers(totalUsers, randomUsers, amount, null, null);
             return ResponseEntity.ok().build();
         } catch (IllegalStateException e) {
             return ResponseEntity.badRequest().build();
