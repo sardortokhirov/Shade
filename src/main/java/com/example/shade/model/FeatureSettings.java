@@ -34,6 +34,9 @@ public class FeatureSettings {
     @Column(name = "bonus_limit_enabled", nullable = false)
     private Boolean bonusLimitEnabled = true;
 
+    @Column(name = "pay_toggle_enabled", nullable = false)
+    private Boolean payToggleEnabled = false;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 }

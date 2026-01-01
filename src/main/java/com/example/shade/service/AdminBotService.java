@@ -32,6 +32,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 @Service
@@ -701,14 +702,34 @@ public class AdminBotService {
             Long totalUsers = Long.parseLong((String) context.get("totalUsers"));
             Long randomUsers = Long.parseLong((String) context.get("randomUsers"));
             Long amount = Long.parseLong((String) context.get("awardAmount"));
-            lotteryService.awardRandomUsers(totalUsers, randomUsers, amount);
-            messageSender.sendTextMessage(chatId, "✅ Random foydalanuvchilarga mukofot berildi!");
-            sendLotteryMenu(chatId);
+            
+            // Return immediate response
+            messageSender.sendTextMessage(chatId, 
+                "⏳ Mukofot berish jarayoni boshlandi. Foydalanuvchilar fon rejimda qayta ishlanmoqda...");
+            
+            // Start async processing
+            CompletableFuture<Void> future = lotteryService.awardRandomUsers(
+                totalUsers, randomUsers, amount, chatId, messageSender
+            );
+            
+            // Handle completion
+            future.whenComplete((result, throwable) -> {
+                if (throwable != null) {
+                    log.error("Error in bonus award process", throwable);
+                    messageSender.sendTextMessage(chatId, 
+                        "❌ Xatolik yuz berdi: " + throwable.getMessage());
+                } else {
+                    messageSender.sendTextMessage(chatId, 
+                        "✅ Barcha mukofotlar muvaffaqiyatli berildi!");
+                }
+                sendLotteryMenu(chatId);
+            });
+            
         } catch (NumberFormatException e) {
             messageSender.sendTextMessage(chatId, "❌ Noto'g'ri format");
         } catch (Exception e) {
-            log.error("Error awarding random users", e);
-            messageSender.sendTextMessage(chatId, "❌ Xatolik yuz berdi: " + e.getMessage());
+            log.error("Error starting bonus award", e);
+            messageSender.sendTextMessage(chatId, "❌ Xatolik: " + e.getMessage());
         }
     }
 

@@ -21,6 +21,7 @@ public class DailyStatsService {
     private static final Logger logger = LoggerFactory.getLogger(DailyStatsService.class);
     private final DailyUserStatsRepository statsRepository;
     private final SystemConfigurationService configurationService;
+    private final FeatureService featureService;
     private static final ZoneId GMT_PLUS_5 = ZoneId.of("GMT+5");
 
     /**
@@ -88,7 +89,9 @@ public class DailyStatsService {
     }
 
     /**
-     * Calculates available limit: min(dailyLimit, dailyTopUps) - dailyTransfers
+     * Calculates available limit based on Pay toggle:
+     * - Pay toggle OFF: min(dailyLimit, dailyTopUps) - dailyTransfers
+     * - Pay toggle ON: dailyLimit - dailyTransfers (ignores deposits)
      */
     public Long getAvailableLimit(Long chatId) {
         DailyUserStats stats = getOrCreateTodayStats(chatId);
@@ -96,7 +99,15 @@ public class DailyStatsService {
         Long dailyTopUps = stats.getDailyTopUpAmount();
         Long dailyTransfers = stats.getDailyTransferAmount();
 
-        Long available = Math.min(dailyLimit, dailyTopUps) - dailyTransfers;
+        Long available;
+        if (featureService.isPayToggleEnabled()) {
+            // Pay toggle ON: ignore deposits, use full daily limit
+            available = dailyLimit - dailyTransfers;
+        } else {
+            // Pay toggle OFF: current behavior (minimum of limit and deposits)
+            available = Math.min(dailyLimit, dailyTopUps) - dailyTransfers;
+        }
+        
         return Math.max(0L, available); // Ensure non-negative
     }
 

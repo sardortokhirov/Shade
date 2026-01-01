@@ -1,6 +1,5 @@
 package com.example.shade.service;
 
-import com.example.shade.bot.AdminTelegramMessageSender;
 import com.example.shade.bot.MessageSender;
 import com.example.shade.model.*;
 import com.example.shade.repository.BlockedUserRepository;
@@ -14,9 +13,13 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import com.example.shade.bot.AdminBotMessageSender;
+
+import java.util.concurrent.CompletableFuture;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 
@@ -216,83 +219,139 @@ public class LotteryService {
                 .orElseThrow(() -> new IllegalStateException("User balance not found: " + chatId));
     }
 
+    @Async("bonusProcessingExecutor")
     @Transactional
-    public void awardRandomUsers(Long totalUsers, Long randomUsers, Long amount) {
-        if (randomUsers > totalUsers || totalUsers <= 0 || randomUsers <= 0 || amount <= 0) {
-            throw new IllegalStateException("Invalid parameters: totalUsers=" + totalUsers + ", randomUsers="
-                    + randomUsers + ", amount=" + amount);
-        }
-
-        // Fetch last 'totalUsers' approved requests, ordered by creation time, with
-        // limit in query
-        Pageable pageable = PageRequest.of(0, totalUsers.intValue(), Sort.by(Sort.Direction.DESC, "createdAt"));
-        List<HizmatRequest> requests = hizmatRequestRepository.findByFilters(RequestStatus.APPROVED, pageable);
-
-        if (requests.size() < randomUsers) {
-            throw new IllegalStateException(
-                    "Not enough approved users: requested=" + randomUsers + ", available=" + requests.size());
-        }
-
-        // Get unique chat IDs
-        List<Long> chatIds = requests.stream()
-                .map(HizmatRequest::getChatId)
-                .distinct()
-                .collect(Collectors.toList());
-
-        if (chatIds.size() < randomUsers) {
-            throw new IllegalStateException(
-                    "Not enough unique approved users: requested=" + randomUsers + ", available=" + chatIds.size());
-        }
-
-        // Randomly select 'randomUsers' chat IDs
-        Collections.shuffle(chatIds, random);
-        List<Long> selectedChatIds = chatIds.subList(0, randomUsers.intValue());
-
-        BigDecimal awardAmount = new BigDecimal(amount);
-
-        // Update balances and send notifications
-        for (Long chatId : selectedChatIds) {
-            try {
-                UserBalance balance = userBalanceRepository.findById(chatId)
-                        .orElseGet(() -> {
-                            UserBalance newBalance = UserBalance.builder()
-                                    .chatId(chatId)
-                                    .tickets(0L)
-                                    .balance(BigDecimal.ZERO)
-                                    .build();
-                            return userBalanceRepository.save(newBalance); // Save new if missing
-                        });
-                balance.setBalance(balance.getBalance().add(awardAmount));
-                userBalanceRepository.save(balance);
-
-                String messageText = String.format(
-                        languageSessionService.getTranslation(chatId, "lottery.message.award_notification"),
-                        amount, balance.getBalance().longValue(),
-                        LocalDateTime.now(ZoneId.of("GMT+5"))
-                                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-
-                SendMessage message = new SendMessage();
-                message.setChatId(chatId);
-                message.setText(messageText);
-                message.setReplyMarkup(backButtonKeyboard(chatId));
-                messageSender.sendMessage(message, chatId);
-
-                // Safe phone fetch
-                Optional<BlockedUser> blockedUserOpt = blockedUserRepository.findByChatId(chatId);
-                String number = blockedUserOpt.map(BlockedUser::getPhoneNumber).orElse("N/A");
-
-                adminLogBotService.sendToAdmins("#Кунлик бонусда голиб болганлар\n\n" +
-                        "Kunlik bonus: " + amount + " \n" +
-                        "Balans: " + balance.getBalance().longValue() + "\n" +
-                        "User ID: " + chatId + "\n" +
-                        "Telefon nomer: " + number + "\n\n" +
-                        "\uD83D\uDCC5 " + LocalDateTime.now(ZoneId.of("GMT+5"))
-                                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                logger.info("Awarded {} UZS to chatId {}", amount, chatId);
-            } catch (Exception e) { // Catch Telegram/DB errors
-                logger.error("Failed to award/notify chatId {}: {}", chatId, e.getMessage());
-                // Optionally: Retry logic or mark as failed in DB
+    public CompletableFuture<Void> awardRandomUsers(
+            Long totalUsers, 
+            Long randomUsers, 
+            Long amount,
+            Long adminChatId,
+            AdminBotMessageSender adminMessageSender
+    ) {
+        try {
+            if (randomUsers > totalUsers || totalUsers <= 0 || randomUsers <= 0 || amount <= 0) {
+                throw new IllegalStateException("Invalid parameters: totalUsers=" + totalUsers + ", randomUsers="
+                        + randomUsers + ", amount=" + amount);
             }
+
+            // Fetch last 'totalUsers' approved requests, ordered by creation time, with
+            // limit in query
+            Pageable pageable = PageRequest.of(0, totalUsers.intValue(), Sort.by(Sort.Direction.DESC, "createdAt"));
+            List<HizmatRequest> requests = hizmatRequestRepository.findByFilters(RequestStatus.APPROVED, pageable);
+
+            if (requests.size() < randomUsers) {
+                throw new IllegalStateException(
+                        "Not enough approved users: requested=" + randomUsers + ", available=" + requests.size());
+            }
+
+            // Get unique chat IDs
+            List<Long> chatIds = requests.stream()
+                    .map(HizmatRequest::getChatId)
+                    .distinct()
+                    .collect(Collectors.toList());
+
+            if (chatIds.size() < randomUsers) {
+                throw new IllegalStateException(
+                        "Not enough unique approved users: requested=" + randomUsers + ", available=" + chatIds.size());
+            }
+
+            // Randomly select 'randomUsers' chat IDs
+            Collections.shuffle(chatIds, random);
+            List<Long> selectedChatIds = chatIds.subList(0, randomUsers.intValue());
+
+            BigDecimal awardAmount = new BigDecimal(amount);
+
+            // Process in batches
+            int batchSize = 50;
+            int totalBatches = (int) Math.ceil((double) selectedChatIds.size() / batchSize);
+            int successCount = 0;
+            int failureCount = 0;
+
+            for (int i = 0; i < selectedChatIds.size(); i += batchSize) {
+                int end = Math.min(i + batchSize, selectedChatIds.size());
+                List<Long> batch = selectedChatIds.subList(i, end);
+                
+                // Process batch
+                for (Long chatId : batch) {
+                    try {
+                        processUserAward(chatId, awardAmount, amount);
+                        successCount++;
+                    } catch (Exception e) {
+                        logger.error("Failed to award/notify chatId {}: {}", chatId, e.getMessage());
+                        failureCount++;
+                    }
+                }
+                
+                // Send progress update
+                int currentBatch = (i / batchSize) + 1;
+                int progress = (currentBatch * 100) / totalBatches;
+                if (adminMessageSender != null && adminChatId != null) {
+                    sendProgressUpdate(adminChatId, progress, currentBatch, totalBatches, 
+                            successCount, failureCount, adminMessageSender);
+                }
+            }
+
+            logger.info("Completed awarding bonuses. Success: {}, Failures: {}", successCount, failureCount);
+            return CompletableFuture.completedFuture(null);
+        } catch (Exception e) {
+            logger.error("Error in awardRandomUsers", e);
+            return CompletableFuture.failedFuture(e);
+        }
+    }
+
+    @Transactional
+    private void processUserAward(Long chatId, BigDecimal awardAmount, Long amount) {
+        UserBalance balance = userBalanceRepository.findById(chatId)
+                .orElseGet(() -> {
+                    UserBalance newBalance = UserBalance.builder()
+                            .chatId(chatId)
+                            .tickets(0L)
+                            .balance(BigDecimal.ZERO)
+                            .build();
+                    return userBalanceRepository.save(newBalance);
+                });
+        balance.setBalance(balance.getBalance().add(awardAmount));
+        userBalanceRepository.save(balance);
+
+        String messageText = String.format(
+                languageSessionService.getTranslation(chatId, "lottery.message.award_notification"),
+                amount, balance.getBalance().longValue(),
+                LocalDateTime.now(ZoneId.of("GMT+5"))
+                        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+
+        SendMessage message = new SendMessage();
+        message.setChatId(chatId);
+        message.setText(messageText);
+        message.setReplyMarkup(backButtonKeyboard(chatId));
+        messageSender.sendMessage(message, chatId);
+
+        // Safe phone fetch
+        Optional<BlockedUser> blockedUserOpt = blockedUserRepository.findByChatId(chatId);
+        String number = blockedUserOpt.map(BlockedUser::getPhoneNumber).orElse("N/A");
+
+        adminLogBotService.sendToAdmins("#Кунлик бонусда голиб болганлар\n\n" +
+                "Kunlik bonus: " + amount + " \n" +
+                "Balans: " + balance.getBalance().longValue() + "\n" +
+                "User ID: " + chatId + "\n" +
+                "Telefon nomer: " + number + "\n\n" +
+                "\uD83D\uDCC5 " + LocalDateTime.now(ZoneId.of("GMT+5"))
+                        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        logger.info("Awarded {} UZS to chatId {}", amount, chatId);
+    }
+
+    private void sendProgressUpdate(Long adminChatId, int progress, int currentBatch, int totalBatches,
+                                   int successCount, int failureCount, AdminBotMessageSender adminMessageSender) {
+        String progressMessage = String.format(
+                "⏳ Mukofot berish jarayoni: %d%%\n" +
+                "📦 Batch: %d / %d\n" +
+                "✅ Muvaffaqiyatli: %d\n" +
+                "❌ Xato: %d",
+                progress, currentBatch, totalBatches, successCount, failureCount);
+        
+        try {
+            adminMessageSender.sendTextMessage(adminChatId, progressMessage);
+        } catch (Exception e) {
+            logger.error("Failed to send progress update to admin {}", adminChatId, e);
         }
     }
 

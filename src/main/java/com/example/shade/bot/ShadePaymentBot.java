@@ -134,9 +134,9 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
             }
             // Handle referral for /start ref_
             if (update.hasMessage() && update.getMessage().hasText()
-                    && update.getMessage().getText().startsWith("/start ref_")) {
+                    && update.getMessage().getText().startsWith("/start=ref_")) {
                 String messageText = update.getMessage().getText();
-                String referrerIdStr = messageText.substring("/start ref_".length());
+                String referrerIdStr = messageText.substring("/start=ref_".length());
                 try {
                     Long referrerChatId = Long.parseLong(referrerIdStr);
                     if (!referrerChatId.equals(chatId)) {
