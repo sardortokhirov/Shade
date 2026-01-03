@@ -833,7 +833,7 @@ public class TopUpService {
                                 "💸 Miqdor: %,d RUB\n" +
                                 "💳 Karta: `%s`\n" +
                                 "🔐 Admin kartasi: `%s`\n" +
-                                "🎟️ Chiptalar: %d\n\n" +
+                                "🎟️ Chiptalar: %d (+ %d )\n\n" +
                                 "\uD83C\uDFE6: %,d %s\n\n" +
                                 "📅 [%s] ",
                         request.getId(),
@@ -844,6 +844,7 @@ public class TopUpService {
                         rubAmount,
                         request.getCardNumber(),
                         adminCard.getCardNumber(),
+                        balance.getTickets(),
                         tickets,
                         transferSuccessful.getLimit().longValue(),
                         request.getCurrency().toString(),
@@ -987,7 +988,7 @@ public class TopUpService {
                                 "💸 Miqdor: %,d RUB\n" +
                                 "💳 Karta: `%s`\n" +
                                 "🔐 Admin kartasi: `%s`\n" +
-                                "🎟️ Chiptalar: %d\n\n" +
+                                "🎟️ Chiptalar: %d (+ %d )\n\n" +
                                 "\uD83C\uDFE6: %,d %s\n\n" +
                                 "📅 [%s] ",
                         request.getId(),
@@ -998,6 +999,7 @@ public class TopUpService {
                         rubAmount,
                         request.getCardNumber(),
                         adminCard.getCardNumber(),
+                        balance.getTickets(),
                         tickets,
                         transferSuccessful.getLimit().longValue(),
                         request.getCurrency().toString(),
