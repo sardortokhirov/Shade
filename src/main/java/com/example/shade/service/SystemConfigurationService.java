@@ -31,6 +31,7 @@ public class SystemConfigurationService {
     private static final BigDecimal DEFAULT_REFERRAL_COMMISSION = new BigDecimal("0.001");
     private static final Long DEFAULT_TICKET_CALCULATION = 10_000L;
     private static final Long DEFAULT_DAILY_BONUS_TRANSFER_LIMIT = 100_000L;
+    private static final BigDecimal DEFAULT_TOP_UP_DAILY_LIMIT_INCREASE_PERCENTAGE = BigDecimal.ZERO;
 
     @Transactional
     public SystemConfiguration getConfiguration() {
@@ -47,6 +48,7 @@ public class SystemConfigurationService {
                     config.setReferralCommissionPercentage(DEFAULT_REFERRAL_COMMISSION);
                     config.setTicketCalculationAmount(DEFAULT_TICKET_CALCULATION);
                     config.setDailyBonusTransferLimit(DEFAULT_DAILY_BONUS_TRANSFER_LIMIT);
+                    config.setTopUpDailyLimitIncreasePercentage(DEFAULT_TOP_UP_DAILY_LIMIT_INCREASE_PERCENTAGE);
                     config.setCreatedAt(LocalDateTime.now());
                     return configurationRepository.save(config);
                 });
@@ -116,5 +118,12 @@ public class SystemConfigurationService {
         return config.getDailyBonusTransferLimit() != null 
                 ? config.getDailyBonusTransferLimit() 
                 : DEFAULT_DAILY_BONUS_TRANSFER_LIMIT;
+    }
+
+    public BigDecimal getTopUpDailyLimitIncreasePercentage() {
+        SystemConfiguration config = getConfiguration();
+        return config.getTopUpDailyLimitIncreasePercentage() != null 
+                ? config.getTopUpDailyLimitIncreasePercentage() 
+                : DEFAULT_TOP_UP_DAILY_LIMIT_INCREASE_PERCENTAGE;
     }
 }

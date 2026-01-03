@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -44,6 +45,7 @@ public class DailyStatsService {
                             .date(today)
                             .dailyTopUpAmount(0L)
                             .dailyTransferAmount(0L)
+                            .dailyLimitIncrease(0L)
                             .lastUpdated(LocalDateTime.now(GMT_PLUS_5))
                             .build();
                     return statsRepository.save(stats);
@@ -52,11 +54,25 @@ public class DailyStatsService {
 
     /**
      * Adds top-up amount to today's stats (called when top-up is confirmed)
+     * Also calculates and adds the daily limit increase based on configured percentage
      */
     @Transactional
     public void addTopUpAmount(Long chatId, Long amount) {
         DailyUserStats stats = getOrCreateTodayStats(chatId);
         stats.setDailyTopUpAmount(stats.getDailyTopUpAmount() + amount);
+        
+        // Calculate and add daily limit increase based on configured percentage
+        BigDecimal percentage = configurationService.getTopUpDailyLimitIncreasePercentage();
+        if (percentage.compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal increaseAmount = BigDecimal.valueOf(amount)
+                    .multiply(percentage)
+                    .divide(BigDecimal.valueOf(100), 0, java.math.RoundingMode.HALF_UP);
+            long increase = increaseAmount.longValue();
+            stats.setDailyLimitIncrease(stats.getDailyLimitIncrease() + increase);
+            logger.info("Added daily limit increase {} ({}% of {}) for chatId {} on date {}", 
+                    increase, percentage, amount, chatId, stats.getDate());
+        }
+        
         stats.setLastUpdated(LocalDateTime.now(GMT_PLUS_5));
         statsRepository.save(stats);
         logger.info("Added top-up amount {} for chatId {} on date {}", amount, chatId, stats.getDate());
@@ -90,22 +106,26 @@ public class DailyStatsService {
 
     /**
      * Calculates available limit based on Pay toggle:
-     * - Pay toggle OFF: min(dailyLimit, dailyTopUps) - dailyTransfers
-     * - Pay toggle ON: dailyLimit - dailyTransfers (ignores deposits)
+     * - Pay toggle OFF: min(dailyLimit + dailyLimitIncrease, dailyTopUps) - dailyTransfers
+     * - Pay toggle ON: (dailyLimit + dailyLimitIncrease) - dailyTransfers (ignores deposits)
      */
     public Long getAvailableLimit(Long chatId) {
         DailyUserStats stats = getOrCreateTodayStats(chatId);
         Long dailyLimit = configurationService.getDailyBonusTransferLimit();
+        Long dailyLimitIncrease = stats.getDailyLimitIncrease() != null ? stats.getDailyLimitIncrease() : 0L;
         Long dailyTopUps = stats.getDailyTopUpAmount();
         Long dailyTransfers = stats.getDailyTransferAmount();
 
+        // Calculate effective daily limit (base limit + increase from top-ups)
+        Long effectiveDailyLimit = dailyLimit + dailyLimitIncrease;
+
         Long available;
         if (featureService.isPayToggleEnabled()) {
-            // Pay toggle ON: ignore deposits, use full daily limit
-            available = dailyLimit - dailyTransfers;
+            // Pay toggle ON: ignore deposits, use full daily limit (including increase)
+            available = effectiveDailyLimit - dailyTransfers;
         } else {
-            // Pay toggle OFF: current behavior (minimum of limit and deposits)
-            available = Math.min(dailyLimit, dailyTopUps) - dailyTransfers;
+            // Pay toggle OFF: current behavior (minimum of effective limit and deposits)
+            available = Math.min(effectiveDailyLimit, dailyTopUps) - dailyTransfers;
         }
         
         return Math.max(0L, available); // Ensure non-negative

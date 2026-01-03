@@ -49,6 +49,9 @@ public class SystemConfiguration {
     @Column(name = "daily_bonus_transfer_limit", nullable = false)
     private Long dailyBonusTransferLimit = 100_000L;
 
+    @Column(name = "top_up_daily_limit_increase_percentage", nullable = false, precision = 5, scale = 4)
+    private BigDecimal topUpDailyLimitIncreasePercentage = BigDecimal.ZERO;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 }
