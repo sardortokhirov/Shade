@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.telegram.telegrambots.bots.DefaultAbsSender;
@@ -33,6 +34,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 @Service
@@ -740,15 +742,16 @@ public class AdminBotService {
                         "Tasdiqlash uchun 'ha' yoki 'yes' deb yozing:");
     }
 
-    @Transactional
-    public void confirmAndForwardMessage(Long chatId, Map<String, Object> context) {
+    @Async("broadcastExecutor")
+    public CompletableFuture<Void> confirmAndForwardMessage(Long chatId, Map<String, Object> context) {
         try {
             Message message = (Message) context.get("message");
             List<User> users = userRepository.findAll();
 
-            int successCount = 0;
-            int failCount = 0;
+            AtomicInteger successCount = new AtomicInteger(0);
+            AtomicInteger failCount = new AtomicInteger(0);
 
+            // Send initial message immediately
             messageSender.sendTextMessage(chatId, "📤 Xabarlar yuborilmoqda...");
 
             // Use AdminBot's ForwardMessage since it has access to the original message
@@ -759,48 +762,99 @@ public class AdminBotService {
                 }
             };
 
-            for (User user : users) {
-                try {
-                    // Forward message directly from AdminBot
-                    ForwardMessage forwardMessage = new ForwardMessage();
-                    forwardMessage.setChatId(user.getChatId().toString());
-                    forwardMessage.setFromChatId(chatId.toString());
-                    forwardMessage.setMessageId(message.getMessageId());
+            // Process in batches
+            int batchSize = 100;
+            int totalBatches = (int) Math.ceil((double) users.size() / batchSize);
 
-                    adminSender.execute(forwardMessage);
-                    successCount++;
-                    Thread.sleep(50); // Avoid hitting rate limits
-                } catch (TelegramApiException e) {
-                    // If forward fails, try sending the content directly
+            for (int i = 0; i < users.size(); i += batchSize) {
+                int end = Math.min(i + batchSize, users.size());
+                List<User> batch = users.subList(i, end);
+
+                // Process batch
+                processForwardBatch(batch, message, chatId, adminSender, successCount, failCount);
+
+                // Send progress update
+                int currentBatch = (i / batchSize) + 1;
+                int progress = (currentBatch * 100) / totalBatches;
+                sendProgressUpdate(chatId, progress, currentBatch, totalBatches,
+                        successCount.get(), failCount.get());
+
+                // Delay between batches to respect Telegram rate limits
+                if (i + batchSize < users.size()) {
                     try {
-                        boolean sent = sendMessageContentDirectly(user.getChatId(), message);
-                        if (sent) {
-                            successCount++;
-                        } else {
-                            failCount++;
-                        }
-                    } catch (Exception ex) {
-                        log.error("Failed to send message to user: " + user.getChatId(), ex);
-                        failCount++;
+                        Thread.sleep(100);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        log.warn("Forward message interrupted");
+                        break;
                     }
-                } catch (Exception e) {
-                    log.error("Failed to send message to user: " + user.getChatId(), e);
-                    failCount++;
                 }
             }
 
+            // Send final completion message
             messageSender.sendTextMessage(chatId,
                     String.format("✅ Xabar yuborish yakunlandi!\n\n" +
                             "✔️ Muvaffaqiyatli: %d\n" +
                             "❌ Xato: %d\n" +
-                            "📊 Jami: %d", successCount, failCount, users.size()));
+                            "📊 Jami: %d", successCount.get(), failCount.get(), users.size()));
 
             // Show main menu after completion
             sendMainMenu(chatId);
+
+            return CompletableFuture.completedFuture(null);
         } catch (Exception e) {
             log.error("Error forwarding message", e);
             messageSender.sendTextMessage(chatId, "❌ Xatolik yuz berdi: " + e.getMessage());
             sendMainMenu(chatId);
+            return CompletableFuture.failedFuture(e);
+        }
+    }
+
+    private void processForwardBatch(List<User> batch, Message message, Long fromChatId,
+                                    DefaultAbsSender adminSender, AtomicInteger successCount, AtomicInteger failCount) {
+        for (User user : batch) {
+            try {
+                // Forward message directly from AdminBot
+                ForwardMessage forwardMessage = new ForwardMessage();
+                forwardMessage.setChatId(user.getChatId().toString());
+                forwardMessage.setFromChatId(fromChatId.toString());
+                forwardMessage.setMessageId(message.getMessageId());
+
+                adminSender.execute(forwardMessage);
+                successCount.incrementAndGet();
+            } catch (TelegramApiException e) {
+                // If forward fails, try sending the content directly
+                try {
+                    boolean sent = sendMessageContentDirectly(user.getChatId(), message);
+                    if (sent) {
+                        successCount.incrementAndGet();
+                    } else {
+                        failCount.incrementAndGet();
+                    }
+                } catch (Exception ex) {
+                    log.error("Failed to send message to user: " + user.getChatId(), ex);
+                    failCount.incrementAndGet();
+                }
+            } catch (Exception e) {
+                log.error("Failed to send message to user: " + user.getChatId(), e);
+                failCount.incrementAndGet();
+            }
+        }
+    }
+
+    private void sendProgressUpdate(Long adminChatId, int progress, int currentBatch, int totalBatches,
+                                   int successCount, int failureCount) {
+        String progressMessage = String.format(
+                "⏳ Xabar yuborish jarayoni: %d%%\n" +
+                "📦 Batch: %d / %d\n" +
+                "✅ Muvaffaqiyatli: %d\n" +
+                "❌ Xato: %d",
+                progress, currentBatch, totalBatches, successCount, failureCount);
+
+        try {
+            messageSender.sendTextMessage(adminChatId, progressMessage);
+        } catch (Exception e) {
+            log.error("Failed to send progress update to admin {}", adminChatId, e);
         }
     }
 
