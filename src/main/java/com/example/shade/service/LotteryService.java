@@ -1,6 +1,7 @@
 package com.example.shade.service;
 
 import com.example.shade.bot.MessageSender;
+import com.example.shade.dto.OverallBalanceTicketsDTO;
 import com.example.shade.model.*;
 import com.example.shade.repository.BlockedUserRepository;
 import com.example.shade.repository.HizmatRequestRepository;
@@ -364,6 +365,23 @@ public class LotteryService {
         Sort sort = Sort.by(direction, sortBy);
         Pageable pageable = PageRequest.of(page, size, sort);
         return userBalanceRepository.findAll(pageable);
+    }
+
+    public OverallBalanceTicketsDTO getOverallBalanceAndTickets() {
+        List<UserBalance> allBalances = userBalanceRepository.findAll();
+        
+        BigDecimal totalBalance = allBalances.stream()
+                .map(UserBalance::getBalance)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        Long totalTickets = allBalances.stream()
+                .map(UserBalance::getTickets)
+                .filter(Objects::nonNull)
+                .mapToLong(Long::longValue)
+                .sum();
+        
+        return new OverallBalanceTicketsDTO(totalBalance, totalTickets);
     }
 
     private InlineKeyboardMarkup backButtonKeyboard(Long chatId) {

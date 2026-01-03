@@ -2,6 +2,7 @@ package com.example.shade.controller;
 
 import com.example.shade.bot.AdminBotMessageSender;
 import com.example.shade.bot.MessageSender;
+import com.example.shade.dto.OverallBalanceTicketsDTO;
 import com.example.shade.model.LotteryPrize;
 import com.example.shade.model.UserBalance;
 import com.example.shade.repository.BlockedUserRepository;
@@ -209,5 +210,14 @@ public class LotteryController {
             // Catches invalid sortDirection value (e.g., if it's not "ASC" or "DESC")
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         }
+    }
+
+    @GetMapping("/lottery/overall")
+    public ResponseEntity<OverallBalanceTicketsDTO> getOverallBalanceAndTickets(HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+        OverallBalanceTicketsDTO result = lotteryService.getOverallBalanceAndTickets();
+        return ResponseEntity.ok(result);
     }
 }
