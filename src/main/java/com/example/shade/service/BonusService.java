@@ -1203,13 +1203,6 @@ public class BonusService {
                         "ADMIN_APPROVE_TRANSFER:" + requestId),
                 createButton(languageSessionService.getTranslation(chatId, "button.decline_transfer"),
                         "ADMIN_DECLINE_TRANSFER:" + requestId)));
-        rows.add(List.of(
-                createButton(languageSessionService.getTranslation(chatId, "button.remove_tickets"),
-                        "ADMIN_REMOVE_TICKETS:" + userChatId),
-                createButton(languageSessionService.getTranslation(chatId, "button.remove_bonus"),
-                        "ADMIN_REMOVE_BONUS:" + userChatId)));
-        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.block_user"),
-                "ADMIN_BLOCK_USER:" + userChatId)));
         markup.setKeyboard(rows);
         return markup;
     }
