@@ -9,6 +9,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Base64;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * REST API controller for system configuration management.
@@ -22,6 +24,7 @@ import java.util.Base64;
 @CrossOrigin(origins = "*")
 public class SystemConfigurationController {
 
+    private static final Logger logger = LoggerFactory.getLogger(SystemConfigurationController.class);
     private final SystemConfigurationService configurationService;
 
     /**
@@ -33,12 +36,43 @@ public class SystemConfigurationController {
      */
     private boolean authenticate(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
-        if (authHeader != null && authHeader.startsWith("Basic ")) {
-            String credentials = new String(Base64.getDecoder().decode(authHeader.substring(6)));
-            String[] parts = credentials.split(":");
-            return parts.length == 2 && "MaxUp1000".equals(parts[0]) && "MaxUp1000998905982808".equals(parts[1]);
+        if (authHeader == null) {
+            logger.warn("Authorization header is missing");
+            return false;
         }
-        return false;
+        
+        if (!authHeader.startsWith("Basic ")) {
+            logger.warn("Authorization header does not start with 'Basic '");
+            return false;
+        }
+        
+        try {
+            String encodedCredentials = authHeader.substring(6);
+            String credentials = new String(Base64.getDecoder().decode(encodedCredentials));
+            String[] parts = credentials.split(":", 2);
+            
+            if (parts.length != 2) {
+                logger.warn("Invalid credentials format. Expected 'username:password', got: {}", credentials.length() > 50 ? credentials.substring(0, 50) + "..." : credentials);
+                return false;
+            }
+            
+            String username = parts[0].trim();
+            String password = parts[1].trim();
+            
+            boolean isValid = "MaxUp1000".equals(username) && "MaxUp1000998905982808".equals(password);
+            
+            if (!isValid) {
+                logger.warn("Authentication failed. Username: '{}', Password length: {}", username, password.length());
+            }
+            
+            return isValid;
+        } catch (IllegalArgumentException e) {
+            logger.error("Failed to decode Base64 credentials: {}", e.getMessage());
+            return false;
+        } catch (Exception e) {
+            logger.error("Unexpected error during authentication: {}", e.getMessage(), e);
+            return false;
+        }
     }
 
     /**
