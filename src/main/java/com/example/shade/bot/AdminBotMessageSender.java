@@ -80,6 +80,7 @@ public class AdminBotMessageSender {
         rows.add(createRow("💸 Yechib olish yoq/o'chir", "toggle_withdraw"));
         rows.add(createRow("🎁 Bonus yoq/o'chir", "toggle_bonus"));
         rows.add(createRow("📊 Bonus Limiti yoq/o'chir", "toggle_bonus_limit"));
+        rows.add(createRow("🟩 HUMO yoq/o'chir", "toggle_humo"));
         rows.add(createRow("🔙 Ortga", "main_menu"));
 
         keyboard.setKeyboard(rows);

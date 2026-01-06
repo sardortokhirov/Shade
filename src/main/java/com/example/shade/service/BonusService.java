@@ -609,6 +609,7 @@ public class BonusService {
         balance.setBalance(balance.getBalance().subtract(new BigDecimal(amount.longValue())));
         userBalanceRepository.save(balance);
         dailyStatsService.addTransferAmount(chatId, amount.longValue());
+        dailyStatsService.subtractTopUpAmount(chatId, amount.longValue()); // Decrease deposit amount
 
         request.setAmount(amount.longValue());
         request.setUniqueAmount(amount.longValue());
@@ -877,6 +878,7 @@ public class BonusService {
         userBalanceRepository.save(balance);
 
         dailyStatsService.subtractTransferAmount(request.getChatId(), request.getAmount());
+        dailyStatsService.addTopUpAmount(request.getChatId(), request.getAmount()); // Refund deposit amount
 
         String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
         String errorLogMessage = String.format(

@@ -105,6 +105,19 @@ public class DailyStatsService {
     }
 
     /**
+     * Subtracts top-up amount from today's stats (called when bonus transfer request is created)
+     * This reserves the deposit amount for the pending transfer
+     */
+    @Transactional
+    public void subtractTopUpAmount(Long chatId, Long amount) {
+        DailyUserStats stats = getOrCreateTodayStats(chatId);
+        stats.setDailyTopUpAmount(Math.max(0L, stats.getDailyTopUpAmount() - amount));
+        stats.setLastUpdated(LocalDateTime.now(GMT_PLUS_5));
+        statsRepository.save(stats);
+        logger.info("Subtracted top-up amount {} for chatId {} on date {}", amount, chatId, stats.getDate());
+    }
+
+    /**
      * Calculates available limit based on Pay toggle:
      * - Pay toggle OFF: min(dailyLimit + dailyLimitIncrease, dailyTopUps) - dailyTransfers
      * - Pay toggle ON: (dailyLimit + dailyLimitIncrease) - dailyTransfers (ignores deposits)

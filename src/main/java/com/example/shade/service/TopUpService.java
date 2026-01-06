@@ -4,6 +4,7 @@ import com.example.shade.bot.MessageSender;
 import com.example.shade.dto.BalanceLimit;
 import com.example.shade.model.*;
 import com.example.shade.model.Currency;
+import com.example.shade.model.PaymentSystem;
 import com.example.shade.repository.*;
 import java.util.Optional;
 import jakarta.xml.bind.DatatypeConverter;
@@ -456,8 +457,22 @@ public class TopUpService {
             adminCard = adminCardRepository.findById(request.getAdminCardId())
                     .orElseThrow(() -> new IllegalStateException("Admin card not found: " + request.getAdminCardId()));
         } else {
-            adminCard = adminCardRepository.findLeastRecentlyUsed()
-                    .orElseThrow(() -> new IllegalStateException("No admin cards available"));
+            // Check HUMO toggle setting
+            if (!configurationService.getHumoEnabled()) {
+                // Try to get UZCARD card first
+                Optional<AdminCard> uzcardCard = adminCardRepository.findLeastRecentlyUsedByPaymentSystem(PaymentSystem.UZCARD);
+                if (uzcardCard.isPresent()) {
+                    adminCard = uzcardCard.get();
+                } else {
+                    // Fallback to HUMO if no UZCARD available
+                    adminCard = adminCardRepository.findLeastRecentlyUsed()
+                            .orElseThrow(() -> new IllegalStateException("No admin cards available"));
+                }
+            } else {
+                // Normal behavior - get any card
+                adminCard = adminCardRepository.findLeastRecentlyUsed()
+                        .orElseThrow(() -> new IllegalStateException("No admin cards available"));
+            }
             request.setAdminCardId(adminCard.getId());
             adminCard.setLastUsed(LocalDateTime.now(ZoneId.of("GMT+5")));
             adminCardRepository.save(adminCard);

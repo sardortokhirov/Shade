@@ -15,6 +15,7 @@ import com.example.shade.repository.LotteryPrizeRepository;
 import com.example.shade.repository.OsonConfigRepository;
 import com.example.shade.repository.PlatformRepository;
 import com.example.shade.repository.UserRepository;
+import com.example.shade.service.SystemConfigurationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -44,6 +45,7 @@ public class AdminBotService {
     @Lazy
     private final AdminBotMessageSender messageSender;
     private final FeatureService featureService;
+    private final SystemConfigurationService systemConfigurationService;
     private final AdminCardRepository adminCardRepository;
     private final OsonConfigRepository osonConfigRepository;
     private final PlatformRepository platformRepository;
@@ -126,6 +128,21 @@ public class AdminBotService {
             sendFeaturesMenu(chatId);
         } catch (Exception e) {
             log.error("Error toggling bonus limit", e);
+            messageSender.sendTextMessage(chatId, "❌ Xatolik yuz berdi: " + e.getMessage());
+        }
+    }
+
+    @Transactional
+    public void toggleHumo(Long chatId) {
+        try {
+            boolean currentStatus = systemConfigurationService.getHumoEnabled();
+            systemConfigurationService.setHumoEnabled(!currentStatus);
+            boolean newStatus = !currentStatus;
+            String status = newStatus ? "Yoqildi ✅" : "O'chirildi ❌";
+            messageSender.sendTextMessage(chatId, "HUMO " + status);
+            sendFeaturesMenu(chatId);
+        } catch (Exception e) {
+            log.error("Error toggling HUMO", e);
             messageSender.sendTextMessage(chatId, "❌ Xatolik yuz berdi: " + e.getMessage());
         }
     }

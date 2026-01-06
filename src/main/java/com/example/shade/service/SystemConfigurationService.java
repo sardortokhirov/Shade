@@ -32,6 +32,7 @@ public class SystemConfigurationService {
     private static final Long DEFAULT_TICKET_CALCULATION = 10_000L;
     private static final Long DEFAULT_DAILY_BONUS_TRANSFER_LIMIT = 100_000L;
     private static final BigDecimal DEFAULT_TOP_UP_DAILY_LIMIT_INCREASE_PERCENTAGE = BigDecimal.ZERO;
+    private static final Boolean DEFAULT_HUMO_ENABLED = true;
 
     @Transactional
     public SystemConfiguration getConfiguration() {
@@ -49,6 +50,7 @@ public class SystemConfigurationService {
                     config.setTicketCalculationAmount(DEFAULT_TICKET_CALCULATION);
                     config.setDailyBonusTransferLimit(DEFAULT_DAILY_BONUS_TRANSFER_LIMIT);
                     config.setTopUpDailyLimitIncreasePercentage(DEFAULT_TOP_UP_DAILY_LIMIT_INCREASE_PERCENTAGE);
+                    config.setHumoEnabled(DEFAULT_HUMO_ENABLED);
                     config.setCreatedAt(LocalDateTime.now());
                     return configurationRepository.save(config);
                 });
@@ -125,5 +127,31 @@ public class SystemConfigurationService {
         return config.getTopUpDailyLimitIncreasePercentage() != null 
                 ? config.getTopUpDailyLimitIncreasePercentage() 
                 : DEFAULT_TOP_UP_DAILY_LIMIT_INCREASE_PERCENTAGE;
+    }
+
+    public Boolean getHumoEnabled() {
+        SystemConfiguration config = getConfiguration();
+        return config.getHumoEnabled() != null ? config.getHumoEnabled() : DEFAULT_HUMO_ENABLED;
+    }
+
+    @Transactional
+    public void setHumoEnabled(boolean enabled) {
+        SystemConfiguration current = getConfiguration();
+        SystemConfiguration config = new SystemConfiguration();
+        config.setTopUpMinAmount(current.getTopUpMinAmount());
+        config.setTopUpMaxAmount(current.getTopUpMaxAmount());
+        config.setBonusTopUpMinAmount(current.getBonusTopUpMinAmount());
+        config.setBonusTopUpMaxAmount(current.getBonusTopUpMaxAmount());
+        config.setMinTickets(current.getMinTickets());
+        config.setMaxTickets(current.getMaxTickets());
+        config.setWithdrawalCommissionPercentage(current.getWithdrawalCommissionPercentage());
+        config.setReferralCommissionPercentage(current.getReferralCommissionPercentage());
+        config.setTicketCalculationAmount(current.getTicketCalculationAmount());
+        config.setDailyBonusTransferLimit(current.getDailyBonusTransferLimit());
+        config.setTopUpDailyLimitIncreasePercentage(current.getTopUpDailyLimitIncreasePercentage());
+        config.setHumoEnabled(enabled);
+        config.setCreatedAt(LocalDateTime.now());
+        configurationRepository.save(config);
+        logger.info("HUMO enabled set to {}", enabled);
     }
 }

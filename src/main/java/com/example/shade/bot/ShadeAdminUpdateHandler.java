@@ -107,6 +107,7 @@ public class ShadeAdminUpdateHandler {
             case "toggle_withdraw" -> adminBotService.toggleWithdraw(chatId);
             case "toggle_bonus" -> adminBotService.toggleBonus(chatId);
             case "toggle_bonus_limit" -> adminBotService.toggleBonusLimit(chatId);
+            case "toggle_humo" -> adminBotService.toggleHumo(chatId);
 
             // Admin Cards
             case "cards_menu" -> adminBotService.sendCardsMenu(chatId);

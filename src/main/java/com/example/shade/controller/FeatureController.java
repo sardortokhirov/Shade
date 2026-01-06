@@ -2,6 +2,7 @@ package com.example.shade.controller;
 
 import com.example.shade.model.FeatureSettings;
 import com.example.shade.service.FeatureService;
+import com.example.shade.service.SystemConfigurationService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -24,6 +25,7 @@ import java.util.Base64;
 public class FeatureController {
     private static final Logger logger = LoggerFactory.getLogger(FeatureController.class);
     private final FeatureService featureService;
+    private final SystemConfigurationService systemConfigurationService;
 
     private boolean authenticate(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
@@ -105,5 +107,16 @@ public class FeatureController {
         featureService.togglePayToggle(enabled);
         logger.info("Pay toggle set to {}", enabled);
         return ResponseEntity.ok("Pay toggle " + (enabled ? "yoqildi" : "o'chirildi"));
+    }
+
+    @PostMapping("/toggle/humo")
+    public ResponseEntity<String> toggleHumo(@RequestParam boolean enabled, HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        // TODO: Add admin authentication (e.g., Spring Security @PreAuthorize)
+        systemConfigurationService.setHumoEnabled(enabled);
+        logger.info("HUMO set to {}", enabled);
+        return ResponseEntity.ok("HUMO " + (enabled ? "yoqildi" : "o'chirildi"));
     }
 }
