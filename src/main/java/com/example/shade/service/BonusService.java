@@ -236,11 +236,10 @@ public class BonusService {
         UserBalance balance = userBalanceRepository.findById(chatId)
                 .orElse(UserBalance.builder().chatId(chatId).tickets(0L).balance(BigDecimal.ZERO).build());
         Long availableLimit = dailyStatsService.getAvailableLimit(chatId);
-        Long totalLimit = dailyStatsService.getEffectiveDailyLimit(chatId);
         SendMessage message = new SendMessage();
         message.setChatId(chatId);
         message.setText(String.format(languageSessionService.getTranslation(chatId, "message.bonus_menu"),
-                balance.getTickets(), balance.getBalance().longValue(), totalLimit, availableLimit));
+                balance.getTickets(), balance.getBalance().longValue(), availableLimit));
         message.setReplyMarkup(createBonusMenuKeyboard(chatId));
         messageSender.sendMessage(message, chatId);
     }
