@@ -151,4 +151,14 @@ public class DailyStatsService {
         Long availableLimit = getAvailableLimit(chatId);
         return amount <= availableLimit;
     }
+
+    /**
+     * Gets the effective daily limit (base limit + increase from top-ups)
+     */
+    public Long getEffectiveDailyLimit(Long chatId) {
+        DailyUserStats stats = getOrCreateTodayStats(chatId);
+        Long dailyLimit = configurationService.getDailyBonusTransferLimit();
+        Long dailyLimitIncrease = stats.getDailyLimitIncrease() != null ? stats.getDailyLimitIncrease() : 0L;
+        return dailyLimit + dailyLimitIncrease;
+    }
 }

@@ -818,8 +818,10 @@ public class TopUpService {
                 dailyStatsService.addTopUpAmount(request.getChatId(), request.getAmount());
 
                 String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
+                Long totalLimit = dailyStatsService.getEffectiveDailyLimit(request.getChatId());
+                Long availableLimit = dailyStatsService.getAvailableLimit(request.getChatId());
                 String logMessage = String.format(
-                        " 🆔: %d To‘lov skrinshoti tasdiqlandi ✅\n" +
+                        " 🆔: %d To'lov skrinshoti tasdiqlandi ✅\n" +
                                 "👤ID [%s] %s\n" +
                                 "🌐 #%s: " + "%s\n" +
                                 "💸 Miqdor: %,d UZS\n" +
@@ -827,6 +829,7 @@ public class TopUpService {
                                 "💳 Karta: `%s`\n" +
                                 "🔐 Admin kartasi: `%s`\n" +
                                 "🎟️ Chiptalar: %d (+ %d )\n\n" +
+                                "📊 Kunlik limit: %,d / %,d so'm\n" +
                                 "📅 [%s] ",
                         request.getId(),
                         request.getChatId(), number,
@@ -838,10 +841,11 @@ public class TopUpService {
                         adminCard.getCardNumber(),
                         balance.getTickets(),
                         tickets,
+                        totalLimit, availableLimit,
                         LocalDateTime.now(ZoneId.of("GMT+5"))
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                 String adminLogMessage = String.format(
-                        " 🆔: %d To‘lov skrinshoti tasdiqlandi ✅\n" +
+                        " 🆔: %d To'lov skrinshoti tasdiqlandi ✅\n" +
                                 "👤ID [%s] %s\n" +
                                 "🌐 #%s: " + "%s\n" +
                                 "💸 Miqdor: %,d UZS\n" +
@@ -850,6 +854,7 @@ public class TopUpService {
                                 "🔐 Admin kartasi: `%s`\n" +
                                 "🎟️ Chiptalar: %d (+ %d )\n\n" +
                                 "\uD83C\uDFE6: %,d %s\n\n" +
+                                "📊 Kunlik limit: %,d / %,d so'm\n" +
                                 "📅 [%s] ",
                         request.getId(),
                         request.getChatId(), number,
@@ -863,6 +868,7 @@ public class TopUpService {
                         tickets,
                         transferSuccessful.getLimit().longValue(),
                         request.getCurrency().toString(),
+                        totalLimit, availableLimit,
                         LocalDateTime.now(ZoneId.of("GMT+5"))
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
@@ -973,8 +979,10 @@ public class TopUpService {
                 dailyStatsService.addTopUpAmount(request.getChatId(), request.getAmount());
 
                 String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
+                Long totalLimit = dailyStatsService.getEffectiveDailyLimit(request.getChatId());
+                Long availableLimit = dailyStatsService.getAvailableLimit(request.getChatId());
                 String logMessage = String.format(
-                        " 🆔: %d To‘lov skrinshoti tasdiqlandi ✅\n" +
+                        " 🆔: %d To'lov skrinshoti tasdiqlandi ✅\n" +
                                 "👤ID [%s] %s\n" +
                                 "🌐 #%s: " + "%s\n" +
                                 "💸 Miqdor: %,d UZS\n" +
@@ -982,6 +990,7 @@ public class TopUpService {
                                 "💳 Karta: `%s`\n" +
                                 "🔐 Admin kartasi: `%s`\n" +
                                 "🎟️ Chiptalar: %d (+ %d )\n\n" +
+                                "📊 Kunlik limit: %,d / %,d so'm\n" +
                                 "📅 [%s] ",
                         request.getId(),
                         request.getChatId(), number,
@@ -993,10 +1002,11 @@ public class TopUpService {
                         adminCard.getCardNumber(),
                         balance.getTickets(),
                         tickets,
+                        totalLimit, availableLimit,
                         LocalDateTime.now(ZoneId.of("GMT+5"))
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                 String adminLogMessage = String.format(
-                        " 🆔: %d To‘lov skrinshoti tasdiqlandi ✅\n" +
+                        " 🆔: %d To'lov skrinshoti tasdiqlandi ✅\n" +
                                 "👤ID [%s] %s\n" +
                                 "🌐 #%s: " + "%s\n" +
                                 "💸 Miqdor: %,d UZS\n" +
@@ -1005,6 +1015,7 @@ public class TopUpService {
                                 "🔐 Admin kartasi: `%s`\n" +
                                 "🎟️ Chiptalar: %d (+ %d )\n\n" +
                                 "\uD83C\uDFE6: %,d %s\n\n" +
+                                "📊 Kunlik limit: %,d / %,d so'm\n" +
                                 "📅 [%s] ",
                         request.getId(),
                         request.getChatId(), number,
@@ -1018,6 +1029,7 @@ public class TopUpService {
                         tickets,
                         transferSuccessful.getLimit().longValue(),
                         request.getCurrency().toString(),
+                        totalLimit, availableLimit,
                         LocalDateTime.now(ZoneId.of("GMT+5"))
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
