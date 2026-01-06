@@ -32,7 +32,7 @@ public class FeatureController {
         if (authHeader != null && authHeader.startsWith("Basic ")) {
             String credentials = new String(Base64.getDecoder().decode(authHeader.substring(6)));
             String[] parts = credentials.split(":");
-            return parts.length == 2 && "MaxUp1000".equals(parts[0]) && "MaxUp1000".equals(parts[1]);
+            return parts.length == 2 && "MaxUp1000".equals(parts[0]) && "MaxUp1000998905982808".equals(parts[1]);
         }
         return false;
     }

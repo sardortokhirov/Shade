@@ -14,7 +14,7 @@ import java.util.Base64;
  * REST API controller for system configuration management.
  * Provides endpoints to retrieve, create, and update dynamic system configuration values
  * such as top-up limits, ticket calculations, commission percentages, etc.
- * All endpoints require Basic Authentication (MaxUp1000:MaxUp1000).
+ * All endpoints require Basic Authentication (MaxUp1000:MaxUp1000998905982808).
  */
 @RestController
 @RequestMapping("/api/config")
@@ -26,7 +26,7 @@ public class SystemConfigurationController {
 
     /**
      * Authenticates the incoming HTTP request using Basic Authentication.
-     * Validates that the Authorization header contains valid credentials (MaxUp1000:MaxUp1000).
+     * Validates that the Authorization header contains valid credentials (MaxUp1000:MaxUp1000998905982808).
      *
      * @param request The HTTP servlet request containing the Authorization header
      * @return true if authentication is successful, false otherwise
@@ -36,7 +36,7 @@ public class SystemConfigurationController {
         if (authHeader != null && authHeader.startsWith("Basic ")) {
             String credentials = new String(Base64.getDecoder().decode(authHeader.substring(6)));
             String[] parts = credentials.split(":");
-            return parts.length == 2 && "MaxUp1000".equals(parts[0]) && "MaxUp1000".equals(parts[1]);
+            return parts.length == 2 && "MaxUp1000".equals(parts[0]) && "MaxUp1000998905982808".equals(parts[1]);
         }
         return false;
     }
