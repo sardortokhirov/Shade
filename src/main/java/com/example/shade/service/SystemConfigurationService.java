@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 /**
  * Service for managing system configuration values
@@ -51,14 +52,14 @@ public class SystemConfigurationService {
                     config.setDailyBonusTransferLimit(DEFAULT_DAILY_BONUS_TRANSFER_LIMIT);
                     config.setTopUpDailyLimitIncreasePercentage(DEFAULT_TOP_UP_DAILY_LIMIT_INCREASE_PERCENTAGE);
                     config.setHumoEnabled(DEFAULT_HUMO_ENABLED);
-                    config.setCreatedAt(LocalDateTime.now());
+                    config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
                     return configurationRepository.save(config);
                 });
     }
 
     @Transactional
     public SystemConfiguration updateConfiguration(SystemConfiguration config) {
-        config.setCreatedAt(LocalDateTime.now());
+        config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
         SystemConfiguration saved = configurationRepository.save(config);
         logger.info("System configuration updated: {}", saved.getId());
         return saved;
@@ -150,7 +151,7 @@ public class SystemConfigurationService {
         config.setDailyBonusTransferLimit(current.getDailyBonusTransferLimit());
         config.setTopUpDailyLimitIncreasePercentage(current.getTopUpDailyLimitIncreasePercentage());
         config.setHumoEnabled(enabled);
-        config.setCreatedAt(LocalDateTime.now());
+        config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
         configurationRepository.save(config);
         logger.info("HUMO enabled set to {}", enabled);
     }

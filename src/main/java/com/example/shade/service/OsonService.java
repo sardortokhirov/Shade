@@ -15,6 +15,7 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
@@ -150,7 +151,7 @@ public class OsonService {
             if (apiResponse.getStatusCode().is2xxSuccessful() && responseBody != null && "0".equals(String.valueOf(responseBody.get("errno")))) {
                 List<Map<String, Object>> transactions = (List<Map<String, Object>>) responseBody.get("array");
                 String userCardLastDigits = userCardNumber.substring(userCardNumber.length() - 4);
-                OffsetDateTime now = OffsetDateTime.now();
+                OffsetDateTime now = OffsetDateTime.now(ZoneId.of("GMT+5"));
 
                 for (Map<String, Object> transaction : transactions) {
                     long txAmount = Long.parseLong(String.valueOf(transaction.get("amount")));

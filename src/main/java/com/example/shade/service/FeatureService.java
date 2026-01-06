@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 /**
  * Date-8/11/2025
@@ -33,7 +34,7 @@ public class FeatureService {
                     settings.setPromoEnabled(false);
                     settings.setBonusLimitEnabled(true);
                     settings.setPayToggleEnabled(false);
-                    settings.setCreatedAt(LocalDateTime.now());
+                    settings.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
                     return featureSettingsRepository.save(settings);
                 });
     }
@@ -48,7 +49,7 @@ public class FeatureService {
         settings.setPromoEnabled(current.getPromoEnabled());
         settings.setBonusLimitEnabled(current.getBonusLimitEnabled());
         settings.setPayToggleEnabled(current.getPayToggleEnabled());
-        settings.setCreatedAt(LocalDateTime.now());
+        settings.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
         featureSettingsRepository.save(settings);
         logger.info("Top-up {} globally", enabled ? "enabled" : "disabled");
     }
@@ -63,7 +64,7 @@ public class FeatureService {
         settings.setPromoEnabled(current.getPromoEnabled());
         settings.setBonusLimitEnabled(current.getBonusLimitEnabled());
         settings.setPayToggleEnabled(current.getPayToggleEnabled());
-        settings.setCreatedAt(LocalDateTime.now());
+        settings.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
         featureSettingsRepository.save(settings);
         logger.info("Withdraw {} globally", enabled ? "enabled" : "disabled");
     }
@@ -78,7 +79,7 @@ public class FeatureService {
         settings.setPromoEnabled(current.getPromoEnabled());
         settings.setBonusLimitEnabled(current.getBonusLimitEnabled());
         settings.setPayToggleEnabled(current.getPayToggleEnabled());
-        settings.setCreatedAt(LocalDateTime.now());
+        settings.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
         featureSettingsRepository.save(settings);
         logger.info("Bonus {} globally", enabled ? "enabled" : "disabled");
     }
@@ -105,7 +106,7 @@ public class FeatureService {
         settings.setPromoEnabled(enabled);
         settings.setBonusLimitEnabled(current.getBonusLimitEnabled());
         settings.setPayToggleEnabled(current.getPayToggleEnabled());
-        settings.setCreatedAt(LocalDateTime.now());
+        settings.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
         featureSettingsRepository.save(settings);
         logger.info("Promo {} globally", enabled ? "enabled" : "disabled");
     }
@@ -124,7 +125,7 @@ public class FeatureService {
         settings.setPromoEnabled(current.getPromoEnabled());
         settings.setBonusLimitEnabled(enabled);
         settings.setPayToggleEnabled(current.getPayToggleEnabled());
-        settings.setCreatedAt(LocalDateTime.now());
+        settings.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
         featureSettingsRepository.save(settings);
         logger.info("Bonus limit {} globally", enabled ? "enabled" : "disabled");
     }
@@ -144,7 +145,7 @@ public class FeatureService {
         settings.setPromoEnabled(current.getPromoEnabled());
         settings.setBonusLimitEnabled(current.getBonusLimitEnabled());
         settings.setPayToggleEnabled(enabled);
-        settings.setCreatedAt(LocalDateTime.now());
+        settings.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
         featureSettingsRepository.save(settings);
         logger.info("Pay toggle {} globally", enabled ? "enabled" : "disabled");
     }

@@ -25,7 +25,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -1087,7 +1086,7 @@ public class TopUpService {
     public BalanceLimit getCashdeskBalance(String hash, String cashierPass, String cashdeskId) {
         RestTemplate restTemplate = new RestTemplate();
         String baseUrl = "https://partners.servcul.com/CashdeskBotAPI";
-        String dt = ZonedDateTime.now(ZoneOffset.UTC)
+        String dt = ZonedDateTime.now(ZoneId.of("GMT+5"))
                 .format(DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm:ss"));
 
         // Generate signature

@@ -32,6 +32,7 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -237,7 +238,7 @@ public class AdminBotService {
             card.setBalance(balance);
             card.setOsonConfig(osonConfig);
             card.setPaymentSystem(paymentSystem);
-            card.setLastUsed(LocalDateTime.now());
+            card.setLastUsed(LocalDateTime.now(ZoneId.of("GMT+5")));
 
             adminCardRepository.save(card);
             messageSender.sendTextMessage(chatId, "✅ Karta muvaffaqiyatli qo'shildi!\nID: " + card.getId());

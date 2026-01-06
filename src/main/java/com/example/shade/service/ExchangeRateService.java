@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @Slf4j
 @Service
@@ -31,7 +32,7 @@ public class ExchangeRateService {
         ExchangeRate exchangeRate = ExchangeRate.builder()
                 .rubToUzs(rubToUzs)
                 .uzsToRub(uzsToRub)
-                .createdAt(LocalDateTime.now())
+                .createdAt(LocalDateTime.now(ZoneId.of("GMT+5")))
                 .build();
 
         exchangeRateRepository.save(exchangeRate);

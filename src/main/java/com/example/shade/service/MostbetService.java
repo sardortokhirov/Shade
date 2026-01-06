@@ -15,7 +15,7 @@ import javax.crypto.spec.SecretKeySpec;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -44,7 +44,7 @@ public class MostbetService {
     private final PlatformRepository  platformRepository;;
     private final ExchangeRateRepository exchangeRateRepository;;
     private String now() {
-        return LocalDateTime.now(ZoneOffset.UTC).format(FMT);
+        return LocalDateTime.now(ZoneId.of("GMT+5")).format(FMT);
     }
 
     private String sign(String apiKey,String secret,String path, String body, String timestamp) throws Exception {
