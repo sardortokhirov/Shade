@@ -616,7 +616,7 @@ public class TopUpService {
 
                 String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
                 String logMessage = String.format(
-                        "🆔: %d  To‘lov yakunlandi ✅\n" +
+                        "🆔: %d  To'lov yakunlandi ✅\n" +
                                 "🌐 #%s: " + "%s\n" +
                                 "💸 Miqdor: %,d UZS\n" +
                                 "💸 Miqdor: %,d RUB\n" +
@@ -636,8 +636,10 @@ public class TopUpService {
                         LocalDateTime.now(ZoneId.of("GMT+5"))
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
+                Long totalLimit = dailyStatsService.getEffectiveDailyLimit(request.getChatId());
+                Long availableLimit = dailyStatsService.getAvailableLimit(request.getChatId());
                 String logMessageAdmin = String.format(
-                        "🆔: %d  To‘lov yakunlandi ✅\n" +
+                        "🆔: %d  To'lov yakunlandi ✅\n" +
                                 "👤: [%s] %s\n" +
                                 "🌐 #%s: " + "%s\n" +
                                 "💸 Miqdor: %,d UZS\n" +
@@ -646,6 +648,7 @@ public class TopUpService {
                                 "\uD83D\uDCB3 Bizniki: `%s`\n" +
                                 "🎟️ Chiptalar: %d (+ %d )\n\n" +
                                 "\uD83C\uDFE6: %,d %s\n\n" +
+                                "📊 Kunlik limit: %,d / %,d so'm\n" +
                                 "📅 [%s]",
                         request.getId(),
                         chatId,
@@ -660,6 +663,7 @@ public class TopUpService {
                         tickets,
                         transferSuccessful.getLimit().longValue(),
                         request.getCurrency().toString(),
+                        totalLimit, availableLimit,
                         LocalDateTime.now(ZoneId.of("GMT+5"))
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                 adminLogBotService.sendLog(logMessageAdmin);

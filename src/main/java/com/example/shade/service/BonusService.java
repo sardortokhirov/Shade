@@ -576,6 +576,16 @@ public class BonusService {
     }
 
     private void initiateTopUpRequest(Long chatId) {
+        // Check for existing PENDING_ADMIN request to prevent duplicates
+        Optional<HizmatRequest> existingRequest = requestRepository.findByChatIdAndStatus(chatId, RequestStatus.PENDING_ADMIN);
+        if (existingRequest.isPresent()) {
+            logger.warn("Duplicate bonus transfer request attempt for chatId {}: existing request ID {}", chatId, existingRequest.get().getId());
+            messageSender.sendMessage(chatId,
+                    languageSessionService.getTranslation(chatId, "message.request_already_pending"));
+            sendBonusMenu(chatId);
+            return;
+        }
+
         String platform = sessionService.getUserData(chatId, "platform");
         String userId = sessionService.getUserData(chatId, "platformUserId");
         String amountStr = sessionService.getUserData(chatId, "amount");
@@ -620,8 +630,23 @@ public class BonusService {
         messageSender.sendMessage(chatId, userMessage);
 
         sendAdminApprovalRequest(chatId, request);
+        
+        // Clear transfer-specific session data immediately after request creation
+        clearTransferSessionData(chatId);
+        
         sessionService.setUserState(chatId, "BONUS_MENU");
         sendBonusMenu(chatId);
+    }
+
+    /**
+     * Clears transfer-specific session data (platformUserId, amount, fullName)
+     * while keeping platform in session for potential reuse.
+     */
+    private void clearTransferSessionData(Long chatId) {
+        sessionService.removeUserData(chatId, "platformUserId");
+        sessionService.removeUserData(chatId, "amount");
+        sessionService.removeUserData(chatId, "fullName");
+        logger.debug("Cleared transfer session data for chatId: {}", chatId);
     }
 
     private void sendAdminApprovalRequest(Long chatId, HizmatRequest request) {

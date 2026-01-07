@@ -44,6 +44,16 @@ public class UserSessionService {
                 .orElse(null);
     }
 
+    public void removeUserData(Long chatId, String key) {
+        Map<String, String> data = sessionDataStore.get(chatId);
+        if (data != null) {
+            data.remove(key);
+            if (data.isEmpty()) {
+                sessionDataStore.remove(chatId);
+            }
+        }
+    }
+
     public void addNavigationState(Long chatId, String state) {
         UserSession session = sessionStore.computeIfAbsent(chatId, k -> new UserSession());
         session.setChatId(chatId);
