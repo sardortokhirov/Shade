@@ -576,16 +576,6 @@ public class BonusService {
     }
 
     private void initiateTopUpRequest(Long chatId) {
-        // Check for existing PENDING_ADMIN request to prevent duplicates
-        Optional<HizmatRequest> existingRequest = requestRepository.findByChatIdAndStatus(chatId, RequestStatus.PENDING_ADMIN);
-        if (existingRequest.isPresent()) {
-            logger.warn("Duplicate bonus transfer request attempt for chatId {}: existing request ID {}", chatId, existingRequest.get().getId());
-            messageSender.sendMessage(chatId,
-                    languageSessionService.getTranslation(chatId, "message.request_already_pending"));
-            sendBonusMenu(chatId);
-            return;
-        }
-
         String platform = sessionService.getUserData(chatId, "platform");
         String userId = sessionService.getUserData(chatId, "platformUserId");
         String amountStr = sessionService.getUserData(chatId, "amount");
@@ -892,8 +882,10 @@ public class BonusService {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         rows.add(List.of(
-                createButton("✅ Qabul qilish", "ADMIN_APPROVE_TRANSFER:" + request.getId()),
-                createButton("❌ Rad etish", "ADMIN_DECLINE_TRANSFER:" + request.getId())));
+                createButton(languageSessionService.getTranslation(request.getChatId(), "button.approve_transfer"),
+                        "ADMIN_APPROVE_TRANSFER:" + request.getId()),
+                createButton(languageSessionService.getTranslation(request.getChatId(), "button.decline_transfer"),
+                        "ADMIN_DECLINE_TRANSFER:" + request.getId())));
         markup.setKeyboard(rows);
 
         adminLogBotService.sendToAdmins(errorLogMessage, markup);
