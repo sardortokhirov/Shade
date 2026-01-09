@@ -133,28 +133,33 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                 }
             }
             // Handle referral for /start ref_
-            if (update.hasMessage() && update.getMessage().hasText()
-                    && update.getMessage().getText().startsWith("/start=ref_")) {
+            if (update.hasMessage() && update.getMessage().hasText()) {
                 String messageText = update.getMessage().getText();
-                String referrerIdStr = messageText.substring("/start=ref_".length());
-                try {
-                    Long referrerChatId = Long.parseLong(referrerIdStr);
-                    if (!referrerChatId.equals(chatId)) {
-                        if (referralRepository.findByReferredChatId(chatId).isEmpty()) {
-                            Referral referral = new Referral();
-                            referral.setReferrerChatId(referrerChatId);
-                            referral.setReferredChatId(chatId);
-                            referralRepository.save(referral);
-                            logger.info("Referral created: referrerChatId={}, referredChatId={}", referrerChatId,
-                                    chatId);
-                        } else {
-                            logger.info("Referral not created: user {} already has a referral", chatId);
+                if (messageText.startsWith("/start ref_")) {
+                    String referrerIdStr = messageText.substring("/start ref_".length()).trim();
+                    if (!referrerIdStr.isEmpty()) {
+                        try {
+                            Long referrerChatId = Long.parseLong(referrerIdStr);
+                            if (!referrerChatId.equals(chatId)) {
+                                if (referralRepository.findByReferredChatId(chatId).isEmpty()) {
+                                    Referral referral = new Referral();
+                                    referral.setReferrerChatId(referrerChatId);
+                                    referral.setReferredChatId(chatId);
+                                    referralRepository.save(referral);
+                                    logger.info("Referral created: referrerChatId={}, referredChatId={}", referrerChatId,
+                                            chatId);
+                                } else {
+                                    logger.info("Referral not created: user {} already has a referral", chatId);
+                                }
+                            } else {
+                                logger.warn("Self-referral attempt by chatId: {}", chatId);
+                            }
+                        } catch (NumberFormatException e) {
+                            logger.error("Invalid referrer ID format: {}", referrerIdStr);
                         }
                     } else {
-                        logger.warn("Self-referral attempt by chatId: {}", chatId);
+                        logger.warn("Empty referrer ID in referral link for chatId: {}", chatId);
                     }
-                } catch (NumberFormatException e) {
-                    logger.error("Invalid referrer ID format: {}", referrerIdStr);
                 }
             }
 

@@ -463,9 +463,12 @@ public class TopUpService {
                 if (uzcardCard.isPresent()) {
                     adminCard = uzcardCard.get();
                 } else {
-                    // Fallback to HUMO if no UZCARD available
-                    adminCard = adminCardRepository.findLeastRecentlyUsed()
-                            .orElseThrow(() -> new IllegalStateException("No admin cards available"));
+                    // No UZCARD available and HUMO is disabled - show error to user
+                    logger.warn("No UZCARD cards available for chatId {} when HUMO is disabled", chatId);
+                    messageSender.sendMessage(chatId,
+                            languageSessionService.getTranslation(chatId, "topup.message.no_uzcard_available"));
+                    sendMainMenu(chatId);
+                    return;
                 }
             } else {
                 // Normal behavior - get any card

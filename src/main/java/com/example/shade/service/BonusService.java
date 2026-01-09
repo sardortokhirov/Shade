@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.*;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 import org.springframework.web.client.HttpClientErrorException;
@@ -275,7 +276,19 @@ public class BonusService {
         message.enableMarkdown(true);
         message.setText(String.format(languageSessionService.getTranslation(chatId, "message.referral_link"),
                 referralLink));
-        message.setReplyMarkup(createNavigationKeyboard(chatId));
+        
+        // Create keyboard with clickable URL button
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        // Add clickable referral link button
+        rows.add(List.of(createButton(
+                languageSessionService.getTranslation(chatId, "button.referral_link"),
+                referralLink)));
+        // Add navigation buttons
+        rows.add(createNavigationButtons(chatId));
+        markup.setKeyboard(rows);
+        
+        message.setReplyMarkup(markup);
         messageSender.sendMessage(message, chatId);
     }
 
@@ -982,7 +995,12 @@ public class BonusService {
         adminLogBotService.sendToAdmins("Foydalanuvchi bloklandi: Foydalanuvchi: " + userChatId);
     }
 
-    private void playLottery(Long chatId) {
+    @Async("bonusProcessingExecutor")
+    public void playLottery(Long chatId) {
+        // Send immediate feedback to user
+        messageSender.sendMessage(chatId,
+                languageSessionService.getTranslation(chatId, "message.lottery_processing"));
+        
         try {
             UserBalance balance = userBalanceRepository.findById(chatId)
                     .orElse(UserBalance.builder().chatId(chatId).tickets(0L).balance(BigDecimal.ZERO).build());
@@ -1008,18 +1026,18 @@ public class BonusService {
 
             StringBuilder winningsLog = new StringBuilder();
             ticketWinnings.forEach(
-                    (ticketNumber, amount) -> winningsLog.append(String.format("%,d so‘m\n", amount.longValue())));
+                    (ticketNumber, amount) -> winningsLog.append(String.format("%,d so'm\n", amount.longValue())));
             winningsLog.append(String.format(languageSessionService.getTranslation(chatId, "message.lottery_results"),
                     "", totalWinnings.longValue(), balance.getBalance().longValue()));
             messageSender.sendMessage(chatId, winningsLog.toString());
 
             String number = blockedUserRepository.findByChatId(chatId).get().getPhoneNumber();
             String adminLog = String.format(
-                    "Lotereya o‘ynaldi 🎟\n" +
+                    "Lotereya o'ynaldi 🎟\n" +
                             "👤 User ID [%s] %s\n" +
-                            "🎫 O‘ynalgan chiptalar: %s ta\n" +
-                            "💰 Jami yutuq: %s so‘m\n" +
-                            "💸 Yangi balans: %s so‘m\n" +
+                            "🎫 O'ynalgan chiptalar: %s ta\n" +
+                            "💰 Jami yutuq: %s so'm\n" +
+                            "💸 Yangi balans: %s so'm\n" +
                             "📅 [%s]",
                     chatId, number, numberOfPlays, totalWinnings.longValue(), balance.getBalance().longValue(),
                     LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
@@ -1028,6 +1046,11 @@ public class BonusService {
             sendLotteryMenu(chatId);
         } catch (IllegalStateException e) {
             logger.error("Lottery play failed for chatId {}: {}", chatId, e.getMessage());
+            messageSender.sendMessage(chatId, String
+                    .format(languageSessionService.getTranslation(chatId, "message.lottery_error"), e.getMessage()));
+            sendLotteryMenu(chatId);
+        } catch (Exception e) {
+            logger.error("Unexpected error in lottery play for chatId {}: {}", chatId, e.getMessage(), e);
             messageSender.sendMessage(chatId, String
                     .format(languageSessionService.getTranslation(chatId, "message.lottery_error"), e.getMessage()));
             sendLotteryMenu(chatId);
@@ -1250,10 +1273,14 @@ public class BonusService {
         return buttons;
     }
 
-    private InlineKeyboardButton createButton(String text, String callback) {
+    private InlineKeyboardButton createButton(String text, String callbackOrUrl) {
         InlineKeyboardButton button = new InlineKeyboardButton();
         button.setText(text);
-        button.setCallbackData(callback);
+        if (callbackOrUrl.startsWith("http")) {
+            button.setUrl(callbackOrUrl);
+        } else {
+            button.setCallbackData(callbackOrUrl);
+        }
         return button;
     }
 
