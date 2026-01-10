@@ -8,6 +8,8 @@ import com.example.shade.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.http.*;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -55,6 +57,10 @@ public class BonusService {
     private final DailyStatsService dailyStatsService;
     private final FeatureService featureService;
     private final UserPlatformPermissionRepository permissionRepository;
+
+    @Lazy
+    @Autowired
+    private BonusService bonusServiceProxy;
 
     public void startBonus(Long chatId) {
         logger.info("Starting bonus section for chatId: {}", chatId);
@@ -149,7 +155,7 @@ public class BonusService {
                 sessionService.addNavigationState(chatId, "BONUS_MENU");
                 sendReferralMenu(chatId);
             }
-            case "BONUS_LOTTERY_PLAY" -> playLottery(chatId);
+            case "BONUS_LOTTERY_PLAY" -> bonusServiceProxy.playLottery(chatId);
             case "BONUS_REFERRAL_LINK" -> sendReferralLink(chatId);
             case "BONUS_TOPUP" -> {
                 String savedPlatform = sessionService.getUserData(chatId, "platform");

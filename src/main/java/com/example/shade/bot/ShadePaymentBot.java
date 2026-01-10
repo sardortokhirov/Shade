@@ -173,7 +173,7 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                 User userLanguage = userRepository.findByChatId(chatId).orElse(null);
                 if (userLanguage == null) {
                     if (update.hasMessage() && update.getMessage().hasText()
-                            && update.getMessage().getText().equals("/start")) {
+                            && update.getMessage().getText().startsWith("/start")) {
                         sessionService.setUserState(chatId, "AWAITING_LANGUAGE");
                         sendLanguageSelection(chatId);
                         return;
@@ -197,8 +197,14 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                 }
                 user.setPhoneNumber(receivedPhoneNumber);
                 blockedUserRepository.save(user);
-                userBalanceRepository
-                        .save(UserBalance.builder().chatId(chatId).tickets(0L).balance(BigDecimal.ZERO).build());
+                // Only create UserBalance if it doesn't exist, preserve existing balance and tickets
+                if (userBalanceRepository.findById(chatId).isEmpty()) {
+                    userBalanceRepository.save(UserBalance.builder()
+                            .chatId(chatId)
+                            .tickets(0L)
+                            .balance(BigDecimal.ZERO)
+                            .build());
+                }
 
                 logger.info("Phone number saved for chatId {}: {}", chatId, receivedPhoneNumber);
                 sessionService.clearSession(chatId);
