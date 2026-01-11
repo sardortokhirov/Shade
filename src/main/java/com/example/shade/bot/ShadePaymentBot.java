@@ -491,6 +491,7 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
         } catch (Exception e) {
             logger.error("Error handling callback {} for chatId {}: {}", callback, chatId, e.getMessage());
             messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "message.callback_error"));
+            sendMainMenu(chatId, true);
         }
     }
 
