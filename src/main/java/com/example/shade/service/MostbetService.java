@@ -44,7 +44,7 @@ public class MostbetService {
     private final PlatformRepository  platformRepository;;
     private final ExchangeRateRepository exchangeRateRepository;;
     private String now() {
-        return LocalDateTime.now(ZoneId.of("GMT+5")).format(FMT);
+        return LocalDateTime.now(ZoneId.of("UTC")).format(FMT);
     }
 
     private String sign(String apiKey,String secret,String path, String body, String timestamp) throws Exception {
