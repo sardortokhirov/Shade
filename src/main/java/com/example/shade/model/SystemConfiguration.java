@@ -1,5 +1,6 @@
 package com.example.shade.model;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -50,6 +51,7 @@ public class SystemConfiguration {
     private Long dailyBonusTransferLimit = 100_000L;
 
     @Column(name = "top_up_daily_limit_increase_percentage", nullable = false, precision = 9, scale = 8)
+    @JsonSerialize(using = BigDecimalPlainSerializer.class)
     private BigDecimal topUpDailyLimitIncreasePercentage = BigDecimal.ZERO;
 
     @Column(name = "humo_enabled", nullable = false)
