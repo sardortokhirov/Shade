@@ -23,6 +23,7 @@ public class DailyStatsService {
     private final DailyUserStatsRepository statsRepository;
     private final SystemConfigurationService configurationService;
     private final FeatureService featureService;
+    private final UserLimitIncreaseService userLimitIncreaseService;
     private static final ZoneId GMT_PLUS_5 = ZoneId.of("GMT+5");
 
     /**
@@ -54,23 +55,24 @@ public class DailyStatsService {
 
     /**
      * Adds top-up amount to today's stats (called when top-up is confirmed)
-     * Also calculates and adds the daily limit increase based on configured percentage
+     * Also calculates and adds the permanent limit increase based on configured percentage
      */
     @Transactional
     public void addTopUpAmount(Long chatId, Long amount) {
         DailyUserStats stats = getOrCreateTodayStats(chatId);
         stats.setDailyTopUpAmount(stats.getDailyTopUpAmount() + amount);
         
-        // Calculate and add daily limit increase based on configured percentage
+        // Calculate and add permanent limit increase based on configured percentage
         BigDecimal percentage = configurationService.getTopUpDailyLimitIncreasePercentage();
         if (percentage.compareTo(BigDecimal.ZERO) > 0) {
             BigDecimal increaseAmount = BigDecimal.valueOf(amount)
                     .multiply(percentage)
                     .divide(BigDecimal.valueOf(100), 0, java.math.RoundingMode.HALF_UP);
             long increase = increaseAmount.longValue();
-            stats.setDailyLimitIncrease(stats.getDailyLimitIncrease() + increase);
-            logger.info("Added daily limit increase {} ({}% of {}) for chatId {} on date {}", 
-                    increase, percentage, amount, chatId, stats.getDate());
+            // Add to permanent increase (accumulates forever, never resets)
+            userLimitIncreaseService.addPermanentLimitIncrease(chatId, increase);
+            logger.info("Added permanent limit increase {} ({}% of {}) for chatId {}", 
+                    increase, percentage, amount, chatId);
         }
         
         stats.setLastUpdated(LocalDateTime.now(GMT_PLUS_5));
@@ -119,22 +121,26 @@ public class DailyStatsService {
 
     /**
      * Calculates available limit based on Pay toggle:
-     * - Pay toggle OFF: min(dailyLimit + dailyLimitIncrease, dailyTopUps) - dailyTransfers
-     * - Pay toggle ON: (dailyLimit + dailyLimitIncrease) - dailyTransfers (ignores deposits)
+     * - Pay toggle OFF: min(dailyLimit + permanentIncrease + dailyLimitIncrease, dailyTopUps) - dailyTransfers
+     * - Pay toggle ON: (dailyLimit + permanentIncrease + dailyLimitIncrease) - dailyTransfers (ignores deposits)
+     * 
+     * Note: permanentIncrease comes from top-ups (never resets)
+     *       dailyLimitIncrease comes from lottery winnings (resets daily)
      */
     public Long getAvailableLimit(Long chatId) {
         DailyUserStats stats = getOrCreateTodayStats(chatId);
         Long dailyLimit = configurationService.getDailyBonusTransferLimit();
+        Long permanentIncrease = userLimitIncreaseService.getPermanentLimitIncrease(chatId);
         Long dailyLimitIncrease = stats.getDailyLimitIncrease() != null ? stats.getDailyLimitIncrease() : 0L;
         Long dailyTopUps = stats.getDailyTopUpAmount();
         Long dailyTransfers = stats.getDailyTransferAmount();
 
-        // Calculate effective daily limit (base limit + increase from top-ups)
-        Long effectiveDailyLimit = dailyLimit + dailyLimitIncrease;
+        // Calculate effective daily limit (base limit + permanent increase + today's daily increase)
+        Long effectiveDailyLimit = dailyLimit + permanentIncrease + dailyLimitIncrease;
 
         Long available;
         if (featureService.isPayToggleEnabled()) {
-            // Pay toggle ON: ignore deposits, use full daily limit (including increase)
+            // Pay toggle ON: ignore deposits, use full daily limit (including all increases)
             available = effectiveDailyLimit - dailyTransfers;
         } else {
             // Pay toggle OFF: current behavior (minimum of effective limit and deposits)
@@ -153,13 +159,16 @@ public class DailyStatsService {
     }
 
     /**
-     * Gets the effective daily limit (base limit + increase from top-ups)
+     * Gets the effective daily limit (base limit + permanent increase + today's daily increase)
+     * permanentIncrease: from top-ups (never resets)
+     * dailyLimitIncrease: from lottery winnings (resets daily)
      */
     public Long getEffectiveDailyLimit(Long chatId) {
         DailyUserStats stats = getOrCreateTodayStats(chatId);
         Long dailyLimit = configurationService.getDailyBonusTransferLimit();
+        Long permanentIncrease = userLimitIncreaseService.getPermanentLimitIncrease(chatId);
         Long dailyLimitIncrease = stats.getDailyLimitIncrease() != null ? stats.getDailyLimitIncrease() : 0L;
-        return dailyLimit + dailyLimitIncrease;
+        return dailyLimit + permanentIncrease + dailyLimitIncrease;
     }
 
     /**
