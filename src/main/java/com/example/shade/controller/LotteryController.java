@@ -4,12 +4,16 @@ import com.example.shade.bot.AdminBotMessageSender;
 import com.example.shade.bot.MessageSender;
 import com.example.shade.dto.OverallBalanceTicketsDTO;
 import com.example.shade.model.LotteryPrize;
+import com.example.shade.model.LotteryTicketBundle;
 import com.example.shade.model.UserBalance;
 import com.example.shade.repository.BlockedUserRepository;
 import com.example.shade.repository.LotteryPrizeRepository;
 import com.example.shade.service.AdminLogBotService;
 import com.example.shade.service.LanguageSessionService;
+import com.example.shade.service.LotteryConfigService;
 import com.example.shade.service.LotteryService;
+import com.example.shade.service.LotteryTicketBundleService;
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
@@ -18,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 
 import jakarta.servlet.http.HttpServletRequest;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -34,6 +39,8 @@ public class LotteryController {
     private final AdminBotMessageSender messageSender;
     private final LanguageSessionService languageSessionService;
     private final AdminLogBotService adminLogBotService;
+    private final LotteryTicketBundleService bundleService;
+    private final LotteryConfigService configService;
 
     private boolean authenticate(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
@@ -219,5 +226,147 @@ public class LotteryController {
         }
         OverallBalanceTicketsDTO result = lotteryService.getOverallBalanceAndTickets();
         return ResponseEntity.ok(result);
+    }
+
+    // Bundle Management Endpoints
+    @PostMapping("/lottery/bundles")
+    public ResponseEntity<LotteryTicketBundle> createBundle(
+            @RequestBody LotteryTicketBundle bundle,
+            HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+        LotteryTicketBundle savedBundle = bundleService.save(bundle);
+        return ResponseEntity.ok(savedBundle);
+    }
+
+    @GetMapping("/lottery/bundles")
+    public ResponseEntity<List<LotteryTicketBundle>> getAllBundles(HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+        return ResponseEntity.ok(bundleService.getActiveBundles());
+    }
+
+    @PutMapping("/lottery/bundles/{id}")
+    public ResponseEntity<LotteryTicketBundle> updateBundle(
+            @PathVariable Long id,
+            @RequestBody LotteryTicketBundle bundle,
+            HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+        try {
+            LotteryTicketBundle existing = bundleService.findById(id);
+            existing.setTicketQuantity(bundle.getTicketQuantity());
+            existing.setPrice(bundle.getPrice());
+            existing.setIsActive(bundle.getIsActive());
+            existing.setDisplayOrder(bundle.getDisplayOrder());
+            LotteryTicketBundle updated = bundleService.save(existing);
+            return ResponseEntity.ok(updated);
+        } catch (IllegalStateException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @DeleteMapping("/lottery/bundles/{id}")
+    public ResponseEntity<Void> deleteBundle(@PathVariable Long id, HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        try {
+            bundleService.delete(id);
+            return ResponseEntity.noContent().build();
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @PutMapping("/lottery/bundles/{id}/toggle")
+    public ResponseEntity<LotteryTicketBundle> toggleBundle(@PathVariable Long id, HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+        try {
+            LotteryTicketBundle bundle = bundleService.toggleActive(id);
+            return ResponseEntity.ok(bundle);
+        } catch (IllegalStateException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    // Purchase Cooldown Endpoints
+    @GetMapping("/lottery/purchase-cooldown")
+    public ResponseEntity<CooldownResponse> getPurchaseCooldown(HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+        return ResponseEntity.ok(new CooldownResponse(configService.getPurchaseCooldownSeconds()));
+    }
+
+    @PutMapping("/lottery/purchase-cooldown")
+    public ResponseEntity<CooldownResponse> setPurchaseCooldown(
+            @RequestBody CooldownRequest requestBody,
+            HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+        try {
+            configService.setPurchaseCooldownSeconds(requestBody.getCooldownSeconds());
+            return ResponseEntity.ok(new CooldownResponse(configService.getPurchaseCooldownSeconds()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    // Winnings Percentage Endpoints
+    @GetMapping("/lottery/winnings-percentage")
+    public ResponseEntity<WinningsPercentageResponse> getWinningsPercentage(HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+        return ResponseEntity.ok(new WinningsPercentageResponse(configService.getWinningsPercentage()));
+    }
+
+    @PutMapping("/lottery/winnings-percentage")
+    public ResponseEntity<WinningsPercentageResponse> setWinningsPercentage(
+            @RequestBody WinningsPercentageRequest requestBody,
+            HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+        try {
+            configService.setWinningsPercentage(requestBody.getPercentage());
+            return ResponseEntity.ok(new WinningsPercentageResponse(configService.getWinningsPercentage()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    // DTOs for request/response
+    @Data
+    public static class CooldownRequest {
+        private Long cooldownSeconds;
+    }
+
+    @Data
+    public static class CooldownResponse {
+        private Long cooldownSeconds;
+        public CooldownResponse(Long cooldownSeconds) {
+            this.cooldownSeconds = cooldownSeconds;
+        }
+    }
+
+    @Data
+    public static class WinningsPercentageRequest {
+        private BigDecimal percentage;
+    }
+
+    @Data
+    public static class WinningsPercentageResponse {
+        private BigDecimal percentage;
+        public WinningsPercentageResponse(BigDecimal percentage) {
+            this.percentage = percentage;
+        }
     }
 }

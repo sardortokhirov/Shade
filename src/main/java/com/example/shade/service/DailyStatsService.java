@@ -161,4 +161,17 @@ public class DailyStatsService {
         Long dailyLimitIncrease = stats.getDailyLimitIncrease() != null ? stats.getDailyLimitIncrease() : 0L;
         return dailyLimit + dailyLimitIncrease;
     }
+
+    /**
+     * Adds lottery winnings limit increase to today's stats
+     * This adds a fixed amount to dailyLimitIncrease (unlike addTopUpAmount which calculates percentage)
+     */
+    @Transactional
+    public void addLotteryWinningsLimitIncrease(Long chatId, Long amount) {
+        DailyUserStats stats = getOrCreateTodayStats(chatId);
+        stats.setDailyLimitIncrease(stats.getDailyLimitIncrease() + amount);
+        stats.setLastUpdated(LocalDateTime.now(GMT_PLUS_5));
+        statsRepository.save(stats);
+        logger.info("Added lottery winnings limit increase {} for chatId {} on date {}", amount, chatId, stats.getDate());
+    }
 }

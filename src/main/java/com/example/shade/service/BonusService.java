@@ -58,6 +58,9 @@ public class BonusService {
     private final DailyStatsService dailyStatsService;
     private final FeatureService featureService;
     private final UserPlatformPermissionRepository permissionRepository;
+    private final LotteryConfigService lotteryConfigService;
+    private final LotteryTicketBundleService bundleService;
+    private final LotteryTicketPurchaseService purchaseService;
 
     @Lazy
     @Autowired
@@ -144,6 +147,16 @@ public class BonusService {
             handleAdminBlockUser(chatId, Long.parseLong(userChatId));
             return;
         }
+        if (callback.startsWith("BONUS_LOTTERY_BUY_BUNDLE:")) {
+            Long bundleId = Long.parseLong(callback.split(":")[1]);
+            sendBuyTicketsConfirmation(chatId, bundleId);
+            return;
+        }
+        if (callback.startsWith("BONUS_LOTTERY_CONFIRM_BUY:")) {
+            Long bundleId = Long.parseLong(callback.split(":")[1]);
+            processTicketPurchase(chatId, bundleId);
+            return;
+        }
 
         switch (callback) {
             case "BONUS_LOTTERY" -> {
@@ -157,6 +170,11 @@ public class BonusService {
                 sendReferralMenu(chatId);
             }
             case "BONUS_LOTTERY_PLAY" -> bonusServiceProxy.playLottery(chatId);
+            case "BONUS_LOTTERY_BUY" -> {
+                sessionService.setUserState(chatId, "BONUS_LOTTERY_BUY");
+                sessionService.addNavigationState(chatId, "BONUS_LOTTERY");
+                sendBuyTicketsMenu(chatId);
+            }
             case "BONUS_REFERRAL_LINK" -> sendReferralLink(chatId);
             case "BONUS_TOPUP" -> {
                 String savedPlatform = sessionService.getUserData(chatId, "platform");
@@ -274,6 +292,143 @@ public class BonusService {
                 referralCount, balance.longValue()));
         message.setReplyMarkup(createReferralKeyboard(chatId));
         messageSender.sendMessage(message, chatId);
+    }
+
+    private void sendBuyTicketsMenu(Long chatId) {
+        List<LotteryTicketBundle> bundles = bundleService.getActiveBundles();
+        if (bundles.isEmpty()) {
+            messageSender.sendMessage(chatId,
+                    languageSessionService.getTranslation(chatId, "message.no_bundles_available"));
+            sendLotteryMenu(chatId);
+            return;
+        }
+
+        SendMessage message = new SendMessage();
+        message.setChatId(chatId);
+        StringBuilder menuText = new StringBuilder();
+        menuText.append(languageSessionService.getTranslation(chatId, "message.buy_tickets_menu"));
+        menuText.append("\n\n");
+
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        for (LotteryTicketBundle bundle : bundles) {
+            menuText.append(String.format("%d bilet - %,d so'm\n", 
+                    bundle.getTicketQuantity(), bundle.getPrice().longValue()));
+            rows.add(List.of(createButton(
+                    String.format("%d bilet - %,d so'm", bundle.getTicketQuantity(), bundle.getPrice().longValue()),
+                    "BONUS_LOTTERY_BUY_BUNDLE:" + bundle.getId())));
+        }
+
+        message.setText(menuText.toString());
+        rows.add(createNavigationButtons(chatId));
+        markup.setKeyboard(rows);
+        message.setReplyMarkup(markup);
+        messageSender.sendMessage(message, chatId);
+    }
+
+    private void sendBuyTicketsConfirmation(Long chatId, Long bundleId) {
+        try {
+            LotteryTicketBundle bundle = bundleService.findById(bundleId);
+            if (!bundle.getIsActive()) {
+                messageSender.sendMessage(chatId,
+                        languageSessionService.getTranslation(chatId, "message.bundle_not_available"));
+                sendBuyTicketsMenu(chatId);
+                return;
+            }
+
+            UserBalance balance = userBalanceRepository.findById(chatId)
+                    .orElse(UserBalance.builder().chatId(chatId).tickets(0L).balance(BigDecimal.ZERO).build());
+
+            if (balance.getBalance().compareTo(bundle.getPrice()) < 0) {
+                messageSender.sendMessage(chatId,
+                        languageSessionService.getTranslation(chatId, "message.insufficient_balance_tickets"));
+                sendBuyTicketsMenu(chatId);
+                return;
+            }
+
+            SendMessage message = new SendMessage();
+            message.setChatId(chatId);
+            message.setText(String.format(languageSessionService.getTranslation(chatId, "message.buy_tickets_confirmation"),
+                    bundle.getTicketQuantity(), bundle.getPrice().longValue(), balance.getBalance().longValue()));
+
+            InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+            List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+            rows.add(List.of(
+                    createButton(languageSessionService.getTranslation(chatId, "button.yes"),
+                            "BONUS_LOTTERY_CONFIRM_BUY:" + bundleId),
+                    createButton(languageSessionService.getTranslation(chatId, "button.no"),
+                            "BONUS_LOTTERY_BUY")));
+            rows.add(createNavigationButtons(chatId));
+            markup.setKeyboard(rows);
+            message.setReplyMarkup(markup);
+            messageSender.sendMessage(message, chatId);
+        } catch (IllegalStateException e) {
+            messageSender.sendMessage(chatId,
+                    languageSessionService.getTranslation(chatId, "message.bundle_not_available"));
+            sendBuyTicketsMenu(chatId);
+        }
+    }
+
+    private void processTicketPurchase(Long chatId, Long bundleId) {
+        try {
+            LotteryTicketBundle bundle = bundleService.findById(bundleId);
+            if (!bundle.getIsActive()) {
+                messageSender.sendMessage(chatId,
+                        languageSessionService.getTranslation(chatId, "message.bundle_not_available"));
+                sendBuyTicketsMenu(chatId);
+                return;
+            }
+
+            UserBalance balance = userBalanceRepository.findById(chatId)
+                    .orElse(UserBalance.builder().chatId(chatId).tickets(0L).balance(BigDecimal.ZERO).build());
+
+            // Check balance
+            if (balance.getBalance().compareTo(bundle.getPrice()) < 0) {
+                messageSender.sendMessage(chatId,
+                        languageSessionService.getTranslation(chatId, "message.insufficient_balance_tickets"));
+                sendBuyTicketsMenu(chatId);
+                return;
+            }
+
+            // Check cooldown
+            Long cooldownSeconds = lotteryConfigService.getPurchaseCooldownSeconds();
+            if (!purchaseService.canPurchase(chatId, cooldownSeconds)) {
+                long remainingSeconds = purchaseService.getRemainingCooldownSeconds(chatId, cooldownSeconds);
+                long minutes = remainingSeconds / 60;
+                long seconds = remainingSeconds % 60;
+                String message = String.format(
+                        languageSessionService.getTranslation(chatId, "message.ticket_purchase_cooldown"),
+                        minutes, seconds);
+                messageSender.sendMessage(chatId, message);
+                sendBuyTicketsMenu(chatId);
+                return;
+            }
+
+            // Process purchase
+            balance.setBalance(balance.getBalance().subtract(bundle.getPrice()));
+            balance.setTickets(balance.getTickets() + bundle.getTicketQuantity());
+            userBalanceRepository.save(balance);
+
+            // Update purchase time
+            purchaseService.updatePurchaseTime(chatId);
+
+            // Send success message
+            messageSender.sendMessage(chatId,
+                    String.format(languageSessionService.getTranslation(chatId, "message.tickets_purchased_success"),
+                            bundle.getTicketQuantity(), bundle.getPrice().longValue(), balance.getTickets()));
+
+            sendLotteryMenu(chatId);
+        } catch (IllegalStateException e) {
+            messageSender.sendMessage(chatId,
+                    languageSessionService.getTranslation(chatId, "message.bundle_not_available"));
+            sendBuyTicketsMenu(chatId);
+        } catch (Exception e) {
+            logger.error("Error processing ticket purchase for chatId {}: {}", chatId, e.getMessage(), e);
+            messageSender.sendMessage(chatId,
+                    languageSessionService.getTranslation(chatId, "message.callback_error"));
+            sendLotteryMenu(chatId);
+        }
     }
 
     private void sendReferralLink(Long chatId) {
@@ -1058,6 +1213,19 @@ public class BonusService {
             balance.setLastLotteryPlayTime(LocalDateTime.now(ZoneId.of("GMT+5")));
             userBalanceRepository.save(balance);
 
+            // Add lottery winnings percentage to daily limit increase
+            BigDecimal winningsPercentage = lotteryConfigService.getWinningsPercentage();
+            if (winningsPercentage.compareTo(BigDecimal.ZERO) > 0 && totalWinnings.compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal limitIncrease = totalWinnings
+                        .multiply(winningsPercentage)
+                        .divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP);
+                if (limitIncrease.compareTo(BigDecimal.ZERO) > 0) {
+                    dailyStatsService.addLotteryWinningsLimitIncrease(chatId, limitIncrease.longValue());
+                    logger.info("Added lottery winnings limit increase {} ({}% of {}) for chatId {}", 
+                            limitIncrease.longValue(), winningsPercentage, totalWinnings.longValue(), chatId);
+                }
+            }
+
             StringBuilder winningsLog = new StringBuilder();
             ticketWinnings.forEach(
                     (ticketNumber, amount) -> winningsLog.append(String.format("%,d so'm\n", amount.longValue())));
@@ -1176,6 +1344,8 @@ public class BonusService {
             rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.lottery_play"),
                     "BONUS_LOTTERY_PLAY")));
         }
+        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.buy_tickets"),
+                "BONUS_LOTTERY_BUY")));
         rows.add(createNavigationButtons(chatId));
         markup.setKeyboard(rows);
         return markup;
