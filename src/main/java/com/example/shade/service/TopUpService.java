@@ -675,10 +675,14 @@ public class TopUpService {
                 // sessionService.getMessageIds(chatId), "OPEN");
                 sessionService.clearMessageIds(chatId);
                 sessionService.setUserData(chatId, PAYMENT_ATTEMPTS_KEY, "0");
-                messageSender.sendMessage(chatId, logMessage +
+                SendMessage successMessage = new SendMessage();
+                successMessage.setChatId(chatId);
+                successMessage.setText(logMessage +
                         (tickets > 0 ? String.format(
                                 languageSessionService.getTranslation(chatId, "topup.message.tickets_received"),
                                 tickets) : ""));
+                successMessage.setReplyMarkup(createMainMenuOnlyKeyboard(chatId));
+                messageSender.sendMessage(successMessage, chatId);
                 sendMainMenu(chatId);
             } else {
                 handleTransferFailure(chatId, request, adminCard);
@@ -879,10 +883,14 @@ public class TopUpService {
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
                 adminLogBotService.sendLog(adminLogMessage);
-                messageSender.sendMessage(requestId, logMessage +
+                SendMessage successMessage = new SendMessage();
+                successMessage.setChatId(requestId);
+                successMessage.setText(logMessage +
                         (tickets > 0 ? String.format(
                                 languageSessionService.getTranslation(requestId, "topup.message.tickets_received"),
                                 tickets) : ""));
+                successMessage.setReplyMarkup(createMainMenuOnlyKeyboard(requestId));
+                messageSender.sendMessage(successMessage, requestId);
             } else {
                 handleTransferFailure(requestId, request, adminCard);
             }
@@ -1040,10 +1048,14 @@ public class TopUpService {
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
                 adminLogBotService.sendLog(adminLogMessage);
-                messageSender.sendMessage(requestId, logMessage +
+                SendMessage successMessage = new SendMessage();
+                successMessage.setChatId(requestId);
+                successMessage.setText(logMessage +
                         (tickets > 0 ? String.format(
                                 languageSessionService.getTranslation(requestId, "topup.message.tickets_received"),
                                 tickets) : ""));
+                successMessage.setReplyMarkup(createMainMenuOnlyKeyboard(requestId));
+                messageSender.sendMessage(successMessage, requestId);
             } else {
                 handleTransferFailure(requestId, request, adminCard);
             }
@@ -1522,6 +1534,14 @@ public class TopUpService {
         buttons.add(createButton(languageSessionService.getTranslation(chatId, "topup.button.back"), "BACK"));
         buttons.add(createButton(languageSessionService.getTranslation(chatId, "topup.button.home"), "HOME"));
         return buttons;
+    }
+
+    private InlineKeyboardMarkup createMainMenuOnlyKeyboard(Long chatId) {
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "topup.button.home"), "HOME")));
+        markup.setKeyboard(rows);
+        return markup;
     }
 
     private InlineKeyboardButton createButton(String text, String callback) {
