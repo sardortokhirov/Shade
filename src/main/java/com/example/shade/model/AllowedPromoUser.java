@@ -20,8 +20,11 @@ public class AllowedPromoUser {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = true, unique = false)
     private String userId;
+
+    @Column(nullable = true, unique = false)
+    private Long chatId;
 
     private LocalDateTime createdAt;
 

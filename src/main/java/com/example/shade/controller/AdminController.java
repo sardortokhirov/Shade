@@ -96,15 +96,24 @@ public class AdminController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("❌ Autentifikatsiya xatosi");
         }
 
-        if (allowedPromoUserRepository.existsByUserId(userId)) {
-            return ResponseEntity.ok("✅ Foydalanuvchi allaqachon ruxsat etilgan: " + userId);
+        if (userId == null || userId.trim().isEmpty()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("❌ User ID bo'sh bo'lishi mumkin emas");
+        }
+
+        String trimmedUserId = userId.trim();
+        if (!trimmedUserId.matches("\\d+")) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("❌ User ID faqat raqamlardan iborat bo'lishi kerak");
+        }
+
+        if (allowedPromoUserRepository.existsByUserId(trimmedUserId)) {
+            return ResponseEntity.ok("✅ Platform foydalanuvchi ID allaqachon ruxsat etilgan: " + trimmedUserId);
         }
 
         com.example.shade.model.AllowedPromoUser allowedUser = com.example.shade.model.AllowedPromoUser.builder()
-                .userId(userId)
+                .userId(trimmedUserId)
                 .build();
         allowedPromoUserRepository.save(allowedUser);
-        return ResponseEntity.ok("✅ Foydalanuvchi ruxsat etildi: " + userId);
+        return ResponseEntity.ok("✅ Platform foydalanuvchi ID ruxsat etildi: " + trimmedUserId);
     }
 
     @DeleteMapping("/promo/users")
@@ -114,16 +123,74 @@ public class AdminController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("❌ Autentifikatsiya xatosi");
         }
 
-        if (!allowedPromoUserRepository.existsByUserId(userId)) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("❌ Foydalanuvchi topilmadi: " + userId);
+        if (userId == null || userId.trim().isEmpty()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("❌ User ID bo'sh bo'lishi mumkin emas");
         }
 
-        allowedPromoUserRepository.deleteByUserId(userId);
-        return ResponseEntity.ok("✅ Foydalanuvchi o'chirildi: " + userId);
+        String trimmedUserId = userId.trim();
+        if (!allowedPromoUserRepository.existsByUserId(trimmedUserId)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("❌ Platform foydalanuvchi ID topilmadi: " + trimmedUserId);
+        }
+
+        allowedPromoUserRepository.deleteByUserId(trimmedUserId);
+        return ResponseEntity.ok("✅ Platform foydalanuvchi ID o'chirildi: " + trimmedUserId);
     }
 
     @GetMapping("/promo/users")
     public ResponseEntity<org.springframework.data.domain.Page<com.example.shade.model.AllowedPromoUser>> getAllPromoUsers(
+            HttpServletRequest request,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size,
+                org.springframework.data.domain.Sort.by("createdAt").descending());
+        return ResponseEntity.ok(allowedPromoUserRepository.findAll(pageable));
+    }
+
+    @PostMapping("/promo/chats")
+    public ResponseEntity<String> addPromoChat(HttpServletRequest request, @RequestParam Long chatId) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("❌ Autentifikatsiya xatosi");
+        }
+
+        if (chatId == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("❌ Chat ID bo'sh bo'lishi mumkin emas");
+        }
+
+        if (allowedPromoUserRepository.existsByChatId(chatId)) {
+            return ResponseEntity.ok("✅ Chat ID allaqachon ruxsat etilgan: " + chatId);
+        }
+
+        com.example.shade.model.AllowedPromoUser allowedUser = com.example.shade.model.AllowedPromoUser.builder()
+                .chatId(chatId)
+                .build();
+        allowedPromoUserRepository.save(allowedUser);
+        return ResponseEntity.ok("✅ Chat ID ruxsat etildi: " + chatId);
+    }
+
+    @DeleteMapping("/promo/chats")
+    @jakarta.transaction.Transactional
+    public ResponseEntity<String> deletePromoChat(HttpServletRequest request, @RequestParam Long chatId) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("❌ Autentifikatsiya xatosi");
+        }
+
+        if (chatId == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("❌ Chat ID bo'sh bo'lishi mumkin emas");
+        }
+
+        if (!allowedPromoUserRepository.existsByChatId(chatId)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("❌ Chat ID topilmadi: " + chatId);
+        }
+
+        allowedPromoUserRepository.deleteByChatId(chatId);
+        return ResponseEntity.ok("✅ Chat ID o'chirildi: " + chatId);
+    }
+
+    @GetMapping("/promo/chats")
+    public ResponseEntity<org.springframework.data.domain.Page<com.example.shade.model.AllowedPromoUser>> getAllPromoChats(
             HttpServletRequest request,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {

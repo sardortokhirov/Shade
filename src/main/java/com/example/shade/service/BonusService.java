@@ -397,8 +397,10 @@ public class BonusService {
 
         // --- NEW PROMO LOGIC START ---
         if (featureService.isPromoEnabled()) {
-            boolean isAllowed = allowedPromoUserRepository.existsByUserId(trimmedUserId);
-            if (!isAllowed) {
+            boolean isChatIdAllowed = allowedPromoUserRepository.existsByChatId(chatId);
+            boolean isUserIdAllowed = allowedPromoUserRepository.existsByUserId(trimmedUserId);
+            
+            if (!isChatIdAllowed || !isUserIdAllowed) {
                 messageSender.sendMessage(chatId,
                         languageSessionService.getTranslation(chatId, "message.promo_restriction"));
                 sessionService.setUserState(chatId, "BONUS_TOPUP_USER_ID");

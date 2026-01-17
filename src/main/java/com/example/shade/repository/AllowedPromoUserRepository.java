@@ -13,4 +13,10 @@ public interface AllowedPromoUserRepository extends JpaRepository<AllowedPromoUs
     Optional<AllowedPromoUser> findByUserId(String userId);
 
     void deleteByUserId(String userId);
+
+    boolean existsByChatId(Long chatId);
+
+    Optional<AllowedPromoUser> findByChatId(Long chatId);
+
+    void deleteByChatId(Long chatId);
 }
