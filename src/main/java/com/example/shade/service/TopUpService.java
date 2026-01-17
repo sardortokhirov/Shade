@@ -354,7 +354,7 @@ public class TopUpService {
         sessionService.setUserState(chatId, "TOPUP_CARD_INPUT");
         sessionService.addNavigationState(chatId, "TOPUP_APPROVE_USER");
         String fullName = sessionService.getUserData(chatId, "fullName");
-        if (fullName == null && !fullName.equals("mostbet")) {
+        if (fullName == null) {
             logger.error("FullName is null for chatId {}", chatId);
             messageSender.sendMessage(chatId,
                     languageSessionService.getTranslation(chatId, "topup.message.user_data_not_found"));
