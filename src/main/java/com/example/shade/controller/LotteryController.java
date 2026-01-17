@@ -2,6 +2,7 @@ package com.example.shade.controller;
 
 import com.example.shade.bot.AdminBotMessageSender;
 import com.example.shade.bot.MessageSender;
+import com.example.shade.dto.LotteryTicketBundleRequest;
 import com.example.shade.dto.OverallBalanceTicketsDTO;
 import com.example.shade.model.LotteryPrize;
 import com.example.shade.model.LotteryTicketBundle;
@@ -231,11 +232,18 @@ public class LotteryController {
     // Bundle Management Endpoints
     @PostMapping("/lottery/bundles")
     public ResponseEntity<LotteryTicketBundle> createBundle(
-            @RequestBody LotteryTicketBundle bundle,
+            @RequestBody LotteryTicketBundleRequest requestBody,
             HttpServletRequest request) {
         if (!authenticate(request)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
         }
+        // Map DTO to entity
+        LotteryTicketBundle bundle = LotteryTicketBundle.builder()
+                .ticketQuantity(requestBody.getTickets())
+                .price(requestBody.getPrice())
+                .isActive(requestBody.getIsActive() != null ? requestBody.getIsActive() : true)
+                .displayOrder(requestBody.getDisplayOrder() != null ? requestBody.getDisplayOrder() : 0)
+                .build();
         LotteryTicketBundle savedBundle = bundleService.save(bundle);
         return ResponseEntity.ok(savedBundle);
     }
@@ -251,17 +259,25 @@ public class LotteryController {
     @PutMapping("/lottery/bundles/{id}")
     public ResponseEntity<LotteryTicketBundle> updateBundle(
             @PathVariable Long id,
-            @RequestBody LotteryTicketBundle bundle,
+            @RequestBody LotteryTicketBundleRequest requestBody,
             HttpServletRequest request) {
         if (!authenticate(request)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
         }
         try {
             LotteryTicketBundle existing = bundleService.findById(id);
-            existing.setTicketQuantity(bundle.getTicketQuantity());
-            existing.setPrice(bundle.getPrice());
-            existing.setIsActive(bundle.getIsActive());
-            existing.setDisplayOrder(bundle.getDisplayOrder());
+            if (requestBody.getTickets() != null) {
+                existing.setTicketQuantity(requestBody.getTickets());
+            }
+            if (requestBody.getPrice() != null) {
+                existing.setPrice(requestBody.getPrice());
+            }
+            if (requestBody.getIsActive() != null) {
+                existing.setIsActive(requestBody.getIsActive());
+            }
+            if (requestBody.getDisplayOrder() != null) {
+                existing.setDisplayOrder(requestBody.getDisplayOrder());
+            }
             LotteryTicketBundle updated = bundleService.save(existing);
             return ResponseEntity.ok(updated);
         } catch (IllegalStateException e) {
