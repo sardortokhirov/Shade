@@ -55,6 +55,9 @@ public class SystemConfiguration {
     @Column(name = "humo_enabled", nullable = false)
     private Boolean humoEnabled = true;
 
+    @Column(name = "lottery_cooldown_seconds", nullable = false)
+    private Long lotteryCooldownSeconds = 300L;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 }

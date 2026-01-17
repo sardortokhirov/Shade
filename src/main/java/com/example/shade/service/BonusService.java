@@ -29,6 +29,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import com.example.shade.repository.*;
 import java.util.Optional;
 import java.util.*;
@@ -1012,6 +1013,30 @@ public class BonusService {
         try {
             UserBalance balance = userBalanceRepository.findById(chatId)
                     .orElse(UserBalance.builder().chatId(chatId).tickets(0L).balance(BigDecimal.ZERO).build());
+            
+            // Check cooldown
+            Long cooldownSeconds = configurationService.getLotteryCooldownSeconds();
+            LocalDateTime lastPlay = balance.getLastLotteryPlayTime();
+            
+            if (lastPlay != null) {
+                LocalDateTime now = LocalDateTime.now(ZoneId.of("GMT+5"));
+                long secondsSinceLastPlay = ChronoUnit.SECONDS.between(lastPlay, now);
+                
+                if (secondsSinceLastPlay < cooldownSeconds) {
+                    long remainingSeconds = cooldownSeconds - secondsSinceLastPlay;
+                    long minutes = remainingSeconds / 60;
+                    long seconds = remainingSeconds % 60;
+                    
+                    String message = String.format(
+                            languageSessionService.getTranslation(chatId, "message.lottery_cooldown"),
+                            minutes, seconds
+                    );
+                    messageSender.sendMessage(chatId, message);
+                    sendLotteryMenu(chatId);
+                    return;
+                }
+            }
+            
             Long availableTickets = balance.getTickets();
             Long minTickets = configurationService.getMinTickets();
             Long maxTickets = configurationService.getMaxTickets();
@@ -1030,6 +1055,7 @@ public class BonusService {
             BigDecimal totalWinnings = ticketWinnings.values().stream()
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
             balance.setBalance(balance.getBalance().add(totalWinnings));
+            balance.setLastLotteryPlayTime(LocalDateTime.now(ZoneId.of("GMT+5")));
             userBalanceRepository.save(balance);
 
             StringBuilder winningsLog = new StringBuilder();

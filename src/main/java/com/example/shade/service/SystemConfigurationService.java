@@ -34,6 +34,7 @@ public class SystemConfigurationService {
     private static final Long DEFAULT_DAILY_BONUS_TRANSFER_LIMIT = 100_000L;
     private static final BigDecimal DEFAULT_TOP_UP_DAILY_LIMIT_INCREASE_PERCENTAGE = BigDecimal.ZERO;
     private static final Boolean DEFAULT_HUMO_ENABLED = true;
+    private static final Long DEFAULT_LOTTERY_COOLDOWN_SECONDS = 300L;
 
     @Transactional
     public SystemConfiguration getConfiguration() {
@@ -52,6 +53,7 @@ public class SystemConfigurationService {
                     config.setDailyBonusTransferLimit(DEFAULT_DAILY_BONUS_TRANSFER_LIMIT);
                     config.setTopUpDailyLimitIncreasePercentage(DEFAULT_TOP_UP_DAILY_LIMIT_INCREASE_PERCENTAGE);
                     config.setHumoEnabled(DEFAULT_HUMO_ENABLED);
+                    config.setLotteryCooldownSeconds(DEFAULT_LOTTERY_COOLDOWN_SECONDS);
                     config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
                     return configurationRepository.save(config);
                 });
@@ -135,6 +137,13 @@ public class SystemConfigurationService {
         return config.getHumoEnabled() != null ? config.getHumoEnabled() : DEFAULT_HUMO_ENABLED;
     }
 
+    public Long getLotteryCooldownSeconds() {
+        SystemConfiguration config = getConfiguration();
+        return config.getLotteryCooldownSeconds() != null 
+                ? config.getLotteryCooldownSeconds() 
+                : DEFAULT_LOTTERY_COOLDOWN_SECONDS;
+    }
+
     @Transactional
     public void setHumoEnabled(boolean enabled) {
         SystemConfiguration current = getConfiguration();
@@ -151,6 +160,7 @@ public class SystemConfigurationService {
         config.setDailyBonusTransferLimit(current.getDailyBonusTransferLimit());
         config.setTopUpDailyLimitIncreasePercentage(current.getTopUpDailyLimitIncreasePercentage());
         config.setHumoEnabled(enabled);
+        config.setLotteryCooldownSeconds(current.getLotteryCooldownSeconds());
         config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
         configurationRepository.save(config);
         logger.info("HUMO enabled set to {}", enabled);

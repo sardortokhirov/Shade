@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "user_balance")
@@ -22,4 +23,7 @@ public class UserBalance {
 
     @Column(name = "balance", nullable = false)
     private BigDecimal balance;
+
+    @Column(name = "last_lottery_play_time", nullable = true)
+    private LocalDateTime lastLotteryPlayTime;
 }
