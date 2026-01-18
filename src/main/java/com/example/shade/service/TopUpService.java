@@ -1195,10 +1195,34 @@ public class TopUpService {
             }
 
             if (response.getStatusCode().is2xxSuccessful() && Boolean.TRUE.equals(successObj)) {
+                // Check for error messages even when success is true
+                Object messageObj = responseBody != null ? responseBody.get("Message") : null;
+                if (messageObj != null) {
+                    String message = messageObj.toString().toLowerCase();
+                    // If message indicates failure (e.g., contains error keywords), treat as failure
+                    if (message.contains("error") || message.contains("fail") || message.contains("insufficient") 
+                            || message.contains("out of money") || message.contains("not enough")) {
+                        String errorMsg = messageObj.toString();
+                        logger.error("❌ Transfer failed despite success=true for chatId {}, userId: {}, message: {}", 
+                                request.getChatId(), userId, errorMsg);
+                        adminLogBotService.sendToAdmins("❌ Transfer xatosi (success=true but error message): " + errorMsg);
+                        return null;
+                    }
+                }
+                
                 logger.info("✅ Transfer successful for chatId {}, userId: {}, amount: {}, platform: {}",
                         request.getChatId(), userId, amount, platformName);
 
-                return getCashdeskBalance(hash, cashierPass, cashdeskId);
+                BalanceLimit balanceLimit = getCashdeskBalance(hash, cashierPass, cashdeskId);
+                if (balanceLimit == null) {
+                    // Balance retrieval failed - treat transfer as failed
+                    logger.error("❌ Failed to retrieve balance after transfer for chatId {}, userId: {}, platform: {}", 
+                            request.getChatId(), userId, platformName);
+                    adminLogBotService.sendToAdmins("❌ Transfer xatosi: Balance retrieval failed for chatId " + request.getChatId());
+                    return null;
+                }
+                
+                return balanceLimit;
             }
 
             String errorMsg = responseBody != null && responseBody.get("Message") != null

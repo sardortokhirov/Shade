@@ -158,10 +158,14 @@ public class MostbetService {
                     .longValue() / 1000;
         }
 
-        deposit(  apiKey, secret,cashpointId, 1, userId, amount, platform.getCurrency().toString());
-        BalanceResponse balance = getBalance( apiKey, secret,cashpointId);
+        TransactionResponse depositResponse = deposit(apiKey, secret, cashpointId, 1, userId, amount, platform.getCurrency().toString());
+        if (depositResponse == null || !"COMPLETED".equalsIgnoreCase(depositResponse.status())) {
+            // Deposit failed - return null to indicate failure
+            return null;
+        }
+        BalanceResponse balance = getBalance(apiKey, secret, cashpointId);
 
-        return new BalanceLimit(null,new BigDecimal(balance.balance));
+        return new BalanceLimit(null, new BigDecimal(balance.balance));
     }
 
     public record CashoutListResponse(List<CashoutItem> items, int totalCount) {}
