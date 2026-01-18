@@ -39,35 +39,44 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public Page<UserDTO> getUsers(Pageable pageable, UserFilter filter) {
-        // Get all users with pagination
-        Page<User> usersPage = userRepository.findAll(
-            org.springframework.data.domain.PageRequest.of(
-                pageable.getPageNumber(),
-                pageable.getPageSize(),
-                Sort.by(Sort.Direction.ASC, "chatId")
-            )
-        );
-
-        List<UserDTO> userDTOs = new ArrayList<>();
+        List<Long> candidateChatIds = new ArrayList<>();
         
-        for (User user : usersPage.getContent()) {
-            Long chatId = user.getChatId();
+        // Step 1: Get candidate chatIds based on searchChatId filter
+        if (filter != null && filter.getSearchChatId() != null) {
+            String searchPattern = String.valueOf(filter.getSearchChatId());
             
-            // Apply filters
-            if (filter != null) {
-                // Search chatId with partial matching (LIKE %number%)
-                if (filter.getSearchChatId() != null) {
-                    String chatIdStr = String.valueOf(chatId);
-                    String searchStr = String.valueOf(filter.getSearchChatId());
-                    if (!chatIdStr.contains(searchStr)) {
-                        continue;
-                    }
-                }
-                
-                if (filter.getLanguage() != null && !filter.getLanguage().equals(user.getLanguage().toString())) {
-                    continue;
+            // Search in User table
+            List<Long> userChatIds = userRepository.findChatIdsBySearchPattern(searchPattern);
+            candidateChatIds.addAll(userChatIds);
+            
+            // Search in BlockedUser table (to include blocked users without User records)
+            List<Long> blockedChatIds = blockedUserRepository.findChatIdsBySearchPattern(searchPattern);
+            candidateChatIds.addAll(blockedChatIds);
+            
+            // Remove duplicates
+            candidateChatIds = candidateChatIds.stream().distinct().sorted().toList();
+        } else {
+            // No searchChatId filter - get all chatIds from User table
+            List<User> allUsers = userRepository.findAll(Sort.by(Sort.Direction.ASC, "chatId"));
+            candidateChatIds = allUsers.stream().map(User::getChatId).toList();
+            
+            // Also include blocked users who don't have User records
+            List<BlockedUser> allBlockedUsers = blockedUserRepository.findAll();
+            for (BlockedUser blockedUser : allBlockedUsers) {
+                if (!candidateChatIds.contains(blockedUser.getChatId())) {
+                    candidateChatIds = new ArrayList<>(candidateChatIds);
+                    candidateChatIds.add(blockedUser.getChatId());
                 }
             }
+            candidateChatIds = candidateChatIds.stream().distinct().sorted().toList();
+        }
+        
+        // Step 2: Apply filters and build UserDTOs
+        List<UserDTO> userDTOs = new ArrayList<>();
+        
+        for (Long chatId : candidateChatIds) {
+            // Get User record (may not exist for blocked-only users)
+            Optional<User> userOpt = userRepository.findByChatId(chatId);
             
             // Get blocked status
             Optional<BlockedUser> blockedUser = blockedUserRepository.findByChatId(chatId);
@@ -78,6 +87,17 @@ public class UserService {
             // Apply blocked filter
             if (filter != null && filter.getBlocked() != null && filter.getBlocked() != isBlocked) {
                 continue;
+            }
+            
+            // Apply language filter (only if User record exists)
+            if (filter != null && filter.getLanguage() != null) {
+                if (userOpt.isEmpty()) {
+                    // Blocked user without User record - skip if language filter is set
+                    continue;
+                }
+                if (!filter.getLanguage().equals(userOpt.get().getLanguage().toString())) {
+                    continue;
+                }
             }
             
             // Apply phone search filter
@@ -112,9 +132,13 @@ public class UserService {
             Long effectiveDailyLimit = dailyStatsService.getEffectiveDailyLimitReadOnly(chatId);
             Long availableLimit = dailyStatsService.getAvailableLimitReadOnly(chatId);
             
+            // Determine language - use from User if exists, otherwise default to UZ
+            String language = userOpt.map(u -> u.getLanguage().toString())
+                    .orElse("UZ");
+            
             UserDTO userDTO = new UserDTO(
                     chatId,
-                    user.getLanguage().toString(),
+                    language,
                     phoneNumber,
                     isBlocked,
                     balance,
@@ -129,7 +153,18 @@ public class UserService {
             userDTOs.add(userDTO);
         }
         
-        return new PageImpl<>(userDTOs, pageable, usersPage.getTotalElements());
+        // Step 3: Apply pagination to filtered results
+        int totalElements = userDTOs.size();
+        int page = pageable.getPageNumber();
+        int size = pageable.getPageSize();
+        int start = page * size;
+        int end = Math.min(start + size, totalElements);
+        
+        List<UserDTO> paginatedDTOs = (start < totalElements) 
+                ? userDTOs.subList(start, end) 
+                : new ArrayList<>();
+        
+        return new PageImpl<>(paginatedDTOs, pageable, totalElements);
     }
 
     @Transactional(readOnly = true)
@@ -286,11 +321,44 @@ public class UserService {
         
         UserLimitIncrease limitIncrease = userLimitIncreaseService.getOrCreate(chatId);
         Long oldLimit = limitIncrease.getAccumulatedLimitIncrease();
+        
+        // Validation: Prevent accidental reset to 0 when current limit > 0
+        if (permanentLimitIncrease == 0 && oldLimit > 0) {
+            logger.error("ATTEMPT TO RESET PERMANENT LIMIT TO ZERO - chatId: {}, current limit: {}. " +
+                    "This operation is blocked to prevent accidental data loss. " +
+                    "If this is intentional, use the resetLimit() method with explicit confirmation.", 
+                    chatId, oldLimit);
+            throw new IllegalArgumentException(
+                    String.format("Cannot reset permanent limit increase to 0 when current limit is %d. " +
+                            "Permanent limits should never be reset automatically. " +
+                            "If this is intentional, contact system administrator.", oldLimit));
+        }
+        
+        // Warning: Log if limit is being decreased (but allow it if not going to 0)
+        if (permanentLimitIncrease < oldLimit && permanentLimitIncrease > 0) {
+            logger.warn("PERMANENT LIMIT DECREASE - chatId: {}, decreasing from {} to {}. " +
+                    "This is unusual and may indicate an error.", 
+                    chatId, oldLimit, permanentLimitIncrease);
+        }
+        
+        // Detailed audit logging
+        String changeType;
+        if (permanentLimitIncrease > oldLimit) {
+            changeType = "INCREASE";
+        } else if (permanentLimitIncrease < oldLimit) {
+            changeType = "DECREASE";
+        } else {
+            changeType = "NO_CHANGE";
+        }
+        
+        logger.info("PERMANENT LIMIT UPDATE [{}] - chatId: {}, old: {}, new: {}, difference: {}", 
+                changeType, chatId, oldLimit, permanentLimitIncrease, 
+                permanentLimitIncrease - oldLimit);
+        
         limitIncrease.setAccumulatedLimitIncrease(permanentLimitIncrease);
         limitIncrease.setLastUpdated(LocalDateTime.now());
         userLimitIncreaseRepository.save(limitIncrease);
         
-        logger.info("Updated permanent limit increase for chatId {}: {} -> {}", chatId, oldLimit, permanentLimitIncrease);
         return limitIncrease;
     }
 

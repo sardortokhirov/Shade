@@ -7,6 +7,8 @@ import com.example.shade.model.RequestType;
 import com.example.shade.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -25,6 +27,7 @@ import java.util.List;
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
 public class UserController {
+    private static final Logger logger = LoggerFactory.getLogger(UserController.class);
     private final UserService userService;
 
     private boolean authenticate(HttpServletRequest request) {
@@ -175,12 +178,42 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
         }
         
+        // Log all limit update requests for audit trail
+        String clientInfo = httpRequest.getRemoteAddr();
+        logger.info("LIMIT UPDATE REQUEST - chatId: {}, requested value: {}, client: {}", 
+                chatId, request.getPermanentLimitIncrease(), clientInfo);
+        
+        // Pre-validation: Check if trying to reset to 0
+        if (request.getPermanentLimitIncrease() != null && request.getPermanentLimitIncrease() == 0) {
+            try {
+                // Check current limit before attempting update
+                Long currentLimit = userService.getUserDetails(chatId).getPermanentLimitIncrease();
+                if (currentLimit != null && currentLimit > 0) {
+                    logger.warn("ATTEMPT TO RESET LIMIT VIA API - chatId: {}, current: {}, requested: 0, client: {}", 
+                            chatId, currentLimit, clientInfo);
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                            .body(String.format("Cannot reset permanent limit increase to 0 when current limit is %d. " +
+                                    "Permanent limits should never be reset automatically. " +
+                                    "If this is intentional, contact system administrator.", currentLimit));
+                }
+            } catch (Exception e) {
+                // If we can't get current limit, let the service handle the validation
+                logger.debug("Could not pre-validate limit reset for chatId {}: {}", chatId, e.getMessage());
+            }
+        }
+        
         try {
             com.example.shade.model.UserLimitIncrease limit = userService.updateLimit(chatId, request.getPermanentLimitIncrease());
+            logger.info("LIMIT UPDATE SUCCESS - chatId: {}, new value: {}, client: {}", 
+                    chatId, limit.getAccumulatedLimitIncrease(), clientInfo);
             return ResponseEntity.ok(limit);
         } catch (IllegalArgumentException e) {
+            logger.error("LIMIT UPDATE FAILED (Validation) - chatId: {}, error: {}, client: {}", 
+                    chatId, e.getMessage(), clientInfo);
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         } catch (Exception e) {
+            logger.error("LIMIT UPDATE FAILED (Error) - chatId: {}, error: {}, client: {}", 
+                    chatId, e.getMessage(), clientInfo);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error updating limit: " + e.getMessage());
         }

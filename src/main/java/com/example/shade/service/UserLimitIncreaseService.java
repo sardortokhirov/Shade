@@ -29,16 +29,59 @@ public class UserLimitIncreaseService {
 
     /**
      * Add amount to permanent limit increase (accumulates forever)
+     * This method only adds to the limit - it never decreases it
      */
     @Transactional
     public void addPermanentLimitIncrease(Long chatId, Long amount) {
+        if (amount == null || amount < 0) {
+            throw new IllegalArgumentException("Amount to add must be non-negative");
+        }
+        
         UserLimitIncrease limitIncrease = getOrCreate(chatId);
-        limitIncrease.setAccumulatedLimitIncrease(
-                limitIncrease.getAccumulatedLimitIncrease() + amount);
+        Long oldLimit = limitIncrease.getAccumulatedLimitIncrease();
+        Long newLimit = oldLimit + amount;
+        
+        limitIncrease.setAccumulatedLimitIncrease(newLimit);
         limitIncrease.setLastUpdated(LocalDateTime.now(GMT_PLUS_5));
         repository.save(limitIncrease);
-        logger.info("Added permanent limit increase {} for chatId {}. Total: {}", 
-                amount, chatId, limitIncrease.getAccumulatedLimitIncrease());
+        
+        logger.info("Added permanent limit increase {} for chatId {}. Old: {}, New: {}", 
+                amount, chatId, oldLimit, newLimit);
+    }
+    
+    /**
+     * Reset permanent limit increase to 0
+     * This method requires explicit confirmation to prevent accidental resets
+     * 
+     * @param chatId User's chat ID
+     * @param confirmReset Must be true to confirm the reset operation
+     * @throws IllegalArgumentException if confirmReset is not true
+     */
+    @Transactional
+    public void resetLimit(Long chatId, boolean confirmReset) {
+        if (!confirmReset) {
+            throw new IllegalArgumentException("Reset confirmation required. " +
+                    "Permanent limit increases should never be reset automatically. " +
+                    "Set confirmReset=true if this is intentional.");
+        }
+        
+        UserLimitIncrease limitIncrease = getOrCreate(chatId);
+        Long oldLimit = limitIncrease.getAccumulatedLimitIncrease();
+        
+        if (oldLimit == 0) {
+            logger.info("Reset limit requested for chatId {} but limit is already 0", chatId);
+            return;
+        }
+        
+        logger.warn("RESETTING PERMANENT LIMIT - chatId: {}, old limit: {}, new limit: 0. " +
+                "This is a destructive operation.", chatId, oldLimit);
+        
+        limitIncrease.setAccumulatedLimitIncrease(0L);
+        limitIncrease.setLastUpdated(LocalDateTime.now(GMT_PLUS_5));
+        repository.save(limitIncrease);
+        
+        logger.error("PERMANENT LIMIT RESET COMPLETED - chatId: {}, previous value: {} was reset to 0", 
+                chatId, oldLimit);
     }
 
     /**
