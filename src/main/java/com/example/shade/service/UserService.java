@@ -39,131 +39,146 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public Page<UserDTO> getUsers(Pageable pageable, UserFilter filter) {
-        List<Long> candidateChatIds = new ArrayList<>();
+        List<Long> candidateChatIds;
+        long totalElements;
         
         // Step 1: Get candidate chatIds based on searchChatId filter
         if (filter != null && filter.getSearchChatId() != null) {
+            // SearchChatId provided - search in both tables
             String searchPattern = "%" + String.valueOf(filter.getSearchChatId()) + "%";
             
             // Search in User table
             List<Long> userChatIds = userRepository.findChatIdsBySearchPattern(searchPattern);
-            candidateChatIds.addAll(userChatIds);
             
             // Search in BlockedUser table (to include blocked users without User records)
             List<Long> blockedChatIds = blockedUserRepository.findChatIdsBySearchPattern(searchPattern);
+            
+            // Combine and remove duplicates
+            candidateChatIds = new ArrayList<>();
+            candidateChatIds.addAll(userChatIds);
             candidateChatIds.addAll(blockedChatIds);
-            
-            // Remove duplicates
             candidateChatIds = candidateChatIds.stream().distinct().sorted().toList();
+            totalElements = candidateChatIds.size();
         } else {
-            // No searchChatId filter - get all chatIds efficiently (only select chat_id, not full entities)
-            List<Long> userChatIds = userRepository.findAllChatIds();
-            candidateChatIds = new ArrayList<>(userChatIds);
+            // No searchChatId - use database pagination for efficiency
+            Page<User> usersPage = userRepository.findAll(
+                PageRequest.of(
+                    pageable.getPageNumber(),
+                    pageable.getPageSize(),
+                    Sort.by(Sort.Direction.ASC, "chatId")
+                )
+            );
             
-            // Also include blocked users who don't have User records
-            List<Long> blockedChatIds = blockedUserRepository.findAllChatIds();
-            for (Long blockedChatId : blockedChatIds) {
-                if (!candidateChatIds.contains(blockedChatId)) {
-                    candidateChatIds.add(blockedChatId);
-                }
-            }
-            candidateChatIds.sort(Long::compareTo);
+            candidateChatIds = usersPage.getContent().stream()
+                    .map(User::getChatId)
+                    .toList();
+            totalElements = usersPage.getTotalElements();
         }
         
-        // Step 2: Apply filters and build UserDTOs
+        // Step 3: Apply filters and build UserDTOs (only for candidate chatIds)
         List<UserDTO> userDTOs = new ArrayList<>();
         
         for (Long chatId : candidateChatIds) {
-            // Get User record (may not exist for blocked-only users)
-            Optional<User> userOpt = userRepository.findByChatId(chatId);
-            
-            // Get blocked status
-            Optional<BlockedUser> blockedUser = blockedUserRepository.findByChatId(chatId);
-            boolean isBlocked = blockedUser.isPresent() && "BLOCKED".equals(blockedUser.get().getPhoneNumber());
-            String phoneNumber = blockedUser.map(BlockedUser::getPhoneNumber)
-                    .orElse(null);
-            
-            // Apply blocked filter
-            if (filter != null && filter.getBlocked() != null && filter.getBlocked() != isBlocked) {
+            try {
+                // Get User record (may not exist for blocked-only users)
+                Optional<User> userOpt = userRepository.findByChatId(chatId);
+                
+                // Get blocked status
+                Optional<BlockedUser> blockedUser = blockedUserRepository.findByChatId(chatId);
+                boolean isBlocked = blockedUser.isPresent() && "BLOCKED".equals(blockedUser.get().getPhoneNumber());
+                String phoneNumber = blockedUser.map(BlockedUser::getPhoneNumber)
+                        .orElse(null);
+                
+                // Apply blocked filter
+                if (filter != null && filter.getBlocked() != null && filter.getBlocked() != isBlocked) {
+                    continue;
+                }
+                
+                // Apply language filter (only if User record exists)
+                if (filter != null && filter.getLanguage() != null) {
+                    if (userOpt.isEmpty()) {
+                        // Blocked user without User record - skip if language filter is set
+                        continue;
+                    }
+                    if (!filter.getLanguage().equals(userOpt.get().getLanguage().toString())) {
+                        continue;
+                    }
+                }
+                
+                // Apply phone search filter
+                if (filter != null && filter.getSearchPhone() != null) {
+                    if (phoneNumber == null || !phoneNumber.contains(filter.getSearchPhone())) {
+                        continue;
+                    }
+                }
+                
+                // Get balance
+                Optional<UserBalance> userBalance = userBalanceRepository.findById(chatId);
+                BigDecimal balance = userBalance.map(UserBalance::getBalance).orElse(BigDecimal.ZERO);
+                Long tickets = userBalance.map(UserBalance::getTickets).orElse(0L);
+                
+                // Apply hasBalance filter
+                if (filter != null && filter.getHasBalance() != null) {
+                    boolean hasBalance = balance.compareTo(BigDecimal.ZERO) > 0;
+                    if (filter.getHasBalance() != hasBalance) {
+                        continue;
+                    }
+                }
+                
+                // Get registration date (earliest request)
+                LocalDateTime registeredAt = hizmatRequestRepository.findEarliestByChatId(chatId)
+                        .orElse(null);
+                
+                // Get platforms used
+                List<String> platformsUsed = hizmatRequestRepository.findDistinctPlatformsByChatId(chatId);
+                
+                // Get limit information (using read-only methods to avoid creating stats in read-only transaction)
+                Long permanentLimitIncrease = userLimitIncreaseService.getPermanentLimitIncrease(chatId);
+                Long effectiveDailyLimit = dailyStatsService.getEffectiveDailyLimitReadOnly(chatId);
+                Long availableLimit = dailyStatsService.getAvailableLimitReadOnly(chatId);
+                
+                // Determine language - use from User if exists, otherwise default to UZ
+                String language = userOpt.map(u -> u.getLanguage().toString())
+                        .orElse("UZ");
+                
+                UserDTO userDTO = new UserDTO(
+                        chatId,
+                        language,
+                        phoneNumber,
+                        isBlocked,
+                        balance,
+                        tickets,
+                        registeredAt,
+                        permanentLimitIncrease,
+                        effectiveDailyLimit,
+                        availableLimit,
+                        platformsUsed
+                );
+                
+                userDTOs.add(userDTO);
+            } catch (Exception e) {
+                // Log error but continue processing other users
+                logger.warn("Error processing user with chatId {}: {}", chatId, e.getMessage());
                 continue;
             }
-            
-            // Apply language filter (only if User record exists)
-            if (filter != null && filter.getLanguage() != null) {
-                if (userOpt.isEmpty()) {
-                    // Blocked user without User record - skip if language filter is set
-                    continue;
-                }
-                if (!filter.getLanguage().equals(userOpt.get().getLanguage().toString())) {
-                    continue;
-                }
-            }
-            
-            // Apply phone search filter
-            if (filter != null && filter.getSearchPhone() != null) {
-                if (phoneNumber == null || !phoneNumber.contains(filter.getSearchPhone())) {
-                    continue;
-                }
-            }
-            
-            // Get balance
-            Optional<UserBalance> userBalance = userBalanceRepository.findById(chatId);
-            BigDecimal balance = userBalance.map(UserBalance::getBalance).orElse(BigDecimal.ZERO);
-            Long tickets = userBalance.map(UserBalance::getTickets).orElse(0L);
-            
-            // Apply hasBalance filter
-            if (filter != null && filter.getHasBalance() != null) {
-                boolean hasBalance = balance.compareTo(BigDecimal.ZERO) > 0;
-                if (filter.getHasBalance() != hasBalance) {
-                    continue;
-                }
-            }
-            
-            // Get registration date (earliest request)
-            LocalDateTime registeredAt = hizmatRequestRepository.findEarliestByChatId(chatId)
-                    .orElse(null);
-            
-            // Get platforms used
-            List<String> platformsUsed = hizmatRequestRepository.findDistinctPlatformsByChatId(chatId);
-            
-            // Get limit information (using read-only methods to avoid creating stats in read-only transaction)
-            Long permanentLimitIncrease = userLimitIncreaseService.getPermanentLimitIncrease(chatId);
-            Long effectiveDailyLimit = dailyStatsService.getEffectiveDailyLimitReadOnly(chatId);
-            Long availableLimit = dailyStatsService.getAvailableLimitReadOnly(chatId);
-            
-            // Determine language - use from User if exists, otherwise default to UZ
-            String language = userOpt.map(u -> u.getLanguage().toString())
-                    .orElse("UZ");
-            
-            UserDTO userDTO = new UserDTO(
-                    chatId,
-                    language,
-                    phoneNumber,
-                    isBlocked,
-                    balance,
-                    tickets,
-                    registeredAt,
-                    permanentLimitIncrease,
-                    effectiveDailyLimit,
-                    availableLimit,
-                    platformsUsed
-            );
-            
-            userDTOs.add(userDTO);
         }
         
-        // Step 3: Apply pagination to filtered results
-        int totalElements = userDTOs.size();
-        int page = pageable.getPageNumber();
-        int size = pageable.getPageSize();
-        int start = page * size;
-        int end = Math.min(start + size, totalElements);
-        
-        List<UserDTO> paginatedDTOs = (start < totalElements) 
-                ? userDTOs.subList(start, end) 
-                : new ArrayList<>();
-        
-        return new PageImpl<>(paginatedDTOs, pageable, totalElements);
+        // Step 4: Apply pagination if searchChatId was provided (results already paginated if not)
+        if (filter != null && filter.getSearchChatId() != null) {
+            int page = pageable.getPageNumber();
+            int size = pageable.getPageSize();
+            int start = page * size;
+            int end = Math.min(start + size, userDTOs.size());
+            
+            List<UserDTO> paginatedDTOs = (start < userDTOs.size()) 
+                    ? userDTOs.subList(start, end) 
+                    : new ArrayList<>();
+            
+            return new PageImpl<>(paginatedDTOs, pageable, userDTOs.size());
+        } else {
+            // No searchChatId - return paginated results (already paginated from database)
+            return new PageImpl<>(userDTOs, pageable, totalElements);
+        }
     }
 
     @Transactional(readOnly = true)
