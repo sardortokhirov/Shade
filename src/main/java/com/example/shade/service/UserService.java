@@ -99,10 +99,10 @@ public class UserService {
             // Get platforms used
             List<String> platformsUsed = hizmatRequestRepository.findDistinctPlatformsByChatId(chatId);
             
-            // Get limit information
+            // Get limit information (using read-only methods to avoid creating stats in read-only transaction)
             Long permanentLimitIncrease = userLimitIncreaseService.getPermanentLimitIncrease(chatId);
-            Long effectiveDailyLimit = dailyStatsService.getEffectiveDailyLimit(chatId);
-            Long availableLimit = dailyStatsService.getAvailableLimit(chatId);
+            Long effectiveDailyLimit = dailyStatsService.getEffectiveDailyLimitReadOnly(chatId);
+            Long availableLimit = dailyStatsService.getAvailableLimitReadOnly(chatId);
             
             UserDTO userDTO = new UserDTO(
                     chatId,

@@ -151,6 +151,33 @@ public class DailyStatsService {
     }
 
     /**
+     * Gets available limit without creating stats (read-only version)
+     */
+    public Long getAvailableLimitReadOnly(Long chatId) {
+        LocalDate today = getTodayInGmtPlus5();
+        DailyUserStats stats = statsRepository.findByChatIdAndDate(chatId, today).orElse(null);
+        Long dailyLimit = configurationService.getDailyBonusTransferLimit();
+        Long permanentIncrease = userLimitIncreaseService.getPermanentLimitIncrease(chatId);
+        Long dailyLimitIncrease = (stats != null && stats.getDailyLimitIncrease() != null) ? stats.getDailyLimitIncrease() : 0L;
+        Long dailyTopUps = (stats != null) ? stats.getDailyTopUpAmount() : 0L;
+        Long dailyTransfers = (stats != null) ? stats.getDailyTransferAmount() : 0L;
+
+        // Calculate effective daily limit (base limit + permanent increase + today's daily increase)
+        Long effectiveDailyLimit = dailyLimit + permanentIncrease + dailyLimitIncrease;
+
+        Long available;
+        if (featureService.isPayToggleEnabled()) {
+            // Pay toggle ON: ignore deposits, use full daily limit (including all increases)
+            available = effectiveDailyLimit - dailyTransfers;
+        } else {
+            // Pay toggle OFF: current behavior (minimum of effective limit and deposits)
+            available = Math.min(effectiveDailyLimit, dailyTopUps) - dailyTransfers;
+        }
+        
+        return Math.max(0L, available); // Ensure non-negative
+    }
+
+    /**
      * Checks if user can transfer the requested amount
      */
     public boolean canTransfer(Long chatId, Long amount) {
@@ -168,6 +195,18 @@ public class DailyStatsService {
         Long dailyLimit = configurationService.getDailyBonusTransferLimit();
         Long permanentIncrease = userLimitIncreaseService.getPermanentLimitIncrease(chatId);
         Long dailyLimitIncrease = stats.getDailyLimitIncrease() != null ? stats.getDailyLimitIncrease() : 0L;
+        return dailyLimit + permanentIncrease + dailyLimitIncrease;
+    }
+
+    /**
+     * Gets the effective daily limit without creating stats (read-only version)
+     */
+    public Long getEffectiveDailyLimitReadOnly(Long chatId) {
+        LocalDate today = getTodayInGmtPlus5();
+        DailyUserStats stats = statsRepository.findByChatIdAndDate(chatId, today).orElse(null);
+        Long dailyLimit = configurationService.getDailyBonusTransferLimit();
+        Long permanentIncrease = userLimitIncreaseService.getPermanentLimitIncrease(chatId);
+        Long dailyLimitIncrease = (stats != null && stats.getDailyLimitIncrease() != null) ? stats.getDailyLimitIncrease() : 0L;
         return dailyLimit + permanentIncrease + dailyLimitIncrease;
     }
 
