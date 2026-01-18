@@ -153,17 +153,18 @@ public class UserService {
         // Get platforms used
         List<String> platformsUsed = hizmatRequestRepository.findDistinctPlatformsByChatId(chatId);
         
-        // Get limit information
+        // Get limit information (using read-only methods to avoid creating stats in read-only transaction)
         Long permanentLimitIncrease = userLimitIncreaseService.getPermanentLimitIncrease(chatId);
-        Long effectiveDailyLimit = dailyStatsService.getEffectiveDailyLimit(chatId);
-        Long availableLimit = dailyStatsService.getAvailableLimit(chatId);
+        Long effectiveDailyLimit = dailyStatsService.getEffectiveDailyLimitReadOnly(chatId);
+        Long availableLimit = dailyStatsService.getAvailableLimitReadOnly(chatId);
         
-        // Get daily stats
-        DailyUserStats dailyStats = dailyStatsService.getOrCreateTodayStats(chatId);
-        Long dailyTopUpAmount = dailyStats.getDailyTopUpAmount();
-        Long dailyTransferAmount = dailyStats.getDailyTransferAmount();
-        Long dailyLimitIncrease = dailyStats.getDailyLimitIncrease();
-        LocalDateTime lastUpdated = dailyStats.getLastUpdated();
+        // Get daily stats (read-only - don't create if doesn't exist)
+        LocalDate today = LocalDate.now(java.time.ZoneId.of("GMT+5"));
+        Optional<DailyUserStats> dailyStatsOpt = dailyUserStatsRepository.findByChatIdAndDate(chatId, today);
+        Long dailyTopUpAmount = dailyStatsOpt.map(DailyUserStats::getDailyTopUpAmount).orElse(0L);
+        Long dailyTransferAmount = dailyStatsOpt.map(DailyUserStats::getDailyTransferAmount).orElse(0L);
+        Long dailyLimitIncrease = dailyStatsOpt.map(DailyUserStats::getDailyLimitIncrease).orElse(0L);
+        LocalDateTime lastUpdated = dailyStatsOpt.map(DailyUserStats::getLastUpdated).orElse(null);
         
         return new UserDetailDTO(
                 chatId,
