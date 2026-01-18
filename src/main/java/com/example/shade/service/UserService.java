@@ -55,8 +55,13 @@ public class UserService {
             
             // Apply filters
             if (filter != null) {
-                if (filter.getSearchChatId() != null && !filter.getSearchChatId().equals(chatId)) {
-                    continue;
+                // Search chatId with partial matching (LIKE %number%)
+                if (filter.getSearchChatId() != null) {
+                    String chatIdStr = String.valueOf(chatId);
+                    String searchStr = String.valueOf(filter.getSearchChatId());
+                    if (!chatIdStr.contains(searchStr)) {
+                        continue;
+                    }
                 }
                 
                 if (filter.getLanguage() != null && !filter.getLanguage().equals(user.getLanguage().toString())) {
