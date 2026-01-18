@@ -43,7 +43,7 @@ public class UserService {
         
         // Step 1: Get candidate chatIds based on searchChatId filter
         if (filter != null && filter.getSearchChatId() != null) {
-            String searchPattern = String.valueOf(filter.getSearchChatId());
+            String searchPattern = "%" + String.valueOf(filter.getSearchChatId()) + "%";
             
             // Search in User table
             List<Long> userChatIds = userRepository.findChatIdsBySearchPattern(searchPattern);
@@ -56,19 +56,18 @@ public class UserService {
             // Remove duplicates
             candidateChatIds = candidateChatIds.stream().distinct().sorted().toList();
         } else {
-            // No searchChatId filter - get all chatIds from User table
-            List<User> allUsers = userRepository.findAll(Sort.by(Sort.Direction.ASC, "chatId"));
-            candidateChatIds = allUsers.stream().map(User::getChatId).toList();
+            // No searchChatId filter - get all chatIds efficiently (only select chat_id, not full entities)
+            List<Long> userChatIds = userRepository.findAllChatIds();
+            candidateChatIds = new ArrayList<>(userChatIds);
             
             // Also include blocked users who don't have User records
-            List<BlockedUser> allBlockedUsers = blockedUserRepository.findAll();
-            for (BlockedUser blockedUser : allBlockedUsers) {
-                if (!candidateChatIds.contains(blockedUser.getChatId())) {
-                    candidateChatIds = new ArrayList<>(candidateChatIds);
-                    candidateChatIds.add(blockedUser.getChatId());
+            List<Long> blockedChatIds = blockedUserRepository.findAllChatIds();
+            for (Long blockedChatId : blockedChatIds) {
+                if (!candidateChatIds.contains(blockedChatId)) {
+                    candidateChatIds.add(blockedChatId);
                 }
             }
-            candidateChatIds = candidateChatIds.stream().distinct().sorted().toList();
+            candidateChatIds.sort(Long::compareTo);
         }
         
         // Step 2: Apply filters and build UserDTOs

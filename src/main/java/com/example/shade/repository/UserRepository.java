@@ -20,9 +20,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
         
         /**
          * Find chatIds from User table that match the search pattern (partial match)
-         * Uses CAST to convert chatId to string for LIKE comparison
+         * Uses native query for PostgreSQL string conversion
          */
-        @Query("SELECT u.chatId FROM User u WHERE CAST(u.chatId AS string) LIKE CONCAT('%', :searchPattern, '%')")
+        @Query(value = "SELECT chat_id FROM users WHERE CAST(chat_id AS TEXT) LIKE :searchPattern", nativeQuery = true)
         List<Long> findChatIdsBySearchPattern(@Param("searchPattern") String searchPattern);
         
         /**
@@ -32,8 +32,14 @@ public interface UserRepository extends JpaRepository<User, Long> {
         List<Long> findChatIdsByLanguage(@Param("language") com.example.shade.model.Language language);
         
         /**
+         * Get all chatIds from User table (efficient - only selects chat_id)
+         */
+        @Query("SELECT u.chatId FROM User u ORDER BY u.chatId ASC")
+        List<Long> findAllChatIds();
+        
+        /**
          * Find chatIds from User table filtered by language and search pattern
          */
-        @Query("SELECT u.chatId FROM User u WHERE CAST(u.chatId AS string) LIKE CONCAT('%', :searchPattern, '%') AND u.language = :language")
-        List<Long> findChatIdsBySearchPatternAndLanguage(@Param("searchPattern") String searchPattern, @Param("language") com.example.shade.model.Language language);
+        @Query(value = "SELECT chat_id FROM users WHERE CAST(chat_id AS TEXT) LIKE :searchPattern AND language = :language", nativeQuery = true)
+        List<Long> findChatIdsBySearchPatternAndLanguage(@Param("searchPattern") String searchPattern, @Param("language") String language);
 }

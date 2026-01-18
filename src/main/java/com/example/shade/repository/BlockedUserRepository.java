@@ -17,7 +17,14 @@ public interface BlockedUserRepository extends JpaRepository<BlockedUser, Long> 
     
     /**
      * Find chatIds from BlockedUser table that match the search pattern (partial match)
+     * Uses native query for PostgreSQL string conversion
      */
-    @Query("SELECT b.chatId FROM BlockedUser b WHERE CAST(b.chatId AS string) LIKE CONCAT('%', :searchPattern, '%')")
+    @Query(value = "SELECT chat_id FROM blocked_user WHERE CAST(chat_id AS TEXT) LIKE :searchPattern", nativeQuery = true)
     List<Long> findChatIdsBySearchPattern(@Param("searchPattern") String searchPattern);
+    
+    /**
+     * Get all chatIds from BlockedUser table (efficient - only selects chat_id)
+     */
+    @Query("SELECT b.chatId FROM BlockedUser b")
+    List<Long> findAllChatIds();
 }
