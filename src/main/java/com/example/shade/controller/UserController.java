@@ -15,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.List;
@@ -327,6 +328,32 @@ public class UserController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error fetching user summary: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/{chatId}/daily-stats")
+    public ResponseEntity<?> getUserDailyStats(
+            @PathVariable Long chatId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            HttpServletRequest request) {
+        
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
+        
+        try {
+            Pageable pageable = PageRequest.of(page, size);
+            Page<DailyUserStatsDTO> statsPage = userService.getUserDailyStats(chatId, date, startDate, endDate, pageable);
+            return ResponseEntity.ok(statsPage);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error fetching daily stats: " + e.getMessage());
         }
     }
 

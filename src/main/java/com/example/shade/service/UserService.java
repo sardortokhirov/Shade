@@ -389,6 +389,51 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
+    public Page<DailyUserStatsDTO> getUserDailyStats(Long chatId, LocalDate date, LocalDate startDate, LocalDate endDate, Pageable pageable) {
+        // Validate user exists
+        if (!userRepository.existsById(chatId)) {
+            throw new RuntimeException("User not found with chatId: " + chatId);
+        }
+        
+        Page<DailyUserStats> statsPage;
+        
+        // If single date is provided, it takes precedence
+        if (date != null) {
+            Optional<DailyUserStats> stats = dailyUserStatsRepository.findByChatIdAndDate(chatId, date);
+            if (stats.isPresent()) {
+                List<DailyUserStatsDTO> dtoList = List.of(mapToDTO(stats.get()));
+                Page<DailyUserStatsDTO> resultPage = new PageImpl<>(dtoList, PageRequest.of(0, 1), 1);
+                return resultPage;
+            } else {
+                return Page.empty(pageable);
+            }
+        } else if (startDate != null && endDate != null) {
+            // Date range query
+            statsPage = dailyUserStatsRepository.findByChatIdAndDateBetween(chatId, startDate, endDate, pageable);
+        } else {
+            // No date filter - get all stats ordered by date descending
+            statsPage = dailyUserStatsRepository.findByChatIdOrderByDateDesc(chatId, pageable);
+        }
+        
+        // Map to DTOs
+        List<DailyUserStatsDTO> dtoList = statsPage.getContent().stream()
+                .map(this::mapToDTO)
+                .toList();
+        
+        return new PageImpl<>(dtoList, statsPage.getPageable(), statsPage.getTotalElements());
+    }
+    
+    private DailyUserStatsDTO mapToDTO(DailyUserStats stats) {
+        return new DailyUserStatsDTO(
+                stats.getDate(),
+                stats.getDailyTopUpAmount(),
+                stats.getDailyTransferAmount(),
+                stats.getDailyLimitIncrease(),
+                stats.getLastUpdated()
+        );
+    }
+
+    @Transactional(readOnly = true)
     public UserSummaryDTO getUserSummary(Long chatId) {
         if (!userRepository.existsById(chatId)) {
             throw new RuntimeException("User not found with chatId: " + chatId);
