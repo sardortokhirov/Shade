@@ -1,5 +1,6 @@
 package com.example.shade.model;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -22,7 +23,8 @@ public class LotteryConfiguration {
     @Column(name = "purchase_cooldown_seconds", nullable = false)
     private Long purchaseCooldownSeconds = 300L;
 
-    @Column(name = "winnings_percentage", nullable = false, precision = 5, scale = 2)
+    @Column(name = "winnings_percentage", nullable = false, precision = 9, scale = 8)
+    @JsonSerialize(using = BigDecimalPlainSerializer.class)
     private BigDecimal winningsPercentage = BigDecimal.ZERO;
 
     @Column(name = "created_at", nullable = false)
