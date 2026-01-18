@@ -4,6 +4,7 @@ import com.example.shade.model.HizmatRequest;
 import com.example.shade.model.RequestStatus;
 import com.example.shade.model.RequestType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -19,7 +20,7 @@ import java.util.Optional;
  * Time-7:56 AM (GMT+5)
  */
 @Repository
-public interface HizmatRequestRepository extends JpaRepository<HizmatRequest, Long> {
+public interface HizmatRequestRepository extends JpaRepository<HizmatRequest, Long>, JpaSpecificationExecutor<HizmatRequest> {
     @Query("SELECT r FROM HizmatRequest r WHERE " +
             "(:cardId IS NULL OR r.adminCardId = :cardId) AND " +
             "(:platformId IS NULL OR r.platform IN (SELECT p.name FROM Platform p WHERE p.id = :platformId)) AND " +
