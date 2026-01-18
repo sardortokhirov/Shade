@@ -78,4 +78,44 @@ public interface HizmatRequestRepository extends JpaRepository<HizmatRequest, Lo
 
     @Query("SELECT DISTINCT h.chatId FROM HizmatRequest h WHERE h.status = 'APPROVED'")
     List<Long> findDistinctChatIdsByStatusApproved();
+
+    @Query("SELECT MIN(h.createdAt) FROM HizmatRequest h WHERE h.chatId = :chatId")
+    Optional<LocalDateTime> findEarliestByChatId(@Param("chatId") Long chatId);
+
+    @Query("SELECT DISTINCT h.platform FROM HizmatRequest h WHERE h.chatId = :chatId")
+    List<String> findDistinctPlatformsByChatId(@Param("chatId") Long chatId);
+
+    @Query("SELECT h FROM HizmatRequest h WHERE h.chatId = :chatId " +
+            "AND (:status IS NULL OR h.status = :status) " +
+            "AND (:platform IS NULL OR h.platform = :platform) " +
+            "AND (:type IS NULL OR h.type = :type) " +
+            "AND (:startDate IS NULL OR h.createdAt >= :startDate) " +
+            "AND (:endDate IS NULL OR h.createdAt <= :endDate) " +
+            "ORDER BY h.createdAt DESC")
+    org.springframework.data.domain.Page<HizmatRequest> findByChatIdAndFilters(
+            @Param("chatId") Long chatId,
+            @Param("status") RequestStatus status,
+            @Param("platform") String platform,
+            @Param("type") RequestType type,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate,
+            Pageable pageable);
+
+    @Query("SELECT COALESCE(SUM(h.amount), 0) FROM HizmatRequest h WHERE h.chatId = :chatId AND h.type = 'TOP_UP' AND h.status = 'APPROVED'")
+    Long sumTopUpAmountByChatId(@Param("chatId") Long chatId);
+
+    @Query("SELECT COALESCE(SUM(h.amount), 0) FROM HizmatRequest h WHERE h.chatId = :chatId AND h.type = 'WITHDRAWAL' AND h.status = 'APPROVED'")
+    Long sumTransferAmountByChatId(@Param("chatId") Long chatId);
+
+    @Query("SELECT COUNT(h) FROM HizmatRequest h WHERE h.chatId = :chatId AND h.status = :status")
+    Long countByChatIdAndStatus(@Param("chatId") Long chatId, @Param("status") RequestStatus status);
+
+    @Query("SELECT COUNT(h) FROM HizmatRequest h WHERE h.chatId = :chatId")
+    Long countByChatId(@Param("chatId") Long chatId);
+
+    @Query("SELECT MIN(h.createdAt) FROM HizmatRequest h WHERE h.chatId = :chatId")
+    Optional<LocalDateTime> findFirstRequestDateByChatId(@Param("chatId") Long chatId);
+
+    @Query("SELECT MAX(h.createdAt) FROM HizmatRequest h WHERE h.chatId = :chatId")
+    Optional<LocalDateTime> findLastRequestDateByChatId(@Param("chatId") Long chatId);
 }
