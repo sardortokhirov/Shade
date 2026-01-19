@@ -61,6 +61,7 @@ public class BonusService {
     private final LotteryConfigService lotteryConfigService;
     private final LotteryTicketBundleService bundleService;
     private final LotteryTicketPurchaseService purchaseService;
+    private final LottoBotService lottoBotService;
 
     @Lazy
     @Autowired
@@ -888,20 +889,21 @@ public class BonusService {
                 } else {
                     Long totalLimit = dailyStatsService.getEffectiveDailyLimit(request.getChatId());
                     Long availableLimit = dailyStatsService.getAvailableLimit(request.getChatId());
+                    LocalDateTime timestamp = LocalDateTime.now(ZoneId.of("GMT+5"));
                     String message = String.format(
                             "🆔: %d #Bonus tasdiqlandi ✅\n\uD83C\uDF10 %s :  %s\n💰 Bonus: %,d so'm\n Foydalanuvchi: `%d` \n \uD83D\uDCDE %s \n\n  \uD83C\uDFE6: %,d %s \n\n📊 Kunlik limit: %,d / %,d so'm\n 📅 [%s]",
                             request.getId(), request.getPlatform(), request.getPlatformUserId(), request.getAmount(),
                             request.getChatId(), number, transferSuccessful.getLimit().longValue(),
                             platformData.getCurrency().toString(), totalLimit, availableLimit,
-                            LocalDateTime.now(ZoneId.of("GMT+5"))
-                                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                            timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                     String bonusMessage = String.format(
                             languageSessionService.getTranslation(request.getChatId(), "message.bonus_approved"),
                             request.getId(), request.getPlatform(), request.getPlatformUserId(), request.getAmount(),
-                            LocalDateTime.now(ZoneId.of("GMT+5"))
-                                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                            timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                     messageSender.sendMessage(request.getChatId(), bonusMessage);
                     adminLogBotService.sendToAdmins(message);
+                    // Send lotto bot notification for successful bonus top-up
+                    lottoBotService.logBonusTopUpWin(request.getChatId(), request.getAmount(), request.getPlatform(), timestamp);
                 }
             } catch (Exception e) {
                 logger.error("❌ Error transferring top-up to platform for chatId {}: {}", request.getChatId(),
@@ -976,6 +978,7 @@ public class BonusService {
                     String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
 
                     BalanceLimit cashdeskBalance = getCashdeskBalance(hash, cashierPass, cashdeskId);
+                    LocalDateTime timestamp = LocalDateTime.now(ZoneId.of("GMT+5"));
                     if (cashdeskBalance == null) {
                         Long totalLimit = dailyStatsService.getEffectiveDailyLimit(request.getChatId());
                         Long availableLimit = dailyStatsService.getAvailableLimit(request.getChatId());
@@ -983,15 +986,15 @@ public class BonusService {
                                 "🆔: %d #Bonus tasdiqlandi ✅ \n\uD83C\uDF10 %s :  %s\n💰 Bonus: %,d so'm\n\uD83D\uDC64 Foydalanuvchi: `%d` \n\uD83D\uDCDE %s \n\n📊 Kunlik limit: %,d / %,d so'm\n 📅 [%s]",
                                 request.getId(), request.getPlatform(), request.getPlatformUserId(),
                                 request.getAmount(), request.getChatId(), number, totalLimit, availableLimit,
-                                LocalDateTime.now(ZoneId.of("GMT+5"))
-                                        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                                timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                         String bonusMessage = String.format(
                                 languageSessionService.getTranslation(request.getChatId(), "message.bonus_approved"),
                                 request.getId(), request.getPlatform(), request.getPlatformUserId(),
-                                request.getAmount(), LocalDateTime.now(ZoneId.of("GMT+5"))
-                                        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                                request.getAmount(), timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                         messageSender.sendMessage(request.getChatId(), bonusMessage);
                         adminLogBotService.sendToAdmins(message);
+                        // Send lotto bot notification for successful bonus top-up
+                        lottoBotService.logBonusTopUpWin(request.getChatId(), request.getAmount(), request.getPlatform(), timestamp);
                     } else {
                         Long totalLimit = dailyStatsService.getEffectiveDailyLimit(request.getChatId());
                         Long availableLimit = dailyStatsService.getAvailableLimit(request.getChatId());
@@ -1001,15 +1004,15 @@ public class BonusService {
                                 request.getAmount(), request.getChatId(), number,
                                 cashdeskBalance.getLimit().longValue(), platformData.getCurrency().toString(),
                                 totalLimit, availableLimit,
-                                LocalDateTime.now(ZoneId.of("GMT+5"))
-                                        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                                timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                         String bonusMessage = String.format(
                                 languageSessionService.getTranslation(request.getChatId(), "message.bonus_approved"),
                                 request.getId(), request.getPlatform(), request.getPlatformUserId(),
-                                request.getAmount(), LocalDateTime.now(ZoneId.of("GMT+5"))
-                                        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                                request.getAmount(), timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                         messageSender.sendMessage(request.getChatId(), bonusMessage);
                         adminLogBotService.sendToAdmins(message);
+                        // Send lotto bot notification for successful bonus top-up
+                        lottoBotService.logBonusTopUpWin(request.getChatId(), request.getAmount(), request.getPlatform(), timestamp);
                     }
                 } else {
                     String error = responseBody != null && responseBody.get("Message") != null

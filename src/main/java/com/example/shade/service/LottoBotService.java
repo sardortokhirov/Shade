@@ -55,6 +55,25 @@ public class LottoBotService {
         }
     }
 
+    public void logBonusTopUpWin(Long chatId, Long amount, String platform, LocalDateTime timestamp) {
+        String date = timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        String logMessage = String.format(
+                languageSessionService.getTranslation(chatId, "lotto.message.bonus_topup_win"),
+                amount, date, platform, amount
+        );
+
+        List<AdminChat> adminChats = adminChatRepository.findByReceiveNotificationsTrue();
+        if (adminChats.isEmpty()) {
+            logger.warn("No admin channels with notifications enabled for bonus top-up: chatId {}, amount {}", chatId, amount);
+            return;
+        }
+
+        for (AdminChat adminChat : adminChats) {
+            messageSender.sendMessage(adminChat.getChatId(), logMessage);
+            logger.info("Sent bonus top-up win log to channel {}: {}", adminChat.getChatId(), logMessage);
+        }
+    }
+
     private String getRandomCongratulations(Long chatId) {
         int index = RANDOM.nextInt(4) + 1; // Random index from 1 to 4
         String translationKey = "lotto.congratulations." + index;
