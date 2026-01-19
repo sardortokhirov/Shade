@@ -20,6 +20,7 @@ public class UserDetailDTO {
     private Long tickets;
     private LocalDateTime registeredAt;
     private Long permanentLimitIncrease;
+    private BigDecimal permanentLimitIncreasePrecise; // Precise decimal value
     private Long effectiveDailyLimit;
     private Long availableLimit;
     private List<String> platformsUsed;
@@ -28,4 +29,8 @@ public class UserDetailDTO {
     private Long dailyLimitIncrease;
     private LocalDateTime lastLotteryPlayTime;
     private LocalDateTime lastUpdated;
+    
+    // Detailed limit breakdown for admin
+    private Long baseDailyLimit;
+    private String limitBreakdown; // Human-readable breakdown
 }

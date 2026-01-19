@@ -36,6 +36,8 @@ public class UserService {
     private final UserLimitIncreaseService userLimitIncreaseService;
     private final DailyUserStatsRepository dailyUserStatsRepository;
     private final UserLimitIncreaseRepository userLimitIncreaseRepository;
+    private final SystemConfigurationService configurationService;
+    private final FeatureService featureService;
 
     @Transactional(readOnly = true)
     public Page<UserDTO> getUsers(Pageable pageable, UserFilter filter) {
@@ -214,6 +216,9 @@ public class UserService {
         Long effectiveDailyLimit = dailyStatsService.getEffectiveDailyLimitReadOnly(chatId);
         Long availableLimit = dailyStatsService.getAvailableLimitReadOnly(chatId);
         
+        // Get base daily limit for detailed breakdown
+        Long baseDailyLimit = configurationService.getDailyBonusTransferLimit();
+        
         // Get daily stats (read-only - don't create if doesn't exist)
         LocalDate today = LocalDate.now(java.time.ZoneId.of("GMT+5"));
         Optional<DailyUserStats> dailyStatsOpt = dailyUserStatsRepository.findByChatIdAndDate(chatId, today);
@@ -221,6 +226,10 @@ public class UserService {
         Long dailyTransferAmount = dailyStatsOpt.map(DailyUserStats::getDailyTransferAmount).orElse(0L);
         Long dailyLimitIncrease = dailyStatsOpt.map(DailyUserStats::getDailyLimitIncrease).orElse(0L);
         LocalDateTime lastUpdated = dailyStatsOpt.map(DailyUserStats::getLastUpdated).orElse(null);
+        
+        // Build detailed limit breakdown string
+        String limitBreakdown = buildLimitBreakdown(baseDailyLimit, permanentLimitIncreaseBD, permanentLimitIncrease, 
+                dailyLimitIncrease, effectiveDailyLimit, dailyTopUpAmount, dailyTransferAmount, availableLimit);
         
         return new UserDetailDTO(
                 chatId,
@@ -231,6 +240,7 @@ public class UserService {
                 tickets,
                 registeredAt,
                 permanentLimitIncrease,
+                permanentLimitIncreaseBD,
                 effectiveDailyLimit,
                 availableLimit,
                 platformsUsed,
@@ -238,8 +248,39 @@ public class UserService {
                 dailyTransferAmount,
                 dailyLimitIncrease,
                 lastLotteryPlayTime,
-                lastUpdated
+                lastUpdated,
+                baseDailyLimit,
+                limitBreakdown
         );
+    }
+    
+    /**
+     * Builds a detailed limit breakdown string for admin display
+     */
+    private String buildLimitBreakdown(Long baseDailyLimit, BigDecimal permanentLimitIncreaseBD, 
+            Long permanentLimitIncrease, Long dailyLimitIncrease, Long effectiveDailyLimit,
+            Long dailyTopUpAmount, Long dailyTransferAmount, Long availableLimit) {
+        StringBuilder breakdown = new StringBuilder();
+        breakdown.append("Base Daily Limit: ").append(String.format("%,d", baseDailyLimit)).append(" UZS\n");
+        breakdown.append("Permanent Increase: ").append(String.format("%,d", permanentLimitIncrease))
+                .append(" UZS (precise: ").append(permanentLimitIncreaseBD).append(")\n");
+        breakdown.append("Daily Limit Increase (from lottery): ").append(String.format("%,d", dailyLimitIncrease)).append(" UZS\n");
+        breakdown.append("Effective Daily Limit: ").append(String.format("%,d", effectiveDailyLimit))
+                .append(" UZS (= ").append(baseDailyLimit).append(" + ").append(permanentLimitIncrease)
+                .append(" + ").append(dailyLimitIncrease).append(")\n");
+        breakdown.append("\nToday's Activity:\n");
+        breakdown.append("- Daily Top-Ups: ").append(String.format("%,d", dailyTopUpAmount)).append(" UZS\n");
+        breakdown.append("- Daily Transfers: ").append(String.format("%,d", dailyTransferAmount)).append(" UZS\n");
+        breakdown.append("\nAvailable Limit: ").append(String.format("%,d", availableLimit)).append(" UZS");
+        
+        boolean payToggleEnabled = featureService.isPayToggleEnabled();
+        if (payToggleEnabled) {
+            breakdown.append("\n(Pay Toggle: ON - ignores deposits)");
+        } else {
+            breakdown.append("\n(Pay Toggle: OFF - min(effective limit, deposits) - transfers)");
+        }
+        
+        return breakdown.toString();
     }
 
     @Transactional(readOnly = true)
