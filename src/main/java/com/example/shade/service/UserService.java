@@ -43,26 +43,55 @@ public class UserService {
     public Page<UserDTO> getUsers(Pageable pageable, UserFilter filter) {
         List<Long> candidateChatIds;
         long totalElements;
+        boolean needsInMemoryPagination = false;
         
-        // Step 1: Get candidate chatIds based on searchChatId filter
-        if (filter != null && filter.getSearchChatId() != null) {
-            // SearchChatId provided - search in both tables
-            String searchPattern = "%" + String.valueOf(filter.getSearchChatId()) + "%";
+        // Step 1: Get candidate chatIds based on search filters
+        if (filter != null && (filter.getSearchChatId() != null || filter.getSearchPhone() != null)) {
+            List<Long> chatIdMatches = new ArrayList<>();
+            List<Long> phoneMatches = new ArrayList<>();
             
-            // Search in User table
-            List<Long> userChatIds = userRepository.findChatIdsBySearchPattern(searchPattern);
+            // Search by chatId if provided
+            if (filter.getSearchChatId() != null) {
+                String searchPattern = "%" + String.valueOf(filter.getSearchChatId()) + "%";
+                
+                // Search in User table
+                List<Long> userChatIds = userRepository.findChatIdsBySearchPattern(searchPattern);
+                
+                // Search in BlockedUser table (to include blocked users without User records)
+                List<Long> blockedChatIds = blockedUserRepository.findChatIdsBySearchPattern(searchPattern);
+                
+                // Combine and remove duplicates
+                chatIdMatches.addAll(userChatIds);
+                chatIdMatches.addAll(blockedChatIds);
+                chatIdMatches = chatIdMatches.stream().distinct().sorted().toList();
+            }
             
-            // Search in BlockedUser table (to include blocked users without User records)
-            List<Long> blockedChatIds = blockedUserRepository.findChatIdsBySearchPattern(searchPattern);
+            // Search by phone number if provided
+            if (filter.getSearchPhone() != null) {
+                String phoneSearchPattern = "%" + filter.getSearchPhone() + "%";
+                phoneMatches = blockedUserRepository.findChatIdsByPhonePattern(phoneSearchPattern);
+            }
             
-            // Combine and remove duplicates
-            candidateChatIds = new ArrayList<>();
-            candidateChatIds.addAll(userChatIds);
-            candidateChatIds.addAll(blockedChatIds);
-            candidateChatIds = candidateChatIds.stream().distinct().sorted().toList();
+            // Combine results: if both filters provided, find intersection; otherwise use union
+            if (filter.getSearchChatId() != null && filter.getSearchPhone() != null) {
+                // Both filters: find intersection (users matching BOTH criteria)
+                candidateChatIds = chatIdMatches.stream()
+                        .filter(phoneMatches::contains)
+                        .distinct()
+                        .sorted()
+                        .toList();
+            } else if (filter.getSearchChatId() != null) {
+                // Only chatId search
+                candidateChatIds = chatIdMatches;
+            } else {
+                // Only phone search
+                candidateChatIds = phoneMatches.stream().distinct().sorted().toList();
+            }
+            
             totalElements = candidateChatIds.size();
+            needsInMemoryPagination = true;
         } else {
-            // No searchChatId - use database pagination for efficiency
+            // No search filters - use database pagination for efficiency
             Page<User> usersPage = userRepository.findAll(
                 PageRequest.of(
                     pageable.getPageNumber(),
@@ -107,12 +136,8 @@ public class UserService {
                     }
                 }
                 
-                // Apply phone search filter
-                if (filter != null && filter.getSearchPhone() != null) {
-                    if (phoneNumber == null || !phoneNumber.contains(filter.getSearchPhone())) {
-                        continue;
-                    }
-                }
+                // Phone search filter is already applied in Step 1 (database query)
+                // No need to filter again here since candidateChatIds already contains matching users
                 
                 // Get balance
                 Optional<UserBalance> userBalance = userBalanceRepository.findById(chatId);
@@ -166,8 +191,8 @@ public class UserService {
             }
         }
         
-        // Step 4: Apply pagination if searchChatId was provided (results already paginated if not)
-        if (filter != null && filter.getSearchChatId() != null) {
+        // Step 4: Apply pagination if search filters were provided (results already paginated if not)
+        if (needsInMemoryPagination) {
             int page = pageable.getPageNumber();
             int size = pageable.getPageSize();
             int start = page * size;
@@ -179,7 +204,7 @@ public class UserService {
             
             return new PageImpl<>(paginatedDTOs, pageable, userDTOs.size());
         } else {
-            // No searchChatId - return paginated results (already paginated from database)
+            // No search filters - return paginated results (already paginated from database)
             return new PageImpl<>(userDTOs, pageable, totalElements);
         }
     }

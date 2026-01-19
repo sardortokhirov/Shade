@@ -27,4 +27,11 @@ public interface BlockedUserRepository extends JpaRepository<BlockedUser, Long> 
      */
     @Query("SELECT b.chatId FROM BlockedUser b")
     List<Long> findAllChatIds();
+    
+    /**
+     * Find chatIds from BlockedUser table where phone number matches the search pattern (partial match)
+     * Uses LIKE for pattern matching (case-insensitive)
+     */
+    @Query(value = "SELECT chat_id FROM blocked_user WHERE phone_number ILIKE :searchPattern", nativeQuery = true)
+    List<Long> findChatIdsByPhonePattern(@Param("searchPattern") String searchPattern);
 }
