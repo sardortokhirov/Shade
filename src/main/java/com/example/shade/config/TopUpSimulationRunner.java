@@ -33,7 +33,7 @@ public class TopUpSimulationRunner implements CommandLineRunner {
     private static final Logger logger = LoggerFactory.getLogger(TopUpSimulationRunner.class);
     
     private static final Long TARGET_CHAT_ID = 1755953324L;
-    private static final Long TOP_UP_AMOUNT = 1_000_000L;
+    private static final Long TOP_UP_AMOUNT = 10_000L;
     
     private final BlockedUserRepository blockedUserRepository;
     private final UserBalanceRepository userBalanceRepository;
