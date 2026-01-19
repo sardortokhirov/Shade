@@ -826,15 +826,20 @@ public class TopUpService {
 
                 bonusService.creditReferral(request.getChatId(), request.getAmount());
 
-                // Get limit before top-up to calculate increase
-                java.math.BigDecimal limitBefore = userLimitIncreaseService.getPermanentLimitIncrease(request.getChatId());
+                // Calculate limit increase directly from percentage (optimize: avoid multiple DB calls)
+                java.math.BigDecimal topUpPercentage = configurationService.getTopUpDailyLimitIncreasePercentage();
+                long limitIncrease = 0L;
+                if (topUpPercentage.compareTo(java.math.BigDecimal.ZERO) > 0) {
+                    java.math.BigDecimal increaseAmountBD = java.math.BigDecimal.valueOf(request.getAmount())
+                            .multiply(topUpPercentage)
+                            .divide(java.math.BigDecimal.valueOf(100), 8, java.math.RoundingMode.HALF_UP);
+                    limitIncrease = increaseAmountBD.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
+                }
                 
+                // Process top-up (this will add the limit increase internally)
                 dailyStatsService.addTopUpAmount(request.getChatId(), request.getAmount());
 
-                // Get limit after top-up to calculate increase
-                java.math.BigDecimal limitAfter = userLimitIncreaseService.getPermanentLimitIncrease(request.getChatId());
-                long limitIncrease = limitAfter.subtract(limitBefore).setScale(0, java.math.RoundingMode.HALF_UP).longValue();
-
+                // Get limit information (cache to avoid multiple calls)
                 String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
                 Long totalLimit = dailyStatsService.getEffectiveDailyLimit(request.getChatId());
                 Long availableLimit = dailyStatsService.getAvailableLimit(request.getChatId());
@@ -1002,15 +1007,20 @@ public class TopUpService {
 
                 bonusService.creditReferral(request.getChatId(), request.getAmount());
 
-                // Get limit before top-up to calculate increase
-                java.math.BigDecimal limitBefore = userLimitIncreaseService.getPermanentLimitIncrease(request.getChatId());
+                // Calculate limit increase directly from percentage (optimize: avoid multiple DB calls)
+                java.math.BigDecimal topUpPercentage = configurationService.getTopUpDailyLimitIncreasePercentage();
+                long limitIncrease = 0L;
+                if (topUpPercentage.compareTo(java.math.BigDecimal.ZERO) > 0) {
+                    java.math.BigDecimal increaseAmountBD = java.math.BigDecimal.valueOf(request.getAmount())
+                            .multiply(topUpPercentage)
+                            .divide(java.math.BigDecimal.valueOf(100), 8, java.math.RoundingMode.HALF_UP);
+                    limitIncrease = increaseAmountBD.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
+                }
                 
+                // Process top-up (this will add the limit increase internally)
                 dailyStatsService.addTopUpAmount(request.getChatId(), request.getAmount());
 
-                // Get limit after top-up to calculate increase
-                java.math.BigDecimal limitAfter = userLimitIncreaseService.getPermanentLimitIncrease(request.getChatId());
-                long limitIncrease = limitAfter.subtract(limitBefore).setScale(0, java.math.RoundingMode.HALF_UP).longValue();
-
+                // Get limit information (cache to avoid multiple calls)
                 String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
                 Long totalLimit = dailyStatsService.getEffectiveDailyLimit(request.getChatId());
                 Long availableLimit = dailyStatsService.getAvailableLimit(request.getChatId());
@@ -1220,17 +1230,51 @@ public class TopUpService {
             if (response.getStatusCode().is2xxSuccessful() && Boolean.TRUE.equals(successObj)) {
                 // Check for error messages even when success is true
                 Object messageObj = responseBody != null ? responseBody.get("Message") : null;
+                boolean isQueuedOperation = false;
                 if (messageObj != null) {
                     String message = messageObj.toString().toLowerCase();
+                    String originalMessage = messageObj.toString();
+                    
+                    // Check if operation is queued (valid success response)
+                    if (message.contains("очередь") || message.contains("принята") || message.contains("поставлена")
+                            || message.contains("queue") || message.contains("queued") || message.contains("accepted")
+                            || message.contains("pending")) {
+                        isQueuedOperation = true;
+                        logger.info("⏳ Transfer queued (will be processed) for chatId {}, userId: {}, message: {}", 
+                                request.getChatId(), userId, originalMessage);
+                    }
+                    
                     // If message indicates failure (e.g., contains error keywords), treat as failure
-                    if (message.contains("error") || message.contains("fail") || message.contains("insufficient") 
-                            || message.contains("out of money") || message.contains("not enough")) {
-                        String errorMsg = messageObj.toString();
+                    if (!isQueuedOperation && (message.contains("error") || message.contains("fail") || message.contains("insufficient") 
+                            || message.contains("out of money") || message.contains("not enough"))) {
+                        String errorMsg = originalMessage;
                         logger.error("❌ Transfer failed despite success=true for chatId {}, userId: {}, message: {}", 
                                 request.getChatId(), userId, errorMsg);
                         adminLogBotService.sendToAdmins("❌ Transfer xatosi (success=true but error message): " + errorMsg);
                         return null;
                     }
+                }
+                
+                if (isQueuedOperation) {
+                    logger.info("✅ Transfer queued successfully for chatId {}, userId: {}, amount: {}, platform: {}. Operation will be processed.",
+                            request.getChatId(), userId, amount, platformName);
+                    
+                    // For queued operations, try to get balance but don't fail if it's not available yet
+                    BalanceLimit balanceLimit = null;
+                    try {
+                        balanceLimit = getCashdeskBalance(hash, cashierPass, cashdeskId);
+                    } catch (Exception e) {
+                        logger.warn("⚠️ Balance retrieval failed for queued operation (chatId: {}, userId: {}), but operation is queued and will be processed: {}", 
+                                request.getChatId(), userId, e.getMessage());
+                    }
+                    
+                    // Return a valid BalanceLimit even if balance retrieval failed (queued operations will process)
+                    if (balanceLimit == null) {
+                        // Return a placeholder balance limit for queued operations
+                        balanceLimit = new BalanceLimit(BigDecimal.ZERO, BigDecimal.ZERO);
+                    }
+                    
+                    return balanceLimit;
                 }
                 
                 logger.info("✅ Transfer successful for chatId {}, userId: {}, amount: {}, platform: {}",
