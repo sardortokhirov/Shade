@@ -211,8 +211,19 @@ public class UserService {
         List<String> platformsUsed = hizmatRequestRepository.findDistinctPlatformsByChatId(chatId);
         
         // Get limit information (using read-only methods to avoid creating stats in read-only transaction)
-        BigDecimal permanentLimitIncreaseBD = userLimitIncreaseService.getPermanentLimitIncrease(chatId);
+        // Fetch UserLimitIncrease entity directly to get all database information
+        Optional<com.example.shade.model.UserLimitIncrease> userLimitIncreaseOpt = 
+                userLimitIncreaseRepository.findByChatId(chatId);
+        BigDecimal permanentLimitIncreaseBD = userLimitIncreaseOpt
+                .map(com.example.shade.model.UserLimitIncrease::getAccumulatedLimitIncrease)
+                .orElse(BigDecimal.ZERO);
         Long permanentLimitIncrease = permanentLimitIncreaseBD.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
+        // Format with 8 decimal places
+        String permanentLimitIncreaseFormatted = permanentLimitIncreaseBD.setScale(8, java.math.RoundingMode.HALF_UP).toPlainString();
+        LocalDateTime permanentLimitLastUpdated = userLimitIncreaseOpt
+                .map(com.example.shade.model.UserLimitIncrease::getLastUpdated)
+                .orElse(null);
+        
         Long effectiveDailyLimit = dailyStatsService.getEffectiveDailyLimitReadOnly(chatId);
         Long availableLimit = dailyStatsService.getAvailableLimitReadOnly(chatId);
         
@@ -225,7 +236,9 @@ public class UserService {
         Long dailyTopUpAmount = dailyStatsOpt.map(DailyUserStats::getDailyTopUpAmount).orElse(0L);
         Long dailyTransferAmount = dailyStatsOpt.map(DailyUserStats::getDailyTransferAmount).orElse(0L);
         Long dailyLimitIncrease = dailyStatsOpt.map(DailyUserStats::getDailyLimitIncrease).orElse(0L);
-        LocalDateTime lastUpdated = dailyStatsOpt.map(DailyUserStats::getLastUpdated).orElse(null);
+        LocalDate dailyStatsDate = dailyStatsOpt.map(DailyUserStats::getDate).orElse(null);
+        LocalDateTime dailyStatsLastUpdated = dailyStatsOpt.map(DailyUserStats::getLastUpdated).orElse(null);
+        LocalDateTime lastUpdated = dailyStatsLastUpdated; // Keep for backward compatibility
         
         // Build detailed limit breakdown string
         String limitBreakdown = buildLimitBreakdown(baseDailyLimit, permanentLimitIncreaseBD, permanentLimitIncrease, 
@@ -241,12 +254,16 @@ public class UserService {
                 registeredAt,
                 permanentLimitIncrease,
                 permanentLimitIncreaseBD,
+                permanentLimitIncreaseFormatted,
+                permanentLimitLastUpdated,
                 effectiveDailyLimit,
                 availableLimit,
                 platformsUsed,
                 dailyTopUpAmount,
                 dailyTransferAmount,
                 dailyLimitIncrease,
+                dailyStatsDate,
+                dailyStatsLastUpdated,
                 lastLotteryPlayTime,
                 lastUpdated,
                 baseDailyLimit,
@@ -262,8 +279,8 @@ public class UserService {
             Long dailyTopUpAmount, Long dailyTransferAmount, Long availableLimit) {
         StringBuilder breakdown = new StringBuilder();
         breakdown.append("Base Daily Limit: ").append(String.format("%,d", baseDailyLimit)).append(" UZS\n");
-        breakdown.append("Permanent Increase: ").append(String.format("%,d", permanentLimitIncrease))
-                .append(" UZS (precise: ").append(permanentLimitIncreaseBD).append(")\n");
+        breakdown.append("Permanent Increase (rounded): ").append(String.format("%,d", permanentLimitIncrease)).append(" UZS\n");
+        breakdown.append("Permanent Increase (precise, 8 decimals): ").append(permanentLimitIncreaseBD.setScale(8, java.math.RoundingMode.HALF_UP).toPlainString()).append(" UZS\n");
         breakdown.append("Daily Limit Increase (from lottery): ").append(String.format("%,d", dailyLimitIncrease)).append(" UZS\n");
         breakdown.append("Effective Daily Limit: ").append(String.format("%,d", effectiveDailyLimit))
                 .append(" UZS (= ").append(baseDailyLimit).append(" + ").append(permanentLimitIncrease)
