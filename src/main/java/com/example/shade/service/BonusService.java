@@ -892,7 +892,7 @@ public class BonusService {
                     Long totalLimit = dailyStatsService.getEffectiveDailyLimit(request.getChatId());
                     Long availableLimit = dailyStatsService.getAvailableLimit(request.getChatId());
                     String message = String.format(
-                            "🆔: %d #Bonus tasdiqlandi ✅ \n\uD83C\uDF10 %s :  %s\n💰 Bonus: %,d so'm\n\uD83D\uDC64 Foydalanuvchi: `%d` \n\uD83D\uDCDE %s \n\n📊 Kunlik limit: %,d / %,d so'm\n 📅 [%s]",
+                            "🆔: %d #Bonus tasdiqlandi ✅ \n\uD83C\uDF10 %s :  %s\n💰 Bonus: %,d so'm\n\uD83D\uDC64 Foydalanuvchi: `%d` \n\uD83D\uDCDE %s \n\n📊 Limit: %,d / %,d so'm\n 📅 [%s]",
                             request.getId(), request.getPlatform(), request.getPlatformUserId(), request.getAmount(),
                             request.getChatId(), number, totalLimit, availableLimit,
                             LocalDateTime.now(ZoneId.of("GMT+5"))
@@ -909,7 +909,7 @@ public class BonusService {
                     Long availableLimit = dailyStatsService.getAvailableLimit(request.getChatId());
                     LocalDateTime timestamp = LocalDateTime.now(ZoneId.of("GMT+5"));
                     String message = String.format(
-                            "🆔: %d #Bonus tasdiqlandi ✅\n\uD83C\uDF10 %s :  %s\n💰 Bonus: %,d so'm\n Foydalanuvchi: `%d` \n \uD83D\uDCDE %s \n\n  \uD83C\uDFE6: %,d %s \n\n📊 Kunlik limit: %,d / %,d so'm\n 📅 [%s]",
+                            "🆔: %d #Bonus tasdiqlandi ✅\n\uD83C\uDF10 %s :  %s\n💰 Bonus: %,d so'm\n Foydalanuvchi: `%d` \n \uD83D\uDCDE %s \n\n  \uD83C\uDFE6: %,d %s \n\n📊 Limit: %,d / %,d so'm\n 📅 [%s]",
                             request.getId(), request.getPlatform(), request.getPlatformUserId(), request.getAmount(),
                             request.getChatId(), number, transferSuccessful.getLimit().longValue(),
                             platformData.getCurrency().toString(), totalLimit, availableLimit,
@@ -1000,7 +1000,7 @@ public class BonusService {
                         Long totalLimit = dailyStatsService.getEffectiveDailyLimit(request.getChatId());
                         Long availableLimit = dailyStatsService.getAvailableLimit(request.getChatId());
                         String message = String.format(
-                                "🆔: %d #Bonus tasdiqlandi ✅ \n\uD83C\uDF10 %s :  %s\n💰 Bonus: %,d so'm\n\uD83D\uDC64 Foydalanuvchi: `%d` \n\uD83D\uDCDE %s \n\n📊 Kunlik limit: %,d / %,d so'm\n 📅 [%s]",
+                                "🆔: %d #Bonus tasdiqlandi ✅ \n\uD83C\uDF10 %s :  %s\n💰 Bonus: %,d so'm\n\uD83D\uDC64 Foydalanuvchi: `%d` \n\uD83D\uDCDE %s \n\n📊 Limit: %,d / %,d so'm\n 📅 [%s]",
                                 request.getId(), request.getPlatform(), request.getPlatformUserId(),
                                 request.getAmount(), request.getChatId(), number, totalLimit, availableLimit,
                                 timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
@@ -1016,7 +1016,7 @@ public class BonusService {
                         Long totalLimit = dailyStatsService.getEffectiveDailyLimit(request.getChatId());
                         Long availableLimit = dailyStatsService.getAvailableLimit(request.getChatId());
                         String message = String.format(
-                                "🆔: %d #Bonus tasdiqlandi ✅\n\uD83C\uDF10 %s :  %s\n💰 Bonus: %,d so'm\n Foydalanuvchi: `%d` \n \uD83D\uDCDE %s \n\n  \uD83C\uDFE6: %,d %s \n\n📊 Kunlik limit: %,d / %,d so'm\n 📅 [%s]",
+                                "🆔: %d #Bonus tasdiqlandi ✅\n\uD83C\uDF10 %s :  %s\n💰 Bonus: %,d so'm\n Foydalanuvchi: `%d` \n \uD83D\uDCDE %s \n\n  \uD83C\uDFE6: %,d %s \n\n📊 Limit: %,d / %,d so'm\n 📅 [%s]",
                                 request.getId(), request.getPlatform(), request.getPlatformUserId(),
                                 request.getAmount(), request.getChatId(), number,
                                 cashdeskBalance.getLimit().longValue(), platformData.getCurrency().toString(),
@@ -1276,7 +1276,7 @@ public class BonusService {
                                 "🎫 O'ynalgan chiptalar: %s ta\n" +
                                 "💰 Jami yutuq: %s so'm\n" +
                                 "📈 Limit oshdi (bu o'yin): %,d so'm\n" +
-                                "📊 Jami kunlik limit oshishi: %,d so'm\n" +
+                                "📊 Jami limit oshishi: %,d so'm\n" +
                                 "💸 Yangi balans: %s so'm\n" +
                                 "📅 [%s]",
                         chatId, number, numberOfPlays, totalWinnings.longValue(), 

@@ -651,7 +651,7 @@ public class TopUpService {
                                 "\uD83D\uDCB3 Bizniki: `%s`\n" +
                                 "🎟️ Chiptalar: %d (+ %d )\n\n" +
                                 "\uD83C\uDFE6: %,d %s\n\n" +
-                                "📊 Kunlik limit: %,d / %,d so'm\n" +
+                                "📊 Limit: %,d / %,d so'm\n" +
                                 "📅 [%s]",
                         request.getId(),
                         chatId,
@@ -839,7 +839,7 @@ public class TopUpService {
                                 "💳 Karta: `%s`\n" +
                                 "🔐 Admin kartasi: `%s`\n" +
                                 "🎟️ Chiptalar: %d (+ %d )\n\n" +
-                                "📊 Kunlik limit: %,d / %,d so'm\n" +
+                                "📊 Limit: %,d / %,d so'm\n" +
                                 "📅 [%s] ",
                         request.getId(),
                         request.getChatId(), number,
@@ -864,7 +864,7 @@ public class TopUpService {
                                 "🔐 Admin kartasi: `%s`\n" +
                                 "🎟️ Chiptalar: %d (+ %d )\n\n" +
                                 "\uD83C\uDFE6: %,d %s\n\n" +
-                                "📊 Kunlik limit: %,d / %,d so'm\n" +
+                                "📊 Limit: %,d / %,d so'm\n" +
                                 "📅 [%s] ",
                         request.getId(),
                         request.getChatId(), number,
@@ -1004,7 +1004,7 @@ public class TopUpService {
                                 "💳 Karta: `%s`\n" +
                                 "🔐 Admin kartasi: `%s`\n" +
                                 "🎟️ Chiptalar: %d (+ %d )\n\n" +
-                                "📊 Kunlik limit: %,d / %,d so'm\n" +
+                                "📊 Limit: %,d / %,d so'm\n" +
                                 "📅 [%s] ",
                         request.getId(),
                         request.getChatId(), number,
@@ -1029,7 +1029,7 @@ public class TopUpService {
                                 "🔐 Admin kartasi: `%s`\n" +
                                 "🎟️ Chiptalar: %d (+ %d )\n\n" +
                                 "\uD83C\uDFE6: %,d %s\n\n" +
-                                "📊 Kunlik limit: %,d / %,d so'm\n" +
+                                "📊 Limit: %,d / %,d so'm\n" +
                                 "📅 [%s] ",
                         request.getId(),
                         request.getChatId(), number,
