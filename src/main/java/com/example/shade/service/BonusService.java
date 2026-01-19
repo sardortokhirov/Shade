@@ -62,6 +62,7 @@ public class BonusService {
     private final LotteryTicketBundleService bundleService;
     private final LotteryTicketPurchaseService purchaseService;
     private final LottoBotService lottoBotService;
+    private final UserLimitIncreaseService userLimitIncreaseService;
 
     @Lazy
     @Autowired
@@ -413,6 +414,25 @@ public class BonusService {
 
             // Update purchase time
             purchaseService.updatePurchaseTime(chatId);
+
+            // Send admin log for ticket purchase
+            String phoneNumber = blockedUserRepository.findByChatId(chatId)
+                    .map(blockedUser -> blockedUser.getPhoneNumber())
+                    .orElse("N/A");
+            LocalDateTime timestamp = LocalDateTime.now(ZoneId.of("GMT+5"));
+            String logMessage = String.format(
+                    "🎫 Chipta sotib olingan 🎫\n\n" +
+                    "👤 User ID: %d\n" +
+                    "📱 Telefon: %s\n" +
+                    "🎟 Sotib olingan chiptalar: %d ta\n" +
+                    "💰 Sarflangan summa: %,d so'm\n" +
+                    "💸 Qolgan balans: %,d so'm\n" +
+                    "🎫 Jami chiptalar: %d ta\n" +
+                    "📅 [%s]",
+                    chatId, phoneNumber, bundle.getTicketQuantity(), bundle.getPrice().longValue(),
+                    balance.getBalance().longValue(), balance.getTickets(),
+                    timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+            adminLogBotService.sendLog(logMessage);
 
             // Send success message
             messageSender.sendMessage(chatId,
@@ -1217,16 +1237,29 @@ public class BonusService {
             userBalanceRepository.save(balance);
 
             // Add lottery winnings percentage to daily limit increase
+            long limitIncreaseJustAdded = 0L;
             BigDecimal winningsPercentage = lotteryConfigService.getWinningsPercentage();
             if (winningsPercentage.compareTo(BigDecimal.ZERO) > 0 && totalWinnings.compareTo(BigDecimal.ZERO) > 0) {
                 BigDecimal limitIncrease = totalWinnings
                         .multiply(winningsPercentage)
                         .divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP);
                 if (limitIncrease.compareTo(BigDecimal.ZERO) > 0) {
-                    dailyStatsService.addLotteryWinningsLimitIncrease(chatId, limitIncrease.longValue());
+                    limitIncreaseJustAdded = limitIncrease.longValue();
+                    dailyStatsService.addLotteryWinningsLimitIncrease(chatId, limitIncreaseJustAdded);
                     logger.info("Added lottery winnings limit increase {} ({}% of {}) for chatId {}", 
-                            limitIncrease.longValue(), winningsPercentage, totalWinnings.longValue(), chatId);
+                            limitIncreaseJustAdded, winningsPercentage, totalWinnings.longValue(), chatId);
                 }
+            }
+
+            // Get total daily limit increase after this play
+            Long totalDailyLimitIncrease = 0L;
+            try {
+                Long effectiveDailyLimit = dailyStatsService.getEffectiveDailyLimitReadOnly(chatId);
+                Long baseLimit = configurationService.getDailyBonusTransferLimit();
+                Long permanentIncrease = userLimitIncreaseService.getPermanentLimitIncrease(chatId);
+                totalDailyLimitIncrease = effectiveDailyLimit - baseLimit - permanentIncrease;
+            } catch (Exception e) {
+                logger.warn("Failed to get total daily limit increase for chatId {}: {}", chatId, e.getMessage());
             }
 
             StringBuilder winningsLog = new StringBuilder();
@@ -1237,15 +1270,33 @@ public class BonusService {
             messageSender.sendMessage(chatId, winningsLog.toString());
 
             String number = blockedUserRepository.findByChatId(chatId).get().getPhoneNumber();
-            String adminLog = String.format(
-                    "Lotereya o'ynaldi 🎟\n" +
-                            "👤 User ID [%s] %s\n" +
-                            "🎫 O'ynalgan chiptalar: %s ta\n" +
-                            "💰 Jami yutuq: %s so'm\n" +
-                            "💸 Yangi balans: %s so'm\n" +
-                            "📅 [%s]",
-                    chatId, number, numberOfPlays, totalWinnings.longValue(), balance.getBalance().longValue(),
-                    LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+            LocalDateTime timestamp = LocalDateTime.now(ZoneId.of("GMT+5"));
+            String adminLog;
+            if (limitIncreaseJustAdded > 0) {
+                adminLog = String.format(
+                        "Lotereya o'ynaldi 🎟\n" +
+                                "👤 User ID [%s] %s\n" +
+                                "🎫 O'ynalgan chiptalar: %s ta\n" +
+                                "💰 Jami yutuq: %s so'm\n" +
+                                "📈 Limit oshdi (bu o'yin): %,d so'm\n" +
+                                "📊 Jami kunlik limit oshishi: %,d so'm\n" +
+                                "💸 Yangi balans: %s so'm\n" +
+                                "📅 [%s]",
+                        chatId, number, numberOfPlays, totalWinnings.longValue(), 
+                        limitIncreaseJustAdded, totalDailyLimitIncrease,
+                        balance.getBalance().longValue(),
+                        timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+            } else {
+                adminLog = String.format(
+                        "Lotereya o'ynaldi 🎟\n" +
+                                "👤 User ID [%s] %s\n" +
+                                "🎫 O'ynalgan chiptalar: %s ta\n" +
+                                "💰 Jami yutuq: %s so'm\n" +
+                                "💸 Yangi balans: %s so'm\n" +
+                                "📅 [%s]",
+                        chatId, number, numberOfPlays, totalWinnings.longValue(), balance.getBalance().longValue(),
+                        timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+            }
             adminLogBotService.sendLog(adminLog);
 
             sendLotteryMenu(chatId);
