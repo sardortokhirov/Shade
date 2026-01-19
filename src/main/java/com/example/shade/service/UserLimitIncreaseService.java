@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 
@@ -21,10 +22,10 @@ public class UserLimitIncreaseService {
     /**
      * Get accumulated permanent limit increase for a user
      */
-    public Long getPermanentLimitIncrease(Long chatId) {
+    public BigDecimal getPermanentLimitIncrease(Long chatId) {
         return repository.findByChatId(chatId)
                 .map(UserLimitIncrease::getAccumulatedLimitIncrease)
-                .orElse(0L);
+                .orElse(BigDecimal.ZERO);
     }
 
     /**
@@ -32,14 +33,14 @@ public class UserLimitIncreaseService {
      * This method only adds to the limit - it never decreases it
      */
     @Transactional
-    public void addPermanentLimitIncrease(Long chatId, Long amount) {
-        if (amount == null || amount < 0) {
+    public void addPermanentLimitIncrease(Long chatId, BigDecimal amount) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) < 0) {
             throw new IllegalArgumentException("Amount to add must be non-negative");
         }
         
         UserLimitIncrease limitIncrease = getOrCreate(chatId);
-        Long oldLimit = limitIncrease.getAccumulatedLimitIncrease();
-        Long newLimit = oldLimit + amount;
+        BigDecimal oldLimit = limitIncrease.getAccumulatedLimitIncrease();
+        BigDecimal newLimit = oldLimit.add(amount);
         
         limitIncrease.setAccumulatedLimitIncrease(newLimit);
         limitIncrease.setLastUpdated(LocalDateTime.now(GMT_PLUS_5));
@@ -66,9 +67,9 @@ public class UserLimitIncreaseService {
         }
         
         UserLimitIncrease limitIncrease = getOrCreate(chatId);
-        Long oldLimit = limitIncrease.getAccumulatedLimitIncrease();
+        BigDecimal oldLimit = limitIncrease.getAccumulatedLimitIncrease();
         
-        if (oldLimit == 0) {
+        if (oldLimit.compareTo(BigDecimal.ZERO) == 0) {
             logger.info("Reset limit requested for chatId {} but limit is already 0", chatId);
             return;
         }
@@ -76,7 +77,7 @@ public class UserLimitIncreaseService {
         logger.warn("RESETTING PERMANENT LIMIT - chatId: {}, old limit: {}, new limit: 0. " +
                 "This is a destructive operation.", chatId, oldLimit);
         
-        limitIncrease.setAccumulatedLimitIncrease(0L);
+        limitIncrease.setAccumulatedLimitIncrease(BigDecimal.ZERO);
         limitIncrease.setLastUpdated(LocalDateTime.now(GMT_PLUS_5));
         repository.save(limitIncrease);
         
@@ -93,7 +94,7 @@ public class UserLimitIncreaseService {
                 .orElseGet(() -> {
                     UserLimitIncrease newRecord = UserLimitIncrease.builder()
                             .chatId(chatId)
-                            .accumulatedLimitIncrease(0L)
+                            .accumulatedLimitIncrease(BigDecimal.ZERO)
                             .lastUpdated(LocalDateTime.now(GMT_PLUS_5))
                             .build();
                     return repository.save(newRecord);

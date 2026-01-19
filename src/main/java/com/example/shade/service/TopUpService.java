@@ -55,6 +55,7 @@ public class TopUpService {
     private final SystemConfigurationService configurationService;
     private final DailyStatsService dailyStatsService;
     private final UserPlatformPermissionRepository permissionRepository;
+    private final UserLimitIncreaseService userLimitIncreaseService;
 
     public void startTopUp(Long chatId) {
         logger.info("Starting top-up for chatId: {}", chatId);
@@ -825,7 +826,14 @@ public class TopUpService {
 
                 bonusService.creditReferral(request.getChatId(), request.getAmount());
 
+                // Get limit before top-up to calculate increase
+                java.math.BigDecimal limitBefore = userLimitIncreaseService.getPermanentLimitIncrease(request.getChatId());
+                
                 dailyStatsService.addTopUpAmount(request.getChatId(), request.getAmount());
+
+                // Get limit after top-up to calculate increase
+                java.math.BigDecimal limitAfter = userLimitIncreaseService.getPermanentLimitIncrease(request.getChatId());
+                long limitIncrease = limitAfter.subtract(limitBefore).setScale(0, java.math.RoundingMode.HALF_UP).longValue();
 
                 String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
                 Long totalLimit = dailyStatsService.getEffectiveDailyLimit(request.getChatId());
@@ -839,6 +847,7 @@ public class TopUpService {
                                 "💳 Karta: `%s`\n" +
                                 "🔐 Admin kartasi: `%s`\n" +
                                 "🎟️ Chiptalar: %d (+ %d )\n\n" +
+                                "📈 Limit oshdi: %,d so'm\n" +
                                 "📊 Limit: %,d / %,d so'm\n" +
                                 "📅 [%s] ",
                         request.getId(),
@@ -851,6 +860,7 @@ public class TopUpService {
                         adminCard.getCardNumber(),
                         balance.getTickets(),
                         tickets,
+                        limitIncrease,
                         totalLimit, availableLimit,
                         LocalDateTime.now(ZoneId.of("GMT+5"))
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
@@ -864,6 +874,7 @@ public class TopUpService {
                                 "🔐 Admin kartasi: `%s`\n" +
                                 "🎟️ Chiptalar: %d (+ %d )\n\n" +
                                 "\uD83C\uDFE6: %,d %s\n\n" +
+                                "📈 Limit oshdi: %,d so'm\n" +
                                 "📊 Limit: %,d / %,d so'm\n" +
                                 "📅 [%s] ",
                         request.getId(),
@@ -878,6 +889,7 @@ public class TopUpService {
                         tickets,
                         transferSuccessful.getLimit().longValue(),
                         request.getCurrency().toString(),
+                        limitIncrease,
                         totalLimit, availableLimit,
                         LocalDateTime.now(ZoneId.of("GMT+5"))
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
@@ -990,7 +1002,14 @@ public class TopUpService {
 
                 bonusService.creditReferral(request.getChatId(), request.getAmount());
 
+                // Get limit before top-up to calculate increase
+                java.math.BigDecimal limitBefore = userLimitIncreaseService.getPermanentLimitIncrease(request.getChatId());
+                
                 dailyStatsService.addTopUpAmount(request.getChatId(), request.getAmount());
+
+                // Get limit after top-up to calculate increase
+                java.math.BigDecimal limitAfter = userLimitIncreaseService.getPermanentLimitIncrease(request.getChatId());
+                long limitIncrease = limitAfter.subtract(limitBefore).setScale(0, java.math.RoundingMode.HALF_UP).longValue();
 
                 String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
                 Long totalLimit = dailyStatsService.getEffectiveDailyLimit(request.getChatId());
@@ -1004,6 +1023,7 @@ public class TopUpService {
                                 "💳 Karta: `%s`\n" +
                                 "🔐 Admin kartasi: `%s`\n" +
                                 "🎟️ Chiptalar: %d (+ %d )\n\n" +
+                                "📈 Limit oshdi: %,d so'm\n" +
                                 "📊 Limit: %,d / %,d so'm\n" +
                                 "📅 [%s] ",
                         request.getId(),
@@ -1016,6 +1036,7 @@ public class TopUpService {
                         adminCard.getCardNumber(),
                         balance.getTickets(),
                         tickets,
+                        limitIncrease,
                         totalLimit, availableLimit,
                         LocalDateTime.now(ZoneId.of("GMT+5"))
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
@@ -1029,6 +1050,7 @@ public class TopUpService {
                                 "🔐 Admin kartasi: `%s`\n" +
                                 "🎟️ Chiptalar: %d (+ %d )\n\n" +
                                 "\uD83C\uDFE6: %,d %s\n\n" +
+                                "📈 Limit oshdi: %,d so'm\n" +
                                 "📊 Limit: %,d / %,d so'm\n" +
                                 "📅 [%s] ",
                         request.getId(),
@@ -1043,6 +1065,7 @@ public class TopUpService {
                         tickets,
                         transferSuccessful.getLimit().longValue(),
                         request.getCurrency().toString(),
+                        limitIncrease,
                         totalLimit, availableLimit,
                         LocalDateTime.now(ZoneId.of("GMT+5"))
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));

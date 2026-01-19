@@ -1253,8 +1253,9 @@ public class BonusService {
             try {
                 Long effectiveDailyLimit = dailyStatsService.getEffectiveDailyLimitReadOnly(chatId);
                 Long baseLimit = configurationService.getDailyBonusTransferLimit();
-                Long permanentIncrease = userLimitIncreaseService.getPermanentLimitIncrease(chatId);
-                totalDailyLimitIncrease = effectiveDailyLimit - baseLimit - permanentIncrease;
+                BigDecimal permanentIncrease = userLimitIncreaseService.getPermanentLimitIncrease(chatId);
+                Long permanentIncreaseLong = permanentIncrease.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
+                totalDailyLimitIncrease = effectiveDailyLimit - baseLimit - permanentIncreaseLong;
             } catch (Exception e) {
                 logger.warn("Failed to get total daily limit increase for chatId {}: {}", chatId, e.getMessage());
             }

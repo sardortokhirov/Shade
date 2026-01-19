@@ -133,7 +133,8 @@ public class UserService {
                 List<String> platformsUsed = hizmatRequestRepository.findDistinctPlatformsByChatId(chatId);
                 
                 // Get limit information (using read-only methods to avoid creating stats in read-only transaction)
-                Long permanentLimitIncrease = userLimitIncreaseService.getPermanentLimitIncrease(chatId);
+                BigDecimal permanentLimitIncreaseBD = userLimitIncreaseService.getPermanentLimitIncrease(chatId);
+                Long permanentLimitIncrease = permanentLimitIncreaseBD.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
                 Long effectiveDailyLimit = dailyStatsService.getEffectiveDailyLimitReadOnly(chatId);
                 Long availableLimit = dailyStatsService.getAvailableLimitReadOnly(chatId);
                 
@@ -208,7 +209,8 @@ public class UserService {
         List<String> platformsUsed = hizmatRequestRepository.findDistinctPlatformsByChatId(chatId);
         
         // Get limit information (using read-only methods to avoid creating stats in read-only transaction)
-        Long permanentLimitIncrease = userLimitIncreaseService.getPermanentLimitIncrease(chatId);
+        BigDecimal permanentLimitIncreaseBD = userLimitIncreaseService.getPermanentLimitIncrease(chatId);
+        Long permanentLimitIncrease = permanentLimitIncreaseBD.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
         Long effectiveDailyLimit = dailyStatsService.getEffectiveDailyLimitReadOnly(chatId);
         Long availableLimit = dailyStatsService.getAvailableLimitReadOnly(chatId);
         
@@ -334,7 +336,9 @@ public class UserService {
         }
         
         UserLimitIncrease limitIncrease = userLimitIncreaseService.getOrCreate(chatId);
-        Long oldLimit = limitIncrease.getAccumulatedLimitIncrease();
+        java.math.BigDecimal oldLimitBD = limitIncrease.getAccumulatedLimitIncrease();
+        Long oldLimit = oldLimitBD.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
+        java.math.BigDecimal newLimitBD = java.math.BigDecimal.valueOf(permanentLimitIncrease);
         
         // Validation: Prevent accidental reset to 0 when current limit > 0
         if (permanentLimitIncrease == 0 && oldLimit > 0) {
@@ -369,7 +373,7 @@ public class UserService {
                 changeType, chatId, oldLimit, permanentLimitIncrease, 
                 permanentLimitIncrease - oldLimit);
         
-        limitIncrease.setAccumulatedLimitIncrease(permanentLimitIncrease);
+        limitIncrease.setAccumulatedLimitIncrease(newLimitBD);
         limitIncrease.setLastUpdated(LocalDateTime.now());
         userLimitIncreaseRepository.save(limitIncrease);
         

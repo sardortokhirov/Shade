@@ -3,6 +3,7 @@ package com.example.shade.model;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -17,9 +18,9 @@ public class UserLimitIncrease {
     @Column(name = "chat_id", nullable = false)
     private Long chatId;
 
-    @Column(name = "accumulated_limit_increase", nullable = false)
+    @Column(name = "accumulated_limit_increase", nullable = false, precision = 20, scale = 8)
     @Builder.Default
-    private Long accumulatedLimitIncrease = 0L;
+    private BigDecimal accumulatedLimitIncrease = BigDecimal.ZERO;
 
     @Column(name = "last_updated", nullable = false)
     private LocalDateTime lastUpdated;
