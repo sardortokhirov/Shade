@@ -40,6 +40,9 @@ public class DailyUserStats {
     @Column(name = "daily_limit_increase", nullable = false)
     private Long dailyLimitIncrease = 0L;
 
+    @Column(name = "carryover_amount", nullable = false)
+    private Long carryoverAmount = 0L;
+
     @Column(name = "last_updated", nullable = false)
     private LocalDateTime lastUpdated;
 }

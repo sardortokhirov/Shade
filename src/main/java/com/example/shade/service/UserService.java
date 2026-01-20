@@ -603,6 +603,7 @@ public class UserService {
                 stats.getDailyTopUpAmount(),
                 stats.getDailyTransferAmount(),
                 stats.getDailyLimitIncrease(),
+                stats.getCarryoverAmount() != null ? stats.getCarryoverAmount() : 0L,
                 stats.getLastUpdated()
         );
     }

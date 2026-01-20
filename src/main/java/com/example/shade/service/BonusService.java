@@ -806,6 +806,7 @@ public class BonusService {
         balance.setBalance(balance.getBalance().subtract(new BigDecimal(amount.longValue())));
         userBalanceRepository.save(balance);
         dailyStatsService.subtractTopUpAmount(chatId, amount.longValue()); // Decrease deposit amount
+        dailyStatsService.addTransferAmount(chatId, amount.longValue()); // Increase transfer amount to decrease available limit
 
         request.setAmount(amount.longValue());
         request.setUniqueAmount(amount.longValue());
@@ -882,7 +883,7 @@ public class BonusService {
                 request.setStatus(RequestStatus.BONUS_APPROVED);
                 request.setTransactionId(UUID.randomUUID().toString());
                 requestRepository.save(request);
-                dailyStatsService.addTransferAmount(request.getChatId(), request.getAmount());
+                // Note: addTransferAmount() already called when request was created
                 // messageSender.animateAndDeleteMessages(request.getChatId(),
                 // sessionService.getMessageIds(request.getChatId()), "OPEN");
                 sessionService.clearMessageIds(request.getChatId());
@@ -986,7 +987,7 @@ public class BonusService {
                     request.setStatus(RequestStatus.BONUS_APPROVED);
                     request.setTransactionId(UUID.randomUUID().toString());
                     requestRepository.save(request);
-                    dailyStatsService.addTransferAmount(request.getChatId(), request.getAmount());
+                    // Note: addTransferAmount() already called when request was created
                     logger.info("✅ Platform transfer completed: chatId={}, userId={}, amount={}", request.getChatId(),
                             userId, amount);
                     // messageSender.animateAndDeleteMessages(request.getChatId(),

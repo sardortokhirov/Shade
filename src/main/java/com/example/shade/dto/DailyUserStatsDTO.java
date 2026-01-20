@@ -18,5 +18,6 @@ public class DailyUserStatsDTO {
     private Long dailyTopUpAmount;
     private Long dailyTransferAmount;
     private Long dailyLimitIncrease;
+    private Long carryoverAmount;
     private LocalDateTime lastUpdated;
 }
