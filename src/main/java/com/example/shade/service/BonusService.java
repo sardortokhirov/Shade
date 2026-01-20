@@ -274,9 +274,13 @@ public class BonusService {
         Long availableLimitSafe = availableLimit != null ? availableLimit : 0L;
         Long effectiveDailyLimitSafe = effectiveDailyLimit != null ? effectiveDailyLimit : 0L;
         
-        // Log values for debugging
-        logger.debug("Bonus menu for chatId {}: tickets={}, balance={}, availableLimit={}, effectiveDailyLimit={}", 
+        // Detailed logging for debugging
+        logger.info("Bonus menu calculation for chatId {}: tickets={}, balance={}, availableLimit={} (Foyadalanish mumkin), effectiveDailyLimit={} (Umumiy limit)", 
                 chatId, tickets, balanceValue, availableLimitSafe, effectiveDailyLimitSafe);
+        
+        // Verify parameter order matches message format
+        logger.debug("Bonus menu format parameters: 1.tickets={}, 2.balance={}, 3.availableLimit={}, 4.effectiveDailyLimit={}", 
+                tickets, balanceValue, availableLimitSafe, effectiveDailyLimitSafe);
         
         SendMessage message = new SendMessage();
         message.setChatId(chatId);

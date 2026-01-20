@@ -284,7 +284,13 @@ public class DailyStatsService {
         BigDecimal permanentIncrease = userLimitIncreaseService.getPermanentLimitIncrease(chatId);
         Long permanentIncreaseLong = permanentIncrease.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
         Long dailyLimitIncrease = stats.getDailyLimitIncrease() != null ? stats.getDailyLimitIncrease() : 0L;
-        return dailyLimit + permanentIncreaseLong + dailyLimitIncrease;
+        
+        Long result = dailyLimit + permanentIncreaseLong + dailyLimitIncrease;
+        
+        logger.debug("getEffectiveDailyLimit for chatId {}: dailyLimit={}, permanentIncrease={}, dailyLimitIncrease={}, result={}", 
+                chatId, dailyLimit, permanentIncreaseLong, dailyLimitIncrease, result);
+        
+        return result;
     }
 
     /**
