@@ -655,17 +655,13 @@ public class TopUpService {
                 Long totalLimit = dailyStatsService.getEffectiveDailyLimit(request.getChatId());
                 Long availableLimit = dailyStatsService.getAvailableLimit(request.getChatId());
                 String logMessageAdmin = String.format(
-                        "🆔: %d  To'lov yakunlandi ✅\n" +
-                                "👤: [%s] %s\n" +
-                                "🌐 #%s: " + "%s\n" +
-                                "💸 Miqdor: %,d UZS\n" +
-                                "💸 Miqdor: %,d RUB\n" +
-                                "💳 Karta: `%s`\n" +
-                                "\uD83D\uDCB3 Bizniki: `%s`\n" +
-                                "🎟️ Chiptalar: %d (+ %d )\n\n" +
-                                "\uD83C\uDFE6: %,d %s\n\n" +
-                                "📊 Limit: %,d / %,d so'm\n" +
-                                "📅 [%s]",
+                        "#%d Topup ✅\n" +
+                                "👤%d | ☎%s | 🌐%s:%s\n" +
+                                "💰%,d UZS | %,d RUB\n" +
+                                "💳%s → 🏦%s\n" +
+                                "🎫%d (+%d) | 🏦%,d %s\n" +
+                                "📊%s/%s\n" +
+                                "📅%s",
                         request.getId(),
                         chatId,
                         number,
@@ -679,7 +675,7 @@ public class TopUpService {
                         tickets,
                         transferSuccessful.getLimit().longValue(),
                         request.getCurrency().toString(),
-                        totalLimit, availableLimit,
+                        adminLogBotService.formatLimitK(totalLimit), adminLogBotService.formatLimitK(availableLimit),
                         LocalDateTime.now(ZoneId.of("GMT+5"))
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                 adminLogBotService.sendLog(logMessageAdmin);
@@ -894,18 +890,13 @@ public class TopUpService {
                         LocalDateTime.now(ZoneId.of("GMT+5"))
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                 String adminLogMessage = String.format(
-                        " 🆔: %d To'lov skrinshoti tasdiqlandi ✅\n" +
-                                "👤ID [%s] %s\n" +
-                                "🌐 #%s: " + "%s\n" +
-                                "💸 Miqdor: %,d UZS\n" +
-                                "💸 Miqdor: %,d RUB\n" +
-                                "💳 Karta: `%s`\n" +
-                                "🔐 Admin kartasi: `%s`\n" +
-                                "🎟️ Chiptalar: %d (+ %d )\n\n" +
-                                "\uD83C\uDFE6: %,d %s\n\n" +
-                                "📈 Limit oshdi: %,d so'm\n" +
-                                "📊 Limit: %,d / %,d so'm\n" +
-                                "📅 [%s] ",
+                        "#%d Topup ✅\n" +
+                                "👤%d | ☎%s | 🌐%s:%s\n" +
+                                "💰%,d UZS | %,d RUB\n" +
+                                "💳%s → 🏦%s\n" +
+                                "🎫%d (+%d) | 🏦%,d %s\n" +
+                                "📈+%,d | 📊%s/%s\n" +
+                                "📅%s",
                         request.getId(),
                         request.getChatId(), number,
                         request.getPlatform(),
@@ -919,7 +910,7 @@ public class TopUpService {
                         transferSuccessful.getLimit().longValue(),
                         request.getCurrency().toString(),
                         limitIncrease,
-                        totalLimit, availableLimit,
+                        adminLogBotService.formatLimitK(totalLimit), adminLogBotService.formatLimitK(availableLimit),
                         LocalDateTime.now(ZoneId.of("GMT+5"))
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
@@ -1087,18 +1078,13 @@ public class TopUpService {
                         LocalDateTime.now(ZoneId.of("GMT+5"))
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                 String adminLogMessage = String.format(
-                        " 🆔: %d To'lov skrinshoti tasdiqlandi ✅\n" +
-                                "👤ID [%s] %s\n" +
-                                "🌐 #%s: " + "%s\n" +
-                                "💸 Miqdor: %,d UZS\n" +
-                                "💸 Miqdor: %,d RUB\n" +
-                                "💳 Karta: `%s`\n" +
-                                "🔐 Admin kartasi: `%s`\n" +
-                                "🎟️ Chiptalar: %d (+ %d )\n\n" +
-                                "\uD83C\uDFE6: %,d %s\n\n" +
-                                "📈 Limit oshdi: %,d so'm\n" +
-                                "📊 Limit: %,d / %,d so'm\n" +
-                                "📅 [%s] ",
+                        "#%d Topup ✅\n" +
+                                "👤%d | ☎%s | 🌐%s:%s\n" +
+                                "💰%,d UZS | %,d RUB\n" +
+                                "💳%s → 🏦%s\n" +
+                                "🎫%d (+%d) | 🏦%,d %s\n" +
+                                "📈+%,d | 📊%s/%s\n" +
+                                "📅%s",
                         request.getId(),
                         request.getChatId(), number,
                         request.getPlatform(),
@@ -1112,7 +1098,7 @@ public class TopUpService {
                         transferSuccessful.getLimit().longValue(),
                         request.getCurrency().toString(),
                         limitIncrease,
-                        totalLimit, availableLimit,
+                        adminLogBotService.formatLimitK(totalLimit), adminLogBotService.formatLimitK(availableLimit),
                         LocalDateTime.now(ZoneId.of("GMT+5"))
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 

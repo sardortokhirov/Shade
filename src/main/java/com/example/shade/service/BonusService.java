@@ -272,17 +272,13 @@ public class BonusService {
         Optional<DailyUserStats> dailyStatsOpt = dailyUserStatsRepository.findByChatIdAndDate(chatId, today);
         Long dailyTransferAmount = dailyStatsOpt.map(DailyUserStats::getDailyTransferAmount).orElse(0L);
         
-        // Get tomorrow's permanent limit
-        Long tomorrowPermanentLimit = dailyStatsService.getTomorrowPermanentLimit(chatId);
-        
         SendMessage message = new SendMessage();
         message.setChatId(chatId);
         message.setText(String.format(languageSessionService.getTranslation(chatId, "message.bonus_menu"),
                 balance.getTickets(), 
                 balance.getBalance().longValue(), 
                 availableLimit,
-                dailyTransferAmount,
-                tomorrowPermanentLimit));
+                dailyTransferAmount));
         message.setReplyMarkup(createBonusMenuKeyboard(chatId));
         messageSender.sendMessage(message, chatId);
     }
@@ -946,10 +942,22 @@ public class BonusService {
                 if (transferSuccessful == null) {
                     Long totalLimit = dailyStatsService.getEffectiveDailyLimit(request.getChatId());
                     Long availableLimit = dailyStatsService.getAvailableLimit(request.getChatId());
+                    LocalDate today = LocalDate.now(ZoneId.of("GMT+5"));
+                    Optional<DailyUserStats> dailyStatsOpt = dailyUserStatsRepository.findByChatIdAndDate(request.getChatId(), today);
+                    Long dailyTransferAmount = dailyStatsOpt.map(DailyUserStats::getDailyTransferAmount).orElse(0L);
+                    BigDecimal permanentIncrease = userLimitIncreaseService.getPermanentLimitIncrease(request.getChatId());
+                    Long permanentLimitIncrease = permanentIncrease.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
+                    
                     String message = String.format(
-                            "🆔: %d #Bonus tasdiqlandi ✅ \n\uD83C\uDF10 %s :  %s\n💰 Bonus: %,d so'm\n\uD83D\uDC64 Foydalanuvchi: `%d` \n\uD83D\uDCDE %s \n\n📊 Limit: %,d / %,d so'm\n 📅 [%s]",
+                            "#%d Bonus ✅\n" +
+                                    "🌐%s:%s | 👤%d | ☎%s\n" +
+                                    "💰%,d UZS\n" +
+                                    "📊%s/%s | 📤%,d | 📈%,d\n" +
+                                    "📅%s",
                             request.getId(), request.getPlatform(), request.getPlatformUserId(), request.getAmount(),
-                            request.getChatId(), number, totalLimit, availableLimit,
+                            request.getChatId(), number, 
+                            adminLogBotService.formatLimitK(totalLimit), adminLogBotService.formatLimitK(availableLimit),
+                            dailyTransferAmount, permanentLimitIncrease,
                             LocalDateTime.now(ZoneId.of("GMT+5"))
                                     .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                     String bonusMessage = String.format(
@@ -963,11 +971,23 @@ public class BonusService {
                     Long totalLimit = dailyStatsService.getEffectiveDailyLimit(request.getChatId());
                     Long availableLimit = dailyStatsService.getAvailableLimit(request.getChatId());
                     LocalDateTime timestamp = LocalDateTime.now(ZoneId.of("GMT+5"));
+                    LocalDate today = LocalDate.now(ZoneId.of("GMT+5"));
+                    Optional<DailyUserStats> dailyStatsOpt = dailyUserStatsRepository.findByChatIdAndDate(request.getChatId(), today);
+                    Long dailyTransferAmount = dailyStatsOpt.map(DailyUserStats::getDailyTransferAmount).orElse(0L);
+                    BigDecimal permanentIncrease = userLimitIncreaseService.getPermanentLimitIncrease(request.getChatId());
+                    Long permanentLimitIncrease = permanentIncrease.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
+                    
                     String message = String.format(
-                            "🆔: %d #Bonus tasdiqlandi ✅\n\uD83C\uDF10 %s :  %s\n💰 Bonus: %,d so'm\n Foydalanuvchi: `%d` \n \uD83D\uDCDE %s \n\n  \uD83C\uDFE6: %,d %s \n\n📊 Limit: %,d / %,d so'm\n 📅 [%s]",
+                            "#%d Bonus ✅\n" +
+                                    "🌐%s:%s | 👤%d | ☎%s\n" +
+                                    "💰%,d UZS | 🏦%,d %s\n" +
+                                    "📊%s/%s | 📤%,d | 📈%,d\n" +
+                                    "📅%s",
                             request.getId(), request.getPlatform(), request.getPlatformUserId(), request.getAmount(),
                             request.getChatId(), number, transferSuccessful.getLimit().longValue(),
-                            platformData.getCurrency().toString(), totalLimit, availableLimit,
+                            platformData.getCurrency().toString(), 
+                            adminLogBotService.formatLimitK(totalLimit), adminLogBotService.formatLimitK(availableLimit),
+                            dailyTransferAmount, permanentLimitIncrease,
                             timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                     String bonusMessage = String.format(
                             languageSessionService.getTranslation(request.getChatId(), "message.bonus_approved"),
@@ -1054,10 +1074,22 @@ public class BonusService {
                     if (cashdeskBalance == null) {
                         Long totalLimit = dailyStatsService.getEffectiveDailyLimit(request.getChatId());
                         Long availableLimit = dailyStatsService.getAvailableLimit(request.getChatId());
+                        LocalDate today = LocalDate.now(ZoneId.of("GMT+5"));
+                        Optional<DailyUserStats> dailyStatsOpt = dailyUserStatsRepository.findByChatIdAndDate(request.getChatId(), today);
+                        Long dailyTransferAmount = dailyStatsOpt.map(DailyUserStats::getDailyTransferAmount).orElse(0L);
+                        BigDecimal permanentIncrease = userLimitIncreaseService.getPermanentLimitIncrease(request.getChatId());
+                        Long permanentLimitIncrease = permanentIncrease.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
+                        
                         String message = String.format(
-                                "🆔: %d #Bonus tasdiqlandi ✅ \n\uD83C\uDF10 %s :  %s\n💰 Bonus: %,d so'm\n\uD83D\uDC64 Foydalanuvchi: `%d` \n\uD83D\uDCDE %s \n\n📊 Limit: %,d / %,d so'm\n 📅 [%s]",
+                                "#%d Bonus ✅\n" +
+                                        "🌐%s:%s | 👤%d | ☎%s\n" +
+                                        "💰%,d UZS\n" +
+                                        "📊%s/%s | 📤%,d | 📈%,d\n" +
+                                        "📅%s",
                                 request.getId(), request.getPlatform(), request.getPlatformUserId(),
-                                request.getAmount(), request.getChatId(), number, totalLimit, availableLimit,
+                                request.getAmount(), request.getChatId(), number, 
+                                adminLogBotService.formatLimitK(totalLimit), adminLogBotService.formatLimitK(availableLimit),
+                                dailyTransferAmount, permanentLimitIncrease,
                                 timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                         String bonusMessage = String.format(
                                 languageSessionService.getTranslation(request.getChatId(), "message.bonus_approved"),
@@ -1070,12 +1102,23 @@ public class BonusService {
                     } else {
                         Long totalLimit = dailyStatsService.getEffectiveDailyLimit(request.getChatId());
                         Long availableLimit = dailyStatsService.getAvailableLimit(request.getChatId());
+                        LocalDate today = LocalDate.now(ZoneId.of("GMT+5"));
+                        Optional<DailyUserStats> dailyStatsOpt = dailyUserStatsRepository.findByChatIdAndDate(request.getChatId(), today);
+                        Long dailyTransferAmount = dailyStatsOpt.map(DailyUserStats::getDailyTransferAmount).orElse(0L);
+                        BigDecimal permanentIncrease = userLimitIncreaseService.getPermanentLimitIncrease(request.getChatId());
+                        Long permanentLimitIncrease = permanentIncrease.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
+                        
                         String message = String.format(
-                                "🆔: %d #Bonus tasdiqlandi ✅\n\uD83C\uDF10 %s :  %s\n💰 Bonus: %,d so'm\n Foydalanuvchi: `%d` \n \uD83D\uDCDE %s \n\n  \uD83C\uDFE6: %,d %s \n\n📊 Limit: %,d / %,d so'm\n 📅 [%s]",
+                                "#%d Bonus ✅\n" +
+                                        "🌐%s:%s | 👤%d | ☎%s\n" +
+                                        "💰%,d UZS | 🏦%,d %s\n" +
+                                        "📊%s/%s | 📤%,d | 📈%,d\n" +
+                                        "📅%s",
                                 request.getId(), request.getPlatform(), request.getPlatformUserId(),
                                 request.getAmount(), request.getChatId(), number,
                                 cashdeskBalance.getLimit().longValue(), platformData.getCurrency().toString(),
-                                totalLimit, availableLimit,
+                                adminLogBotService.formatLimitK(totalLimit), adminLogBotService.formatLimitK(availableLimit),
+                                dailyTransferAmount, permanentLimitIncrease,
                                 timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                         String bonusMessage = String.format(
                                 languageSessionService.getTranslation(request.getChatId(), "message.bonus_approved"),
@@ -1119,13 +1162,11 @@ public class BonusService {
                 .multiply(latest.getUzsToRub())
                 .longValue() / 1000;
         String errorLogMessage = String.format(
-                "🆔: %d \n Transfer xatosi ❌\n" +
-                        "👤 User ID [%s] %s\n" +
-                        "🌐 %s: " + "%s\n" +
-                        "💸 Miqdor: %,d UZS\n" +
-                        "💸 Miqdor: %,d RUB\n" +
-                        "💳 Karta: `%s`\n" +
-                        "📅 [%s] ",
+                "#%d Transfer ❌\n" +
+                        "👤%d | ☎%s | 🌐%s:%s\n" +
+                        "💰%,d UZS | %,d RUB\n" +
+                        "💳%s\n" +
+                        "📅%s",
                 request.getId(),
                 request.getChatId(), number, request.getPlatform(), request.getPlatformUserId(),
                 request.getUniqueAmount(), rubAmount, request.getCardNumber(),

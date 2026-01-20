@@ -199,13 +199,11 @@ public class WithdrawService {
             requestRepository.save(request);
 
             String logMessage = String.format(
-                    "\uD83C\uDD94: %s Pul yechib olish tasdiqlandi ✅\n" +
-                            "👤 [%s] %s\n" +
-                            "🌐 %s: %s\n" +
-                            "💳 Karta: `%s`\n" +
-                            "🔑 Kod: %s\n" +
-                            "💵 Tushgan: %,d\n" +
-                            "📅 [%s]",
+                    "#%d Withdraw ✅\n" +
+                            "👤%d | ☎%s | 🌐%s:%s\n" +
+                            "💳%s | 🔑%s\n" +
+                            "💵%,d UZS\n" +
+                            "📅%s",
                     request.getId(),
                     chatId, number,
                     platform, userId,
@@ -227,13 +225,10 @@ public class WithdrawService {
             requestRepository.save(request);
 
             String logMessage = String.format(
-                    "Pul \n\n 📋 \uD83C\uDD94: %s  Pul yechib olish rad etildi ❌\n" +
-                            "👤 User ID [%s] %s\n" +
-                            "🌐 %s: %s\n" +
-                            "💵 Berish: %s\n" +
-                            "💳 Karta: `%s`\n" +
-                            "🔑 Kod: %s\n" +
-                            "📅 [%s]",
+                    "#%d Withdraw ❌\n" +
+                            "👤%d | ☎%s | 🌐%s:%s\n" +
+                            "💵%,d UZS | 💳%s | 🔑%s\n" +
+                            "📅%s",
                     request.getId(), chatId, number, platform, userId,
                     request.getUniqueAmount(), cardNumber, code,
                     LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
@@ -671,15 +666,11 @@ public class WithdrawService {
                     .replace("-", "\\-");
 
             String logMessage = String.format(
-                    "*#Pul yechish so'rovi \uD83D\uDCB8*\n\n" +
-                            "\uD83C\uDD94: `%d`\n" +
-                            "👤: [%s]\n" +
-                            "📞: `%s`\n" +
-                            "🌐 *#%s:* `%s`\n" +
-                            "💳 *Karta:* `%s`\n" +
-                            "🔑 *Kod:* `%s`\n" +
-                            "💵 *Berish:* `%s`\n" +
-                            "📅 *%s*",
+                    "*#%d Withdraw \uD83D\uDCB8*\n" +
+                            "*👤%s | ☎%s | 🌐%s:%s*\n" +
+                            "*💳%s | 🔑%s*\n" +
+                            "*💵%s UZS*\n" +
+                            "*📅%s*",
                     request.getId(),
                     chatId.toString(), escapeMarkdown(number),
                     escapeMarkdown(platform),

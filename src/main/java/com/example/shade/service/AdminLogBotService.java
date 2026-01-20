@@ -59,6 +59,7 @@ public class AdminLogBotService {
                         .longValue() / 1000;
         // Format log message as photo caption
         String number = blockedUserRepository.findByChatId(userChatId).get().getPhoneNumber();
+        String adminCardNum = request.getAdminCardId() != null ? adminCardRepository.findById(request.getAdminCardId()).map(AdminCard::getCardNumber).orElse("N/A") : "N/A";
 
         String logMessage = String.format(
                 "\uD83C\uDD94: %d To‘lov skrinshoti keldi 📷\n" +
@@ -70,9 +71,8 @@ public class AdminLogBotService {
                         "\uD83D\uDCB3 Bizniki: `%s`\n" +
                         "📅 [%s]",
                 request.getId(),
-                userChatId, number,  request.getPlatform(), request.getPlatformUserId(),
-                request.getUniqueAmount(), rubAmount, request.getCardNumber(),
-                request.getAdminCardId() != null ? adminCardRepository.findById(request.getAdminCardId()).map(AdminCard::getCardNumber).orElse("N/A") : "N/A",
+                userChatId, number, request.getPlatform(), request.getPlatformUserId(),
+                request.getUniqueAmount(), rubAmount, request.getCardNumber(), adminCardNum,
                 LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
         // Set log message as photo caption
@@ -252,5 +252,21 @@ public class AdminLogBotService {
         button.setText(text);
         button.setCallbackData(callback);
         return button;
+    }
+
+    /**
+     * Formats large numbers in thousands (k) or millions (M) notation
+     * Example: 150000 -> "150k", 1500000 -> "1.5M"
+     */
+    String formatLimitK(Long value) {
+        if (value == null || value == 0) {
+            return "0";
+        }
+        if (value >= 1000000) {
+            return String.format("%.1fM", value / 1000000.0);
+        } else if (value >= 1000) {
+            return String.format("%dk", value / 1000);
+        }
+        return String.valueOf(value);
     }
 }
