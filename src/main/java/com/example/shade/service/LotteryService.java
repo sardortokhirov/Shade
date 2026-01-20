@@ -47,12 +47,27 @@ public class LotteryService {
     private final SystemConfigurationService configurationService;
 
     public void awardTickets(Long chatId, Long amount) {
-        UserBalance balance = userBalanceRepository.findById(chatId)
-                .orElse(UserBalance.builder()
-                        .chatId(chatId)
-                        .tickets(0L)
-                        .balance(BigDecimal.ZERO)
-                        .build());
+        Optional<UserBalance> balanceOpt = userBalanceRepository.findById(chatId);
+        UserBalance balance;
+        if (balanceOpt.isPresent()) {
+            balance = balanceOpt.get();
+        } else {
+            // Double-check it doesn't exist (prevent race condition)
+            if (userBalanceRepository.existsById(chatId)) {
+                // Entity exists but findById returned empty - fetch again
+                balance = userBalanceRepository.findById(chatId)
+                    .orElseThrow(() -> new IllegalStateException("UserBalance exists but not accessible for chatId: " + chatId));
+            } else {
+                // Truly doesn't exist - safe to create
+                balance = UserBalance.builder()
+                    .chatId(chatId)
+                    .tickets(0L)
+                    .balance(BigDecimal.ZERO)
+                    .build();
+                balance = userBalanceRepository.save(balance);
+                logger.info("Created new UserBalance for chatId {}", chatId);
+            }
+        }
         Long tickets = amount;
         balance.setTickets(balance.getTickets() + tickets);
         userBalanceRepository.save(balance);

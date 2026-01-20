@@ -377,11 +377,7 @@ public class UserService {
         }
         
         UserBalance userBalance = userBalanceRepository.findById(chatId)
-                .orElse(UserBalance.builder()
-                        .chatId(chatId)
-                        .tickets(0L)
-                        .balance(BigDecimal.ZERO)
-                        .build());
+                .orElseThrow(() -> new IllegalStateException("UserBalance not found for chatId: " + chatId + ". Cannot update non-existent balance."));
         
         BigDecimal oldBalance = userBalance.getBalance();
         userBalance.setBalance(balance);
@@ -398,11 +394,7 @@ public class UserService {
         }
         
         UserBalance userBalance = userBalanceRepository.findById(chatId)
-                .orElse(UserBalance.builder()
-                        .chatId(chatId)
-                        .tickets(0L)
-                        .balance(BigDecimal.ZERO)
-                        .build());
+                .orElseThrow(() -> new IllegalStateException("UserBalance not found for chatId: " + chatId + ". Cannot update non-existent tickets."));
         
         Long oldTickets = userBalance.getTickets();
         userBalance.setTickets(tickets);

@@ -599,15 +599,27 @@ public class TopUpService {
                 transferSuccessful = transferToPlatform(request, adminCard);
             }
             if (transferSuccessful != null) {
-                UserBalance balance = userBalanceRepository.findById(chatId)
-                        .orElseGet(() -> {
-                            UserBalance newBalance = UserBalance.builder()
-                                    .chatId(request.getChatId())
-                                    .tickets(0L)
-                                    .balance(BigDecimal.ZERO)
-                                    .build();
-                            return userBalanceRepository.save(newBalance);
-                        });
+                Optional<UserBalance> balanceOpt = userBalanceRepository.findById(chatId);
+                UserBalance balance;
+                if (balanceOpt.isPresent()) {
+                    balance = balanceOpt.get();
+                } else {
+                    // Double-check it doesn't exist (prevent race condition)
+                    if (userBalanceRepository.existsById(chatId)) {
+                        // Entity exists but findById returned empty - fetch again
+                        balance = userBalanceRepository.findById(chatId)
+                            .orElseThrow(() -> new IllegalStateException("UserBalance exists but not accessible for chatId: " + chatId));
+                    } else {
+                        // Truly doesn't exist - safe to create
+                        balance = UserBalance.builder()
+                            .chatId(request.getChatId())
+                            .tickets(0L)
+                            .balance(BigDecimal.ZERO)
+                            .build();
+                        balance = userBalanceRepository.save(balance);
+                        logger.info("Created new UserBalance for chatId {}", chatId);
+                    }
+                }
                 long ticketCalculationAmount = configurationService.getTicketCalculationAmount();
                 long tickets = request.getAmount() / ticketCalculationAmount;
                 if (tickets > 0) {
@@ -809,15 +821,27 @@ public class TopUpService {
                 transferSuccessful = transferToPlatform(request, adminCard);
             }
             if (transferSuccessful != null) {
-                UserBalance balance = userBalanceRepository.findById(request.getChatId())
-                        .orElseGet(() -> {
-                            UserBalance newBalance = UserBalance.builder()
-                                    .chatId(request.getChatId())
-                                    .tickets(0L)
-                                    .balance(BigDecimal.ZERO)
-                                    .build();
-                            return userBalanceRepository.save(newBalance);
-                        });
+                Optional<UserBalance> balanceOpt = userBalanceRepository.findById(request.getChatId());
+                UserBalance balance;
+                if (balanceOpt.isPresent()) {
+                    balance = balanceOpt.get();
+                } else {
+                    // Double-check it doesn't exist (prevent race condition)
+                    if (userBalanceRepository.existsById(request.getChatId())) {
+                        // Entity exists but findById returned empty - fetch again
+                        balance = userBalanceRepository.findById(request.getChatId())
+                            .orElseThrow(() -> new IllegalStateException("UserBalance exists but not accessible for chatId: " + request.getChatId()));
+                    } else {
+                        // Truly doesn't exist - safe to create
+                        balance = UserBalance.builder()
+                            .chatId(request.getChatId())
+                            .tickets(0L)
+                            .balance(BigDecimal.ZERO)
+                            .build();
+                        balance = userBalanceRepository.save(balance);
+                        logger.info("Created new UserBalance for chatId {}", request.getChatId());
+                    }
+                }
                 long ticketCalculationAmount = configurationService.getTicketCalculationAmount();
                 long tickets = request.getAmount() / ticketCalculationAmount;
                 if (tickets > 0) {
@@ -990,15 +1014,27 @@ public class TopUpService {
                 transferSuccessful = transferToPlatform(request, adminCard);
             }
             if (transferSuccessful != null) {
-                UserBalance balance = userBalanceRepository.findById(requestId)
-                        .orElseGet(() -> {
-                            UserBalance newBalance = UserBalance.builder()
-                                    .chatId(request.getChatId())
-                                    .tickets(0L)
-                                    .balance(BigDecimal.ZERO)
-                                    .build();
-                            return userBalanceRepository.save(newBalance);
-                        });
+                Optional<UserBalance> balanceOpt = userBalanceRepository.findById(requestId);
+                UserBalance balance;
+                if (balanceOpt.isPresent()) {
+                    balance = balanceOpt.get();
+                } else {
+                    // Double-check it doesn't exist (prevent race condition)
+                    if (userBalanceRepository.existsById(requestId)) {
+                        // Entity exists but findById returned empty - fetch again
+                        balance = userBalanceRepository.findById(requestId)
+                            .orElseThrow(() -> new IllegalStateException("UserBalance exists but not accessible for chatId: " + requestId));
+                    } else {
+                        // Truly doesn't exist - safe to create
+                        balance = UserBalance.builder()
+                            .chatId(request.getChatId())
+                            .tickets(0L)
+                            .balance(BigDecimal.ZERO)
+                            .build();
+                        balance = userBalanceRepository.save(balance);
+                        logger.info("Created new UserBalance for chatId {}", requestId);
+                    }
+                }
                 long ticketCalculationAmount = configurationService.getTicketCalculationAmount();
                 long tickets = request.getAmount() / ticketCalculationAmount;
                 if (tickets > 0) {

@@ -780,8 +780,27 @@ public class BonusService {
         String fullName = sessionService.getUserData(chatId, "fullName");
 
         BigDecimal amount = new BigDecimal(amountStr);
-        UserBalance balance = userBalanceRepository.findById(chatId)
-                .orElse(UserBalance.builder().chatId(chatId).tickets(0L).balance(BigDecimal.ZERO).build());
+        Optional<UserBalance> balanceOpt = userBalanceRepository.findById(chatId);
+        UserBalance balance;
+        if (balanceOpt.isPresent()) {
+            balance = balanceOpt.get();
+        } else {
+            // Double-check it doesn't exist (prevent race condition)
+            if (userBalanceRepository.existsById(chatId)) {
+                // Entity exists but findById returned empty - fetch again
+                balance = userBalanceRepository.findById(chatId)
+                    .orElseThrow(() -> new IllegalStateException("UserBalance exists but not accessible for chatId: " + chatId));
+            } else {
+                // Truly doesn't exist - safe to create
+                balance = UserBalance.builder()
+                    .chatId(chatId)
+                    .tickets(0L)
+                    .balance(BigDecimal.ZERO)
+                    .build();
+                balance = userBalanceRepository.save(balance);
+                logger.info("Created new UserBalance for chatId {}", chatId);
+            }
+        }
 
         if (balance.getBalance().compareTo(amount) < 0) {
             logger.warn("Insufficient balance for chatId {}: requested {}, available {}", chatId, amount,
@@ -1098,8 +1117,27 @@ public class BonusService {
         requestRepository.save(request);
 
         // Refund balance and daily limit
-        UserBalance balance = userBalanceRepository.findById(request.getChatId())
-                .orElse(UserBalance.builder().chatId(request.getChatId()).tickets(0L).balance(BigDecimal.ZERO).build());
+        Optional<UserBalance> balanceOpt = userBalanceRepository.findById(request.getChatId());
+        UserBalance balance;
+        if (balanceOpt.isPresent()) {
+            balance = balanceOpt.get();
+        } else {
+            // Double-check it doesn't exist (prevent race condition)
+            if (userBalanceRepository.existsById(request.getChatId())) {
+                // Entity exists but findById returned empty - fetch again
+                balance = userBalanceRepository.findById(request.getChatId())
+                    .orElseThrow(() -> new IllegalStateException("UserBalance exists but not accessible for chatId: " + request.getChatId()));
+            } else {
+                // Truly doesn't exist - safe to create
+                balance = UserBalance.builder()
+                    .chatId(request.getChatId())
+                    .tickets(0L)
+                    .balance(BigDecimal.ZERO)
+                    .build();
+                balance = userBalanceRepository.save(balance);
+                logger.info("Created new UserBalance for chatId {}", request.getChatId());
+            }
+        }
         balance.setBalance(balance.getBalance().add(BigDecimal.valueOf(request.getAmount())));
         userBalanceRepository.save(balance);
 
@@ -1138,8 +1176,27 @@ public class BonusService {
                     languageSessionService.getTranslation(chatId, "message.no_admin_permission"));
             return;
         }
-        UserBalance balance = userBalanceRepository.findById(userChatId)
-                .orElse(UserBalance.builder().chatId(userChatId).tickets(0L).balance(BigDecimal.ZERO).build());
+        Optional<UserBalance> balanceOpt = userBalanceRepository.findById(userChatId);
+        UserBalance balance;
+        if (balanceOpt.isPresent()) {
+            balance = balanceOpt.get();
+        } else {
+            // Double-check it doesn't exist (prevent race condition)
+            if (userBalanceRepository.existsById(userChatId)) {
+                // Entity exists but findById returned empty - fetch again
+                balance = userBalanceRepository.findById(userChatId)
+                    .orElseThrow(() -> new IllegalStateException("UserBalance exists but not accessible for chatId: " + userChatId));
+            } else {
+                // Truly doesn't exist - safe to create
+                balance = UserBalance.builder()
+                    .chatId(userChatId)
+                    .tickets(0L)
+                    .balance(BigDecimal.ZERO)
+                    .build();
+                balance = userBalanceRepository.save(balance);
+                logger.info("Created new UserBalance for chatId {}", userChatId);
+            }
+        }
         balance.setTickets(0L);
         userBalanceRepository.save(balance);
 
@@ -1155,8 +1212,27 @@ public class BonusService {
                     languageSessionService.getTranslation(chatId, "message.no_admin_permission"));
             return;
         }
-        UserBalance balance = userBalanceRepository.findById(userChatId)
-                .orElse(UserBalance.builder().chatId(userChatId).tickets(0L).balance(BigDecimal.ZERO).build());
+        Optional<UserBalance> balanceOpt = userBalanceRepository.findById(userChatId);
+        UserBalance balance;
+        if (balanceOpt.isPresent()) {
+            balance = balanceOpt.get();
+        } else {
+            // Double-check it doesn't exist (prevent race condition)
+            if (userBalanceRepository.existsById(userChatId)) {
+                // Entity exists but findById returned empty - fetch again
+                balance = userBalanceRepository.findById(userChatId)
+                    .orElseThrow(() -> new IllegalStateException("UserBalance exists but not accessible for chatId: " + userChatId));
+            } else {
+                // Truly doesn't exist - safe to create
+                balance = UserBalance.builder()
+                    .chatId(userChatId)
+                    .tickets(0L)
+                    .balance(BigDecimal.ZERO)
+                    .build();
+                balance = userBalanceRepository.save(balance);
+                logger.info("Created new UserBalance for chatId {}", userChatId);
+            }
+        }
         balance.setBalance(BigDecimal.ZERO);
         userBalanceRepository.save(balance);
 
@@ -1328,8 +1404,27 @@ public class BonusService {
         Long referrerChatId = referral.getReferrerChatId();
         BigDecimal referralPercentage = configurationService.getReferralCommissionPercentage();
         BigDecimal commission = new BigDecimal(topUpAmount).multiply(referralPercentage).setScale(2, RoundingMode.DOWN);
-        UserBalance referrerBalance = userBalanceRepository.findById(referrerChatId)
-                .orElse(UserBalance.builder().chatId(referrerChatId).tickets(0L).balance(BigDecimal.ZERO).build());
+        Optional<UserBalance> referrerBalanceOpt = userBalanceRepository.findById(referrerChatId);
+        UserBalance referrerBalance;
+        if (referrerBalanceOpt.isPresent()) {
+            referrerBalance = referrerBalanceOpt.get();
+        } else {
+            // Double-check it doesn't exist (prevent race condition)
+            if (userBalanceRepository.existsById(referrerChatId)) {
+                // Entity exists but findById returned empty - fetch again
+                referrerBalance = userBalanceRepository.findById(referrerChatId)
+                    .orElseThrow(() -> new IllegalStateException("UserBalance exists but not accessible for referrerChatId: " + referrerChatId));
+            } else {
+                // Truly doesn't exist - safe to create
+                referrerBalance = UserBalance.builder()
+                    .chatId(referrerChatId)
+                    .tickets(0L)
+                    .balance(BigDecimal.ZERO)
+                    .build();
+                referrerBalance = userBalanceRepository.save(referrerBalance);
+                logger.info("Created new UserBalance for referrer chatId {}", referrerChatId);
+            }
+        }
         referrerBalance.setBalance(referrerBalance.getBalance().add(commission));
         userBalanceRepository.save(referrerBalance);
         logger.info("Credited {} UZS to referrer {} for referredChatId {}", commission, referrerChatId, referredChatId);
