@@ -119,6 +119,9 @@ public class DailyStatsService {
         
         // Calculate and add permanent limit increase based on configured percentage
         BigDecimal percentage = configurationService.getTopUpDailyLimitIncreasePercentage();
+        logger.info("Top-up limit increase percentage for chatId {}: {}% (amount: {})", 
+                chatId, percentage, amount);
+        
         if (percentage.compareTo(BigDecimal.ZERO) > 0) {
             // Store precise decimal value without rounding
             BigDecimal increaseAmount = BigDecimal.valueOf(amount)
@@ -128,6 +131,9 @@ public class DailyStatsService {
             userLimitIncreaseService.addPermanentLimitIncrease(chatId, increaseAmount);
             logger.info("Added permanent limit increase {} ({}% of {}) for chatId {}", 
                     increaseAmount, percentage, amount, chatId);
+        } else {
+            logger.warn("Permanent limit increase skipped for chatId {}: topUpDailyLimitIncreasePercentage is 0% or not configured. " +
+                    "To enable permanent limit increases, set topUpDailyLimitIncreasePercentage > 0 in system configuration.", chatId);
         }
         
         stats.setLastUpdated(LocalDateTime.now(GMT_PLUS_5));

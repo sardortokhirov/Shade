@@ -272,13 +272,23 @@ public class BonusService {
         Optional<DailyUserStats> dailyStatsOpt = dailyUserStatsRepository.findByChatIdAndDate(chatId, today);
         Long dailyTransferAmount = dailyStatsOpt.map(DailyUserStats::getDailyTransferAmount).orElse(0L);
         
+        // Null-safety checks and default values
+        Long tickets = balance.getTickets() != null ? balance.getTickets() : 0L;
+        Long balanceValue = balance.getBalance() != null ? balance.getBalance().longValue() : 0L;
+        Long availableLimitSafe = availableLimit != null ? availableLimit : 0L;
+        Long dailyTransferAmountSafe = dailyTransferAmount != null ? dailyTransferAmount : 0L;
+        
+        // Log values for debugging
+        logger.debug("Bonus menu for chatId {}: tickets={}, balance={}, availableLimit={}, dailyTransferAmount={}", 
+                chatId, tickets, balanceValue, availableLimitSafe, dailyTransferAmountSafe);
+        
         SendMessage message = new SendMessage();
         message.setChatId(chatId);
         message.setText(String.format(languageSessionService.getTranslation(chatId, "message.bonus_menu"),
-                balance.getTickets(), 
-                balance.getBalance().longValue(), 
-                availableLimit,
-                dailyTransferAmount));
+                tickets, 
+                balanceValue, 
+                availableLimitSafe,
+                dailyTransferAmountSafe));
         message.setReplyMarkup(createBonusMenuKeyboard(chatId));
         messageSender.sendMessage(message, chatId);
     }
