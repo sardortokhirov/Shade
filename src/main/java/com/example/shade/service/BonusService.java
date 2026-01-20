@@ -266,21 +266,17 @@ public class BonusService {
         UserBalance balance = userBalanceRepository.findById(chatId)
                 .orElse(UserBalance.builder().chatId(chatId).tickets(0L).balance(BigDecimal.ZERO).build());
         Long availableLimit = dailyStatsService.getAvailableLimit(chatId);
-        
-        // Get daily stats for today's transfer amount
-        LocalDate today = LocalDate.now(ZoneId.of("GMT+5"));
-        Optional<DailyUserStats> dailyStatsOpt = dailyUserStatsRepository.findByChatIdAndDate(chatId, today);
-        Long dailyTransferAmount = dailyStatsOpt.map(DailyUserStats::getDailyTransferAmount).orElse(0L);
+        Long effectiveDailyLimit = dailyStatsService.getEffectiveDailyLimit(chatId);
         
         // Null-safety checks and default values
         Long tickets = balance.getTickets() != null ? balance.getTickets() : 0L;
         Long balanceValue = balance.getBalance() != null ? balance.getBalance().longValue() : 0L;
         Long availableLimitSafe = availableLimit != null ? availableLimit : 0L;
-        Long dailyTransferAmountSafe = dailyTransferAmount != null ? dailyTransferAmount : 0L;
+        Long effectiveDailyLimitSafe = effectiveDailyLimit != null ? effectiveDailyLimit : 0L;
         
         // Log values for debugging
-        logger.debug("Bonus menu for chatId {}: tickets={}, balance={}, availableLimit={}, dailyTransferAmount={}", 
-                chatId, tickets, balanceValue, availableLimitSafe, dailyTransferAmountSafe);
+        logger.debug("Bonus menu for chatId {}: tickets={}, balance={}, availableLimit={}, effectiveDailyLimit={}", 
+                chatId, tickets, balanceValue, availableLimitSafe, effectiveDailyLimitSafe);
         
         SendMessage message = new SendMessage();
         message.setChatId(chatId);
@@ -288,7 +284,7 @@ public class BonusService {
                 tickets, 
                 balanceValue, 
                 availableLimitSafe,
-                dailyTransferAmountSafe));
+                effectiveDailyLimitSafe));
         message.setReplyMarkup(createBonusMenuKeyboard(chatId));
         messageSender.sendMessage(message, chatId);
     }
