@@ -249,6 +249,17 @@ public class DailyStatsService {
     }
 
     /**
+     * Gets tomorrow's permanent limit (base limit + permanent increase)
+     * This is what the user will have as minimum limit tomorrow
+     */
+    public Long getTomorrowPermanentLimit(Long chatId) {
+        Long dailyLimit = configurationService.getDailyBonusTransferLimit();
+        BigDecimal permanentIncrease = userLimitIncreaseService.getPermanentLimitIncrease(chatId);
+        Long permanentIncreaseLong = permanentIncrease.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
+        return dailyLimit + permanentIncreaseLong;
+    }
+
+    /**
      * Checks if user can transfer the requested amount
      */
     public boolean canTransfer(Long chatId, Long amount) {

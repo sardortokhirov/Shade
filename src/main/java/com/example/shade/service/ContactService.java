@@ -101,30 +101,31 @@ public class ContactService {
         logger.info("BlockedUser updated for chatId {}: {} -> {}", chatId, oldPhoneNumber, phoneNumber);
         
         // Safely check and create UserBalance if it doesn't exist
+        // Use double-check pattern to prevent race condition overwrites
         Optional<UserBalance> existingBalance = userBalanceRepository.findById(chatId);
         boolean balanceCreated = false;
         
-        if (existingBalance.isEmpty()) {
-            // Create new UserBalance only if it doesn't exist
-            UserBalance newBalance = UserBalance.builder()
-                    .chatId(chatId)
-                    .tickets(0L)
-                    .balance(BigDecimal.ZERO)
-                    .build();
-            userBalanceRepository.save(newBalance);
-            balanceCreated = true;
-            logger.info("Created new UserBalance for chatId {}: tickets=0, balance=0", chatId);
-        } else {
-            // Log existing balance to ensure it's preserved
+        if (existingBalance.isPresent()) {
+            // Balance exists - preserve it
             UserBalance balance = existingBalance.get();
             logger.info("UserBalance already exists for chatId {}: tickets={}, balance={} - PRESERVED", 
                     chatId, balance.getTickets(), balance.getBalance());
-            
-            // Double-check: Verify the balance wasn't accidentally reset
-            if (balance.getBalance().compareTo(BigDecimal.ZERO) == 0 && balance.getTickets() == 0) {
-                logger.debug("UserBalance for chatId {} has zero values (may be new user)", chatId);
+        } else {
+            // Double-check to prevent race condition overwrites
+            if (userBalanceRepository.existsById(chatId)) {
+                // Entity exists but wasn't found - possible race condition
+                // Don't create a new one to avoid overwriting existing data
+                logger.warn("UserBalance exists but wasn't found by findById for chatId {} - NOT creating new one", chatId);
             } else {
-                logger.debug("UserBalance for chatId {} has non-zero values - ensuring preservation", chatId);
+                // Truly doesn't exist - safe to create
+                UserBalance newBalance = UserBalance.builder()
+                        .chatId(chatId)
+                        .tickets(0L)
+                        .balance(BigDecimal.ZERO)
+                        .build();
+                userBalanceRepository.save(newBalance);
+                balanceCreated = true;
+                logger.info("Created new UserBalance for chatId {}: tickets=0, balance=0", chatId);
             }
         }
         

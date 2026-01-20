@@ -25,6 +25,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -63,6 +64,7 @@ public class BonusService {
     private final LotteryTicketPurchaseService purchaseService;
     private final LottoBotService lottoBotService;
     private final UserLimitIncreaseService userLimitIncreaseService;
+    private final DailyUserStatsRepository dailyUserStatsRepository;
 
     @Lazy
     @Autowired
@@ -264,10 +266,23 @@ public class BonusService {
         UserBalance balance = userBalanceRepository.findById(chatId)
                 .orElse(UserBalance.builder().chatId(chatId).tickets(0L).balance(BigDecimal.ZERO).build());
         Long availableLimit = dailyStatsService.getAvailableLimit(chatId);
+        
+        // Get daily stats for today's transfer amount
+        LocalDate today = LocalDate.now(ZoneId.of("GMT+5"));
+        Optional<DailyUserStats> dailyStatsOpt = dailyUserStatsRepository.findByChatIdAndDate(chatId, today);
+        Long dailyTransferAmount = dailyStatsOpt.map(DailyUserStats::getDailyTransferAmount).orElse(0L);
+        
+        // Get tomorrow's permanent limit
+        Long tomorrowPermanentLimit = dailyStatsService.getTomorrowPermanentLimit(chatId);
+        
         SendMessage message = new SendMessage();
         message.setChatId(chatId);
         message.setText(String.format(languageSessionService.getTranslation(chatId, "message.bonus_menu"),
-                balance.getTickets(), balance.getBalance().longValue(), availableLimit));
+                balance.getTickets(), 
+                balance.getBalance().longValue(), 
+                availableLimit,
+                dailyTransferAmount,
+                tomorrowPermanentLimit));
         message.setReplyMarkup(createBonusMenuKeyboard(chatId));
         messageSender.sendMessage(message, chatId);
     }
@@ -382,8 +397,28 @@ public class BonusService {
                 return;
             }
 
-            UserBalance balance = userBalanceRepository.findById(chatId)
-                    .orElse(UserBalance.builder().chatId(chatId).tickets(0L).balance(BigDecimal.ZERO).build());
+            // Safe pattern: get existing balance or create new one if truly doesn't exist
+            Optional<UserBalance> balanceOpt = userBalanceRepository.findById(chatId);
+            UserBalance balance;
+            if (balanceOpt.isPresent()) {
+                balance = balanceOpt.get();
+            } else {
+                // Double-check to prevent race condition overwrites
+                if (userBalanceRepository.existsById(chatId)) {
+                    balance = userBalanceRepository.findById(chatId)
+                            .orElseThrow(() -> new IllegalStateException(
+                                    "UserBalance exists but not accessible for chatId: " + chatId));
+                } else {
+                    // Truly doesn't exist - safe to create
+                    balance = UserBalance.builder()
+                            .chatId(chatId)
+                            .tickets(0L)
+                            .balance(BigDecimal.ZERO)
+                            .build();
+                    balance = userBalanceRepository.save(balance);
+                    logger.info("Created new UserBalance for chatId {} in processTicketPurchase", chatId);
+                }
+            }
 
             // Check balance
             if (balance.getBalance().compareTo(bundle.getPrice()) < 0) {
@@ -1263,8 +1298,28 @@ public class BonusService {
                 languageSessionService.getTranslation(chatId, "message.lottery_processing"));
         
         try {
-            UserBalance balance = userBalanceRepository.findById(chatId)
-                    .orElse(UserBalance.builder().chatId(chatId).tickets(0L).balance(BigDecimal.ZERO).build());
+            // Safe pattern: get existing balance or create new one if truly doesn't exist
+            Optional<UserBalance> balanceOpt = userBalanceRepository.findById(chatId);
+            UserBalance balance;
+            if (balanceOpt.isPresent()) {
+                balance = balanceOpt.get();
+            } else {
+                // Double-check to prevent race condition overwrites
+                if (userBalanceRepository.existsById(chatId)) {
+                    balance = userBalanceRepository.findById(chatId)
+                            .orElseThrow(() -> new IllegalStateException(
+                                    "UserBalance exists but not accessible for chatId: " + chatId));
+                } else {
+                    // Truly doesn't exist - safe to create
+                    balance = UserBalance.builder()
+                            .chatId(chatId)
+                            .tickets(0L)
+                            .balance(BigDecimal.ZERO)
+                            .build();
+                    balance = userBalanceRepository.save(balance);
+                    logger.info("Created new UserBalance for chatId {} in playLottery", chatId);
+                }
+            }
             
             // Check cooldown
             Long cooldownSeconds = configurationService.getLotteryCooldownSeconds();

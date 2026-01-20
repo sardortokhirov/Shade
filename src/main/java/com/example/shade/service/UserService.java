@@ -376,10 +376,27 @@ public class UserService {
             throw new IllegalArgumentException("Balance must be non-negative");
         }
         
-        UserBalance userBalance = userBalanceRepository.findById(chatId)
-                .orElseThrow(() -> new IllegalStateException("UserBalance not found for chatId: " + chatId + ". Cannot update non-existent balance."));
+        // For API/admin operations: get existing balance or create new one
+        // This is safe because we explicitly set the balance value (admin override)
+        Optional<UserBalance> existingBalance = userBalanceRepository.findById(chatId);
+        UserBalance userBalance;
+        BigDecimal oldBalance;
         
-        BigDecimal oldBalance = userBalance.getBalance();
+        if (existingBalance.isPresent()) {
+            userBalance = existingBalance.get();
+            oldBalance = userBalance.getBalance();
+            logger.info("Updating existing UserBalance for chatId {}", chatId);
+        } else {
+            // Create new balance - this is intentional for admin API
+            userBalance = UserBalance.builder()
+                    .chatId(chatId)
+                    .tickets(0L)
+                    .balance(BigDecimal.ZERO)
+                    .build();
+            oldBalance = BigDecimal.ZERO;
+            logger.info("Creating new UserBalance for chatId {} via API", chatId);
+        }
+        
         userBalance.setBalance(balance);
         userBalanceRepository.save(userBalance);
         
@@ -393,10 +410,27 @@ public class UserService {
             throw new IllegalArgumentException("Tickets must be non-negative");
         }
         
-        UserBalance userBalance = userBalanceRepository.findById(chatId)
-                .orElseThrow(() -> new IllegalStateException("UserBalance not found for chatId: " + chatId + ". Cannot update non-existent tickets."));
+        // For API/admin operations: get existing balance or create new one
+        // This is safe because we explicitly set the tickets value (admin override)
+        Optional<UserBalance> existingBalance = userBalanceRepository.findById(chatId);
+        UserBalance userBalance;
+        Long oldTickets;
         
-        Long oldTickets = userBalance.getTickets();
+        if (existingBalance.isPresent()) {
+            userBalance = existingBalance.get();
+            oldTickets = userBalance.getTickets();
+            logger.info("Updating existing UserBalance for chatId {}", chatId);
+        } else {
+            // Create new balance - this is intentional for admin API
+            userBalance = UserBalance.builder()
+                    .chatId(chatId)
+                    .tickets(0L)
+                    .balance(BigDecimal.ZERO)
+                    .build();
+            oldTickets = 0L;
+            logger.info("Creating new UserBalance for chatId {} via API", chatId);
+        }
+        
         userBalance.setTickets(tickets);
         userBalanceRepository.save(userBalance);
         
