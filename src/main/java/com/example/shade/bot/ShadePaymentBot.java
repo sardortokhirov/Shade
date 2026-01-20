@@ -26,7 +26,6 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.Keyboard
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.io.File;
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -44,7 +43,6 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
     private final MessageSender messageSender;
     private final UserSessionService sessionService;
     private final AdminLogBotService adminLogBotService;
-    private final UserBalanceRepository userBalanceRepository;
     private final FeatureService featureService;
     private final LanguageSessionService languageSessionService;
     private final UserRepository userRepository;
@@ -189,24 +187,14 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
             // Handle phone number submission
             if (update.hasMessage() && update.getMessage().hasContact()) {
                 String receivedPhoneNumber = update.getMessage().getContact().getPhoneNumber();
-                if (user == null) {
-                    user = BlockedUser.builder().chatId(chatId).build();
-                }
-                if (!receivedPhoneNumber.startsWith("+")) {
-                    receivedPhoneNumber = "+" + receivedPhoneNumber;
-                }
-                user.setPhoneNumber(receivedPhoneNumber);
-                blockedUserRepository.save(user);
-                // Only create UserBalance if it doesn't exist, preserve existing balance and tickets
-                if (userBalanceRepository.findById(chatId).isEmpty()) {
-                    userBalanceRepository.save(UserBalance.builder()
-                            .chatId(chatId)
-                            .tickets(0L)
-                            .balance(BigDecimal.ZERO)
-                            .build());
-                }
-
-                logger.info("Phone number saved for chatId {}: {}", chatId, receivedPhoneNumber);
+                
+                // Use transactional service method to safely handle phone number update
+                // This ensures UserBalance is never overwritten if it already exists
+                boolean isNewUser = contactService.handlePhoneNumberUpdate(chatId, receivedPhoneNumber);
+                
+                logger.info("Phone number saved for chatId {}: {} (new user: {})", 
+                        chatId, receivedPhoneNumber, isNewUser);
+                
                 sessionService.clearSession(chatId);
 
                 SendMessage removeKeyboardMessage = new SendMessage();
@@ -222,9 +210,11 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
 
             // If user hasn't shared phone number, show menu link
             if (user == null || user.getPhoneNumber() == null) {
-                if (user == null) {
-                    user = BlockedUser.builder().chatId(chatId).build();
-                    blockedUserRepository.save(user);
+                // Safely retrieve or create BlockedUser - don't overwrite existing entity
+                BlockedUser blockedUser = blockedUserRepository.findById(chatId)
+                        .orElse(BlockedUser.builder().chatId(chatId).build());
+                if (blockedUser.getPhoneNumber() == null) {
+                    blockedUserRepository.save(blockedUser);
                 }
                 sessionService.setUserState(chatId, "AWAITING_PHONE_NUMBER");
                 sendPhoneNumberRequest(chatId);
