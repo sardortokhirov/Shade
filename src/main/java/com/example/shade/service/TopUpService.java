@@ -798,6 +798,14 @@ public class TopUpService {
     public void handleScreenshotApproval(Long chatId, Long requestId, boolean approve) throws Exception {
         HizmatRequest request = requestRepository.findById(requestId)
                 .orElse(null);
+        
+        // Verify the request is still in PENDING_SCREENSHOT status before processing
+        if (request != null && request.getStatus() != RequestStatus.PENDING_SCREENSHOT) {
+            logger.warn("Request {} is not in PENDING_SCREENSHOT status, current status: {}", requestId, request.getStatus());
+            adminLogBotService.sendLog("So'rov allaqachon ko'rib chiqilgan. ID: " + requestId + ", Status: " + request.getStatus());
+            return;
+        }
+        
         if (request == null) {
             logger.error("No request found for ID {}", requestId);
             adminLogBotService.sendLog("❌ Xatolik: So‘rov topilmadi. ID: " + requestId);
@@ -988,9 +996,18 @@ public class TopUpService {
         sendMainMenu(requestId);
     }
 
-    public void handleScreenshotApprovalChat(Long chatId, Long requestId, boolean approve) {
-        HizmatRequest request = requestRepository.findByChatIdAndStatus(requestId, RequestStatus.PENDING_SCREENSHOT)
-                .orElse(null);
+    public void handleScreenshotApprovalChat(Long adminChatId, Long requestId, boolean approve) {
+        // Use findById with the actual request ID to ensure we approve the correct request
+        // This fixes the bug where approving one screenshot could approve a different request
+        HizmatRequest request = requestRepository.findById(requestId).orElse(null);
+        
+        // Verify the request is still in PENDING_SCREENSHOT status before processing
+        if (request != null && request.getStatus() != RequestStatus.PENDING_SCREENSHOT) {
+            logger.warn("Request {} is not in PENDING_SCREENSHOT status, current status: {}", requestId, request.getStatus());
+            adminLogBotService.sendLog("So'rov allaqachon ko'rib chiqilgan. ID: " + requestId + ", Status: " + request.getStatus());
+            return;
+        }
+        
         if (request == null) {
             logger.error("No request found for ID {}", requestId);
             adminLogBotService.sendLog("❌ Xatolik: So‘rov topilmadi. ID: " + requestId);

@@ -78,6 +78,10 @@ public class AdminLogBotService {
         // Set log message as photo caption
         sendPhoto.setCaption(logMessage);
 
+        // Set the approval keyboard with the actual request ID (not chatId)
+        // This ensures admins approve the correct request when multiple are pending
+        sendPhoto.setReplyMarkup(createScreenshotApprovalKeyboard(request.getId()));
+
         // Send screenshot with log caption to admins
         for (AdminChat adminChat : adminChats) {
             try {
@@ -242,6 +246,22 @@ public class AdminLogBotService {
         rows.add(List.of(
                 createButton("✅ Tasdiqlash", "APPROVE_WITHDRAW:" + requestId),
                 createButton("❌ Rad etish", "REJECT_WITHDRAW:" + requestId)
+        ));
+        markup.setKeyboard(rows);
+        return markup;
+    }
+
+    /**
+     * Creates the screenshot approval keyboard with the actual request ID.
+     * This ensures admins approve the specific request shown in the screenshot,
+     * not just "any pending request from this user".
+     */
+    private InlineKeyboardMarkup createScreenshotApprovalKeyboard(Long requestId) {
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        rows.add(List.of(
+                createButton("✅ Approve", "SCREENSHOT_APPROVE:" + requestId),
+                createButton("❌ Reject", "SCREENSHOT_REJECT:" + requestId)
         ));
         markup.setKeyboard(rows);
         return markup;

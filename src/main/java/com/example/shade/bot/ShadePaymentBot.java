@@ -259,7 +259,8 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                     SendPhoto sendPhoto = new SendPhoto();
                     sendPhoto.setPhoto(new InputFile(downloadedFile));
                     sendPhoto.setCaption("Screenshot from user: " + chatId); // Admin message, not translated
-                    sendPhoto.setReplyMarkup(createScreenshotMarkup(chatId));
+                    // Note: Reply markup with approval buttons is now set in AdminLogBotService.sendScreenshotRequest()
+                    // using the actual request ID to prevent approval mismatches
                     adminLogBotService.sendScreenshotRequest(sendPhoto, chatId);
                     // Send confirmation message to user
                     messageSender.sendMessage(chatId,
@@ -306,16 +307,6 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
         contactButton.setRequestContact(true);
         row1.add(contactButton);
         rows.add(row1);
-        markup.setKeyboard(rows);
-        return markup;
-    }
-
-    private InlineKeyboardMarkup createScreenshotMarkup(Long chatId) {
-        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-        rows.add(List.of(
-                createButton("✅ Approve", "SCREENSHOT_APPROVE_CHAT:" + chatId),
-                createButton("❌ Reject", "SCREENSHOT_REJECT_CHAT:" + chatId)));
         markup.setKeyboard(rows);
         return markup;
     }

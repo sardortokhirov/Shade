@@ -215,15 +215,10 @@ public class AdminLogBot extends TelegramLongPollingBot {
             Long requestId = Long.parseLong(callbackData.split(":")[1]);
             withdrawService.processAdminApproval(chatId, requestId, false);
             return;
-        }else if (callbackData.startsWith("SCREENSHOT_APPROVE_CHAT:")) {
-            Long requestId = Long.parseLong(callbackData.split(":")[1]);
-            topUpService.handleScreenshotApprovalChat(chatId, requestId, true);
-            return;
-        } else if (callbackData.startsWith("SCREENSHOT_REJECT_CHAT:")) {
-            Long requestId = Long.parseLong(callbackData.split(":")[1]);
-            topUpService.handleScreenshotApprovalChat(chatId, requestId, false);
-            return;
         }
+        // Note: SCREENSHOT_APPROVE_CHAT and SCREENSHOT_REJECT_CHAT handlers have been removed
+        // The new screenshot approval buttons use SCREENSHOT_APPROVE:{requestId} format with the actual request ID
+        // to prevent approval mismatches when multiple screenshots are pending from the same user
         else if (callbackData.startsWith("SCREENSHOT_APPROVE:")) {
             Long requestId = Long.parseLong(callbackData.split(":")[1]);
             topUpService.handleScreenshotApproval(chatId, requestId, true);

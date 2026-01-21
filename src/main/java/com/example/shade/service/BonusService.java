@@ -1470,11 +1470,13 @@ public class BonusService {
             // Get total daily limit increase after this play
             Long totalDailyLimitIncrease = 0L;
             Long permanentIncreaseLong = 0L;
+            Long baseLimit = configurationService.getDailyBonusTransferLimit();
+            Long tomorrowPermanentLimit = baseLimit; // Default to base limit if permanent increase retrieval fails
             try {
                 Long effectiveDailyLimit = dailyStatsService.getEffectiveDailyLimitReadOnly(chatId);
-                Long baseLimit = configurationService.getDailyBonusTransferLimit();
                 BigDecimal permanentIncrease = userLimitIncreaseService.getPermanentLimitIncrease(chatId);
                 permanentIncreaseLong = permanentIncrease.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
+                tomorrowPermanentLimit = baseLimit + permanentIncreaseLong;
                 totalDailyLimitIncrease = effectiveDailyLimit - baseLimit - permanentIncreaseLong;
             } catch (Exception e) {
                 logger.warn("Failed to get total daily limit increase for chatId {}: {}", chatId, e.getMessage());
@@ -1482,6 +1484,7 @@ public class BonusService {
                 try {
                     BigDecimal permanentIncrease = userLimitIncreaseService.getPermanentLimitIncrease(chatId);
                     permanentIncreaseLong = permanentIncrease.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
+                    tomorrowPermanentLimit = baseLimit + permanentIncreaseLong;
                 } catch (Exception ex) {
                     logger.warn("Failed to get permanent limit increase for chatId {}: {}", chatId, ex.getMessage());
                 }
@@ -1504,12 +1507,11 @@ public class BonusService {
                                 "🎫 O'ynalgan chiptalar: %s ta\n" +
                                 "💰 Jami yutuq: %s so'm\n" +
                                 "📈 Limit oshdi (bu o'yin): %,d so'm\n" +
-                                "📊 Jami limit oshishi: %,d so'm\n" +
-                                "🔒 Jami doimiy limit: %,d so'm\n" +
+                                "📊 Limit: %,d / %,d so'm (Jami oshishi / Doimiy)\n" +
                                 "💸 Yangi balans: %s so'm\n" +
                                 "📅 [%s]",
                         chatId, number, numberOfPlays, totalWinnings.longValue(), 
-                        limitIncreaseJustAdded, totalDailyLimitIncrease, permanentIncreaseLong,
+                        limitIncreaseJustAdded, totalDailyLimitIncrease, tomorrowPermanentLimit,
                         balance.getBalance().longValue(),
                         timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
             } else {
@@ -1518,10 +1520,11 @@ public class BonusService {
                                 "👤 User ID [%s] %s\n" +
                                 "🎫 O'ynalgan chiptalar: %s ta\n" +
                                 "💰 Jami yutuq: %s so'm\n" +
-                                "🔒 Jami doimiy limit: %,d so'm\n" +
+                                "📊 Limit: %,d / %,d so'm (Jami oshishi / Doimiy)\n" +
                                 "💸 Yangi balans: %s so'm\n" +
                                 "📅 [%s]",
-                        chatId, number, numberOfPlays, totalWinnings.longValue(), permanentIncreaseLong,
+                        chatId, number, numberOfPlays, totalWinnings.longValue(), 
+                        totalDailyLimitIncrease, tomorrowPermanentLimit,
                         balance.getBalance().longValue(),
                         timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
             }
