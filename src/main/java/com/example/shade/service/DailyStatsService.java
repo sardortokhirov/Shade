@@ -58,7 +58,10 @@ public class DailyStatsService {
         Long availableLimitBeforeTransfers = effectiveDailyLimit;
         if (!featureService.isPayToggleEnabled()) {
             Long dailyTopUps = stats.getDailyTopUpAmount() != null ? stats.getDailyTopUpAmount() : 0L;
-            availableLimitBeforeTransfers = Math.min(effectiveDailyLimit, dailyTopUps);
+            // Include yesterday's carryover to allow proper chaining across days
+            // This ensures unused deposits roll forward until used, not just for one day
+            Long yesterdaysCarryover = stats.getCarryoverAmount() != null ? stats.getCarryoverAmount() : 0L;
+            availableLimitBeforeTransfers = Math.min(effectiveDailyLimit, dailyTopUps + yesterdaysCarryover);
         }
         
         // Calculate unused limit
