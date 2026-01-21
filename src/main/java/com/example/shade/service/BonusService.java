@@ -964,13 +964,12 @@ public class BonusService {
                                     "👤: [%d] %s\n" +
                                     "🌐 #%s %s🇺🇿:%s\n" +
                                     "💸 Miqdor: %,d UZS\n" +
-                                    "\n📤%,d\n" +
-                                    "📈%,d\n" +
+                                    "\n📊 Limit: %,d / %,d so'm\n" +
                                     "📅 [%s]",
                             request.getId(), request.getChatId(), number,
                             request.getPlatform(), request.getCurrency().toString(), request.getPlatformUserId(),
                             request.getAmount(),
-                            dailyTransferAmount, permanentLimitIncrease,
+                            totalLimit, availableLimit,
                             LocalDateTime.now(ZoneId.of("GMT+5"))
                                     .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                     String bonusMessage = String.format(
@@ -997,14 +996,13 @@ public class BonusService {
                                     "🌐 #%s %s🇺🇿:%s\n" +
                                     "💸 Miqdor: %,d UZS\n" +
                                     "\n🏦: %,d %s\n" +
-                                    "\n📤%,d\n" +
-                                    "📈%,d\n" +
+                                    "\n📊 Limit: %,d / %,d so'm\n" +
                                     "📅 [%s]",
                             request.getId(), request.getChatId(), number,
                             request.getPlatform(), platformData.getCurrency().toString(), request.getPlatformUserId(),
                             request.getAmount(),
                             transferSuccessful.getLimit().longValue(), platformData.getCurrency().toString(),
-                            dailyTransferAmount, permanentLimitIncrease,
+                            totalLimit, availableLimit,
                             timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                     String bonusMessage = String.format(
                             languageSessionService.getTranslation(request.getChatId(), "message.bonus_approved"),
@@ -1103,13 +1101,12 @@ public class BonusService {
                                         "👤: [%d] %s\n" +
                                         "🌐 #%s %s🇺🇿:%s\n" +
                                         "💸 Miqdor: %,d UZS\n" +
-                                        "\n📤%,d\n" +
-                                        "📈%,d\n" +
+                                        "\n📊 Limit: %,d / %,d so'm\n" +
                                         "📅 [%s]",
                                 request.getId(), request.getChatId(), number,
                                 request.getPlatform(), request.getCurrency().toString(), request.getPlatformUserId(),
                                 request.getAmount(),
-                                dailyTransferAmount, permanentLimitIncrease,
+                                totalLimit, availableLimit,
                                 timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                         String bonusMessage = String.format(
                                 languageSessionService.getTranslation(request.getChatId(), "message.bonus_approved"),
@@ -1135,14 +1132,13 @@ public class BonusService {
                                         "🌐 #%s %s🇺🇿:%s\n" +
                                         "💸 Miqdor: %,d UZS\n" +
                                         "\n🏦: %,d %s\n" +
-                                        "\n📤%,d\n" +
-                                        "📈%,d\n" +
+                                        "\n📊 Limit: %,d / %,d so'm\n" +
                                         "📅 [%s]",
                                 request.getId(), request.getChatId(), number,
                                 request.getPlatform(), platformData.getCurrency().toString(), request.getPlatformUserId(),
                                 request.getAmount(),
                                 cashdeskBalance.getLimit().longValue(), platformData.getCurrency().toString(),
-                                dailyTransferAmount, permanentLimitIncrease,
+                                totalLimit, availableLimit,
                                 timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                         String bonusMessage = String.format(
                                 languageSessionService.getTranslation(request.getChatId(), "message.bonus_approved"),

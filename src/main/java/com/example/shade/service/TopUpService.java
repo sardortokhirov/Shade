@@ -669,7 +669,8 @@ public class TopUpService {
                                 "💳 Bizniki: %s\n" +
                                 "🎟️ Chiptalar: %d (+ %d )\n" +
                                 "\n🏦: %,d %s\n" +
-                                "\n📅 [%s]",
+                                "\n📊 Limit: %,d / %,d so'm\n" +
+                                "📅 [%s]",
                         request.getId(),
                         chatId,
                         number,
@@ -684,6 +685,7 @@ public class TopUpService {
                         tickets,
                         transferSuccessful.getLimit().longValue(),
                         request.getCurrency().toString(),
+                        totalLimit, availableLimit,
                         LocalDateTime.now(ZoneId.of("GMT+5"))
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                 adminLogBotService.sendLog(logMessageAdmin);
@@ -911,6 +913,7 @@ public class TopUpService {
                                 "🎟️ Chiptalar: %d (+ %d )\n" +
                                 "\n🏦: %,d %s\n" +
                                 "\n📈+%,d\n" +
+                                "📊 Limit: %,d / %,d so'm\n" +
                                 "📅 [%s]",
                         request.getId(),
                         request.getChatId(), number,
@@ -926,6 +929,7 @@ public class TopUpService {
                         transferSuccessful.getLimit().longValue(),
                         request.getCurrency().toString(),
                         limitIncrease,
+                        totalLimit, availableLimit,
                         LocalDateTime.now(ZoneId.of("GMT+5"))
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
@@ -1106,6 +1110,7 @@ public class TopUpService {
                                 "🎟️ Chiptalar: %d (+ %d )\n" +
                                 "\n🏦: %,d %s\n" +
                                 "\n📈+%,d\n" +
+                                "📊 Limit: %,d / %,d so'm\n" +
                                 "📅 [%s]",
                         request.getId(),
                         request.getChatId(), number,
@@ -1121,6 +1126,7 @@ public class TopUpService {
                         transferSuccessful.getLimit().longValue(),
                         request.getCurrency().toString(),
                         limitIncrease,
+                        totalLimit, availableLimit,
                         LocalDateTime.now(ZoneId.of("GMT+5"))
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
