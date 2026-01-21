@@ -23,6 +23,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -56,6 +57,7 @@ public class TopUpService {
     private final DailyStatsService dailyStatsService;
     private final UserPlatformPermissionRepository permissionRepository;
     private final UserLimitIncreaseService userLimitIncreaseService;
+    private final DailyUserStatsRepository dailyUserStatsRepository;
 
     public void startTopUp(Long chatId) {
         logger.info("Starting top-up for chatId: {}", chatId);
@@ -654,13 +656,20 @@ public class TopUpService {
 
                 Long totalLimit = dailyStatsService.getEffectiveDailyLimit(request.getChatId());
                 Long availableLimit = dailyStatsService.getAvailableLimit(request.getChatId());
+                LocalDate today = LocalDate.now(ZoneId.of("GMT+5"));
+                Optional<DailyUserStats> dailyStatsOpt = dailyUserStatsRepository.findByChatIdAndDate(request.getChatId(), today);
+                Long dailyTopUpAmount = dailyStatsOpt.map(DailyUserStats::getDailyTopUpAmount).orElse(0L);
                 String logMessageAdmin = String.format(
                         "#%d Topup ✅\n" +
                                 "👤%d | ☎%s | 🌐%s:%s\n" +
                                 "💰%,d UZS | %,d RUB\n" +
                                 "💳%s → 🏦%s\n" +
                                 "🎫%d (+%d) | 🏦%,d %s\n" +
-                                "📊%s/%s\n" +
+                                "📊%,d/%,d\n" +
+                                "📊 Limit ma'lumotlari:\n" +
+                                "   ✅ Foyadalanish mumkin: %,d so'm\n" +
+                                "   📤 Umumiy limit: %,d so'm\n" +
+                                "   💰 Bugungi to'lov: %,d so'm\n" +
                                 "📅%s",
                         request.getId(),
                         chatId,
@@ -675,7 +684,8 @@ public class TopUpService {
                         tickets,
                         transferSuccessful.getLimit().longValue(),
                         request.getCurrency().toString(),
-                        adminLogBotService.formatLimitK(totalLimit), adminLogBotService.formatLimitK(availableLimit),
+                        totalLimit, availableLimit,
+                        availableLimit, totalLimit, dailyTopUpAmount,
                         LocalDateTime.now(ZoneId.of("GMT+5"))
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                 adminLogBotService.sendLog(logMessageAdmin);
@@ -889,13 +899,20 @@ public class TopUpService {
                         totalLimit, availableLimit,
                         LocalDateTime.now(ZoneId.of("GMT+5"))
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                LocalDate todayForTopUp = LocalDate.now(ZoneId.of("GMT+5"));
+                Optional<DailyUserStats> dailyStatsOptForTopUp = dailyUserStatsRepository.findByChatIdAndDate(request.getChatId(), todayForTopUp);
+                Long dailyTopUpAmountForLog = dailyStatsOptForTopUp.map(DailyUserStats::getDailyTopUpAmount).orElse(0L);
                 String adminLogMessage = String.format(
                         "#%d Topup ✅\n" +
                                 "👤%d | ☎%s | 🌐%s:%s\n" +
                                 "💰%,d UZS | %,d RUB\n" +
                                 "💳%s → 🏦%s\n" +
                                 "🎫%d (+%d) | 🏦%,d %s\n" +
-                                "📈+%,d | 📊%s/%s\n" +
+                                "📈+%,d | 📊%,d/%,d\n" +
+                                "📊 Limit ma'lumotlari:\n" +
+                                "   ✅ Foyadalanish mumkin: %,d so'm\n" +
+                                "   📤 Umumiy limit: %,d so'm\n" +
+                                "   💰 Bugungi to'lov: %,d so'm\n" +
                                 "📅%s",
                         request.getId(),
                         request.getChatId(), number,
@@ -910,7 +927,8 @@ public class TopUpService {
                         transferSuccessful.getLimit().longValue(),
                         request.getCurrency().toString(),
                         limitIncrease,
-                        adminLogBotService.formatLimitK(totalLimit), adminLogBotService.formatLimitK(availableLimit),
+                        totalLimit, availableLimit,
+                        availableLimit, totalLimit, dailyTopUpAmountForLog,
                         LocalDateTime.now(ZoneId.of("GMT+5"))
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
@@ -1077,13 +1095,20 @@ public class TopUpService {
                         totalLimit, availableLimit,
                         LocalDateTime.now(ZoneId.of("GMT+5"))
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                LocalDate todayForTopUp = LocalDate.now(ZoneId.of("GMT+5"));
+                Optional<DailyUserStats> dailyStatsOptForTopUp = dailyUserStatsRepository.findByChatIdAndDate(request.getChatId(), todayForTopUp);
+                Long dailyTopUpAmountForLog = dailyStatsOptForTopUp.map(DailyUserStats::getDailyTopUpAmount).orElse(0L);
                 String adminLogMessage = String.format(
                         "#%d Topup ✅\n" +
                                 "👤%d | ☎%s | 🌐%s:%s\n" +
                                 "💰%,d UZS | %,d RUB\n" +
                                 "💳%s → 🏦%s\n" +
                                 "🎫%d (+%d) | 🏦%,d %s\n" +
-                                "📈+%,d | 📊%s/%s\n" +
+                                "📈+%,d | 📊%,d/%,d\n" +
+                                "📊 Limit ma'lumotlari:\n" +
+                                "   ✅ Foyadalanish mumkin: %,d so'm\n" +
+                                "   📤 Umumiy limit: %,d so'm\n" +
+                                "   💰 Bugungi to'lov: %,d so'm\n" +
                                 "📅%s",
                         request.getId(),
                         request.getChatId(), number,
@@ -1098,7 +1123,8 @@ public class TopUpService {
                         transferSuccessful.getLimit().longValue(),
                         request.getCurrency().toString(),
                         limitIncrease,
-                        adminLogBotService.formatLimitK(totalLimit), adminLogBotService.formatLimitK(availableLimit),
+                        totalLimit, availableLimit,
+                        availableLimit, totalLimit, dailyTopUpAmountForLog,
                         LocalDateTime.now(ZoneId.of("GMT+5"))
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
