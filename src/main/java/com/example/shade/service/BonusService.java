@@ -964,14 +964,12 @@ public class BonusService {
                                     "👤: [%d] %s\n" +
                                     "🌐 #%s %s🇺🇿:%s\n" +
                                     "💸 Miqdor: %,d UZS\n" +
-                                    "📊 Limit: %,d / %,d so'm\n" +
-                                    "📤%,d\n" +
+                                    "\n📤%,d\n" +
                                     "📈%,d\n" +
                                     "📅 [%s]",
                             request.getId(), request.getChatId(), number,
                             request.getPlatform(), request.getCurrency().toString(), request.getPlatformUserId(),
                             request.getAmount(),
-                            totalLimit, availableLimit,
                             dailyTransferAmount, permanentLimitIncrease,
                             LocalDateTime.now(ZoneId.of("GMT+5"))
                                     .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
@@ -999,15 +997,13 @@ public class BonusService {
                                     "🌐 #%s %s🇺🇿:%s\n" +
                                     "💸 Miqdor: %,d UZS\n" +
                                     "\n🏦: %,d %s\n" +
-                                    "📊 Limit: %,d / %,d so'm\n" +
-                                    "📤%,d\n" +
+                                    "\n📤%,d\n" +
                                     "📈%,d\n" +
                                     "📅 [%s]",
                             request.getId(), request.getChatId(), number,
                             request.getPlatform(), platformData.getCurrency().toString(), request.getPlatformUserId(),
                             request.getAmount(),
                             transferSuccessful.getLimit().longValue(), platformData.getCurrency().toString(),
-                            totalLimit, availableLimit,
                             dailyTransferAmount, permanentLimitIncrease,
                             timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                     String bonusMessage = String.format(
@@ -1107,14 +1103,12 @@ public class BonusService {
                                         "👤: [%d] %s\n" +
                                         "🌐 #%s %s🇺🇿:%s\n" +
                                         "💸 Miqdor: %,d UZS\n" +
-                                        "📊 Limit: %,d / %,d so'm\n" +
-                                        "📤%,d\n" +
+                                        "\n📤%,d\n" +
                                         "📈%,d\n" +
                                         "📅 [%s]",
                                 request.getId(), request.getChatId(), number,
                                 request.getPlatform(), request.getCurrency().toString(), request.getPlatformUserId(),
                                 request.getAmount(),
-                                totalLimit, availableLimit,
                                 dailyTransferAmount, permanentLimitIncrease,
                                 timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                         String bonusMessage = String.format(
@@ -1141,15 +1135,13 @@ public class BonusService {
                                         "🌐 #%s %s🇺🇿:%s\n" +
                                         "💸 Miqdor: %,d UZS\n" +
                                         "\n🏦: %,d %s\n" +
-                                        "📊 Limit: %,d / %,d so'm\n" +
-                                        "📤%,d\n" +
+                                        "\n📤%,d\n" +
                                         "📈%,d\n" +
                                         "📅 [%s]",
                                 request.getId(), request.getChatId(), number,
                                 request.getPlatform(), platformData.getCurrency().toString(), request.getPlatformUserId(),
                                 request.getAmount(),
                                 cashdeskBalance.getLimit().longValue(), platformData.getCurrency().toString(),
-                                totalLimit, availableLimit,
                                 dailyTransferAmount, permanentLimitIncrease,
                                 timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                         String bonusMessage = String.format(
