@@ -960,20 +960,19 @@ public class BonusService {
                     Long permanentLimitIncrease = permanentIncrease.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
                     
                     String message = String.format(
-                            "#%d Bonus ✅\n" +
-                                    "🌐%s:%s | 👤%d | ☎%s\n" +
+                            "🆔: %d  Bonus To'lov yakunlandi ✅\n" +
+                                    "🌐%s:%s\n" +
+                                    "👤%d\n" +
+                                    "☎%s\n" +
                                     "💰%,d UZS\n" +
-                                    "📊%,d/%,d | 📤%,d | 📈%,d\n" +
-                                    "📊 Limit ma'lumotlari:\n" +
-                                    "   ✅ Foyadalanish mumkin: %,d so'm\n" +
-                                    "   📤 Umumiy limit: %,d so'm\n" +
-                                    "   💰 Bugungi to'lov: %,d so'm\n" +
+                                    "📊%,d/%,d\n" +
+                                    "📤%,d\n" +
+                                    "📈%,d\n" +
                                     "📅%s",
                             request.getId(), request.getPlatform(), request.getPlatformUserId(), request.getAmount(),
                             request.getChatId(), number, 
                             totalLimit, availableLimit,
                             dailyTransferAmount, permanentLimitIncrease,
-                            availableLimit, totalLimit, dailyTopUpAmount,
                             LocalDateTime.now(ZoneId.of("GMT+5"))
                                     .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                     String bonusMessage = String.format(
@@ -995,21 +994,21 @@ public class BonusService {
                     Long permanentLimitIncrease = permanentIncrease.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
                     
                     String message = String.format(
-                            "#%d Bonus ✅\n" +
-                                    "🌐%s:%s | 👤%d | ☎%s\n" +
-                                    "💰%,d UZS | 🏦%,d %s\n" +
-                                    "📊%,d/%,d | 📤%,d | 📈%,d\n" +
-                                    "📊 Limit ma'lumotlari:\n" +
-                                    "   ✅ Foyadalanish mumkin: %,d so'm\n" +
-                                    "   📤 Umumiy limit: %,d so'm\n" +
-                                    "   💰 Bugungi to'lov: %,d so'm\n" +
+                            "🆔: %d  Bonus To'lov yakunlandi ✅\n" +
+                                    "🌐%s:%s\n" +
+                                    "👤%d\n" +
+                                    "☎%s\n" +
+                                    "💰%,d UZS\n" +
+                                    "🏦%,d %s\n" +
+                                    "📊%,d/%,d\n" +
+                                    "📤%,d\n" +
+                                    "📈%,d\n" +
                                     "📅%s",
                             request.getId(), request.getPlatform(), request.getPlatformUserId(), request.getAmount(),
                             request.getChatId(), number, transferSuccessful.getLimit().longValue(),
                             platformData.getCurrency().toString(), 
                             totalLimit, availableLimit,
                             dailyTransferAmount, permanentLimitIncrease,
-                            availableLimit, totalLimit, dailyTopUpAmount,
                             timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                     String bonusMessage = String.format(
                             languageSessionService.getTranslation(request.getChatId(), "message.bonus_approved"),
@@ -1104,20 +1103,19 @@ public class BonusService {
                         Long permanentLimitIncrease = permanentIncrease.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
                         
                         String message = String.format(
-                                "#%d Bonus ✅\n" +
-                                        "🌐%s:%s | 👤%d | ☎%s\n" +
+                                "🆔: %d  Bonus To'lov yakunlandi ✅\n" +
+                                        "🌐%s:%s\n" +
+                                        "👤%d\n" +
+                                        "☎%s\n" +
                                         "💰%,d UZS\n" +
-                                        "📊%,d/%,d | 📤%,d | 📈%,d\n" +
-                                        "📊 Limit ma'lumotlari:\n" +
-                                        "   ✅ Foyadalanish mumkin: %,d so'm\n" +
-                                        "   📤 Umumiy limit: %,d so'm\n" +
-                                        "   💰 Bugungi to'lov: %,d so'm\n" +
+                                        "📊%,d/%,d\n" +
+                                        "📤%,d\n" +
+                                        "📈%,d\n" +
                                         "📅%s",
                                 request.getId(), request.getPlatform(), request.getPlatformUserId(),
                                 request.getAmount(), request.getChatId(), number, 
                                 totalLimit, availableLimit,
                                 dailyTransferAmount, permanentLimitIncrease,
-                                availableLimit, totalLimit, dailyTopUpAmount,
                                 timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                         String bonusMessage = String.format(
                                 languageSessionService.getTranslation(request.getChatId(), "message.bonus_approved"),
@@ -1138,21 +1136,21 @@ public class BonusService {
                         Long permanentLimitIncrease = permanentIncrease.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
                         
                         String message = String.format(
-                                "#%d Bonus ✅\n" +
-                                        "🌐%s:%s | 👤%d | ☎%s\n" +
-                                        "💰%,d UZS | 🏦%,d %s\n" +
-                                        "📊%,d/%,d | 📤%,d | 📈%,d\n" +
-                                        "📊 Limit ma'lumotlari:\n" +
-                                        "   ✅ Foyadalanish mumkin: %,d so'm\n" +
-                                        "   📤 Umumiy limit: %,d so'm\n" +
-                                        "   💰 Bugungi to'lov: %,d so'm\n" +
+                                "🆔: %d  Bonus To'lov yakunlandi ✅\n" +
+                                        "🌐%s:%s\n" +
+                                        "👤%d\n" +
+                                        "☎%s\n" +
+                                        "💰%,d UZS\n" +
+                                        "🏦%,d %s\n" +
+                                        "📊%,d/%,d\n" +
+                                        "📤%,d\n" +
+                                        "📈%,d\n" +
                                         "📅%s",
                                 request.getId(), request.getPlatform(), request.getPlatformUserId(),
                                 request.getAmount(), request.getChatId(), number,
                                 cashdeskBalance.getLimit().longValue(), platformData.getCurrency().toString(),
                                 totalLimit, availableLimit,
                                 dailyTransferAmount, permanentLimitIncrease,
-                                availableLimit, totalLimit, dailyTopUpAmount,
                                 timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                         String bonusMessage = String.format(
                                 languageSessionService.getTranslation(request.getChatId(), "message.bonus_approved"),
