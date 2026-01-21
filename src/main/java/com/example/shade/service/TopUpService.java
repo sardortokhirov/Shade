@@ -661,21 +661,21 @@ public class TopUpService {
                 Long dailyTopUpAmount = dailyStatsOpt.map(DailyUserStats::getDailyTopUpAmount).orElse(0L);
                 String logMessageAdmin = String.format(
                         "🆔: %d  To'lov yakunlandi ✅\n" +
-                                "👤%d\n" +
-                                "☎%s\n" +
-                                "🌐%s:%s\n" +
-                                "💰%,d UZS\n" +
-                                "💰%,d RUB\n" +
-                                "💳%s\n" +
-                                "🏦%s\n" +
-                                "🎫%d (+%d)\n" +
-                                "🏦%,d %s\n" +
-                                "📊%,d/%,d\n" +
-                                "📅%s",
+                                "👤: [%d] %s\n" +
+                                "🌐 #%s %s🇺🇿:%s\n" +
+                                "💸 Miqdor: %,d UZS\n" +
+                                "💸 Miqdor: %,d RUB\n" +
+                                "💳 Karta: %s\n" +
+                                "💳 Bizniki: %s\n" +
+                                "🎟️ Chiptalar: %d (+ %d )\n" +
+                                "\n🏦: %,d %s\n" +
+                                "📊 Limit: %,d / %,d so'm\n" +
+                                "📅 [%s]",
                         request.getId(),
                         chatId,
                         number,
                         request.getPlatform(),
+                        request.getCurrency().toString(),
                         request.getPlatformUserId(),
                         request.getUniqueAmount(),
                         rubAmount,
@@ -904,21 +904,21 @@ public class TopUpService {
                 Long dailyTopUpAmountForLog = dailyStatsOptForTopUp.map(DailyUserStats::getDailyTopUpAmount).orElse(0L);
                 String adminLogMessage = String.format(
                         "🆔: %d  To'lov yakunlandi ✅\n" +
-                                "👤%d\n" +
-                                "☎%s\n" +
-                                "🌐%s:%s\n" +
-                                "💰%,d UZS\n" +
-                                "💰%,d RUB\n" +
-                                "💳%s\n" +
-                                "🏦%s\n" +
-                                "🎫%d (+%d)\n" +
-                                "🏦%,d %s\n" +
+                                "👤: [%d] %s\n" +
+                                "🌐 #%s %s🇺🇿:%s\n" +
+                                "💸 Miqdor: %,d UZS\n" +
+                                "💸 Miqdor: %,d RUB\n" +
+                                "💳 Karta: %s\n" +
+                                "💳 Bizniki: %s\n" +
+                                "🎟️ Chiptalar: %d (+ %d )\n" +
+                                "\n🏦: %,d %s\n" +
                                 "📈+%,d\n" +
-                                "📊%,d/%,d\n" +
-                                "📅%s",
+                                "📊 Limit: %,d / %,d so'm\n" +
+                                "📅 [%s]",
                         request.getId(),
                         request.getChatId(), number,
                         request.getPlatform(),
+                        request.getCurrency().toString(),
                         request.getPlatformUserId(),
                         request.getUniqueAmount(),
                         rubAmount,
@@ -1101,21 +1101,21 @@ public class TopUpService {
                 Long dailyTopUpAmountForLog = dailyStatsOptForTopUp.map(DailyUserStats::getDailyTopUpAmount).orElse(0L);
                 String adminLogMessage = String.format(
                         "🆔: %d  To'lov yakunlandi ✅\n" +
-                                "👤%d\n" +
-                                "☎%s\n" +
-                                "🌐%s:%s\n" +
-                                "💰%,d UZS\n" +
-                                "💰%,d RUB\n" +
-                                "💳%s\n" +
-                                "🏦%s\n" +
-                                "🎫%d (+%d)\n" +
-                                "🏦%,d %s\n" +
+                                "👤: [%d] %s\n" +
+                                "🌐 #%s %s🇺🇿:%s\n" +
+                                "💸 Miqdor: %,d UZS\n" +
+                                "💸 Miqdor: %,d RUB\n" +
+                                "💳 Karta: %s\n" +
+                                "💳 Bizniki: %s\n" +
+                                "🎟️ Chiptalar: %d (+ %d )\n" +
+                                "\n🏦: %,d %s\n" +
                                 "📈+%,d\n" +
-                                "📊%,d/%,d\n" +
-                                "📅%s",
+                                "📊 Limit: %,d / %,d so'm\n" +
+                                "📅 [%s]",
                         request.getId(),
                         request.getChatId(), number,
                         request.getPlatform(),
+                        request.getCurrency().toString(),
                         request.getPlatformUserId(),
                         request.getUniqueAmount(),
                         rubAmount,

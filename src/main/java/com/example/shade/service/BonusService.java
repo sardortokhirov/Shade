@@ -961,16 +961,16 @@ public class BonusService {
                     
                     String message = String.format(
                             "🆔: %d  Bonus To'lov yakunlandi ✅\n" +
-                                    "🌐%s:%s\n" +
-                                    "👤%d\n" +
-                                    "☎%s\n" +
-                                    "💰%,d UZS\n" +
-                                    "📊%,d/%,d\n" +
+                                    "👤: [%d] %s\n" +
+                                    "🌐 #%s %s🇺🇿:%s\n" +
+                                    "💸 Miqdor: %,d UZS\n" +
+                                    "📊 Limit: %,d / %,d so'm\n" +
                                     "📤%,d\n" +
                                     "📈%,d\n" +
-                                    "📅%s",
-                            request.getId(), request.getPlatform(), request.getPlatformUserId(), request.getAmount(),
-                            request.getChatId(), number, 
+                                    "📅 [%s]",
+                            request.getId(), request.getChatId(), number,
+                            request.getPlatform(), request.getCurrency().toString(), request.getPlatformUserId(),
+                            request.getAmount(),
                             totalLimit, availableLimit,
                             dailyTransferAmount, permanentLimitIncrease,
                             LocalDateTime.now(ZoneId.of("GMT+5"))
@@ -995,18 +995,18 @@ public class BonusService {
                     
                     String message = String.format(
                             "🆔: %d  Bonus To'lov yakunlandi ✅\n" +
-                                    "🌐%s:%s\n" +
-                                    "👤%d\n" +
-                                    "☎%s\n" +
-                                    "💰%,d UZS\n" +
-                                    "🏦%,d %s\n" +
-                                    "📊%,d/%,d\n" +
+                                    "👤: [%d] %s\n" +
+                                    "🌐 #%s %s🇺🇿:%s\n" +
+                                    "💸 Miqdor: %,d UZS\n" +
+                                    "\n🏦: %,d %s\n" +
+                                    "📊 Limit: %,d / %,d so'm\n" +
                                     "📤%,d\n" +
                                     "📈%,d\n" +
-                                    "📅%s",
-                            request.getId(), request.getPlatform(), request.getPlatformUserId(), request.getAmount(),
-                            request.getChatId(), number, transferSuccessful.getLimit().longValue(),
-                            platformData.getCurrency().toString(), 
+                                    "📅 [%s]",
+                            request.getId(), request.getChatId(), number,
+                            request.getPlatform(), platformData.getCurrency().toString(), request.getPlatformUserId(),
+                            request.getAmount(),
+                            transferSuccessful.getLimit().longValue(), platformData.getCurrency().toString(),
                             totalLimit, availableLimit,
                             dailyTransferAmount, permanentLimitIncrease,
                             timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
@@ -1104,16 +1104,16 @@ public class BonusService {
                         
                         String message = String.format(
                                 "🆔: %d  Bonus To'lov yakunlandi ✅\n" +
-                                        "🌐%s:%s\n" +
-                                        "👤%d\n" +
-                                        "☎%s\n" +
-                                        "💰%,d UZS\n" +
-                                        "📊%,d/%,d\n" +
+                                        "👤: [%d] %s\n" +
+                                        "🌐 #%s %s🇺🇿:%s\n" +
+                                        "💸 Miqdor: %,d UZS\n" +
+                                        "📊 Limit: %,d / %,d so'm\n" +
                                         "📤%,d\n" +
                                         "📈%,d\n" +
-                                        "📅%s",
-                                request.getId(), request.getPlatform(), request.getPlatformUserId(),
-                                request.getAmount(), request.getChatId(), number, 
+                                        "📅 [%s]",
+                                request.getId(), request.getChatId(), number,
+                                request.getPlatform(), request.getCurrency().toString(), request.getPlatformUserId(),
+                                request.getAmount(),
                                 totalLimit, availableLimit,
                                 dailyTransferAmount, permanentLimitIncrease,
                                 timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
@@ -1137,17 +1137,17 @@ public class BonusService {
                         
                         String message = String.format(
                                 "🆔: %d  Bonus To'lov yakunlandi ✅\n" +
-                                        "🌐%s:%s\n" +
-                                        "👤%d\n" +
-                                        "☎%s\n" +
-                                        "💰%,d UZS\n" +
-                                        "🏦%,d %s\n" +
-                                        "📊%,d/%,d\n" +
+                                        "👤: [%d] %s\n" +
+                                        "🌐 #%s %s🇺🇿:%s\n" +
+                                        "💸 Miqdor: %,d UZS\n" +
+                                        "\n🏦: %,d %s\n" +
+                                        "📊 Limit: %,d / %,d so'm\n" +
                                         "📤%,d\n" +
                                         "📈%,d\n" +
-                                        "📅%s",
-                                request.getId(), request.getPlatform(), request.getPlatformUserId(),
-                                request.getAmount(), request.getChatId(), number,
+                                        "📅 [%s]",
+                                request.getId(), request.getChatId(), number,
+                                request.getPlatform(), platformData.getCurrency().toString(), request.getPlatformUserId(),
+                                request.getAmount(),
                                 cashdeskBalance.getLimit().longValue(), platformData.getCurrency().toString(),
                                 totalLimit, availableLimit,
                                 dailyTransferAmount, permanentLimitIncrease,
