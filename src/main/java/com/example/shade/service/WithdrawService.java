@@ -676,7 +676,7 @@ public class WithdrawService {
                             "🆔: %d\n" +
                             "👤: %s\n" +
                             "📞: %s\n" +
-                            "🌐 #%s %s🇺🇿:%s\n" +
+                            "🌐 #%s: %s\n" +
                             "💳 Karta: %s\n" +
                             "🔑 Kod: %s\n" +
                             "💵 Berish: %s\n" +
@@ -684,7 +684,7 @@ public class WithdrawService {
                     request.getId(),
                     chatId.toString(),
                     number,
-                    platform, request.getCurrency().toString(), request.getPlatformUserId(),
+                    platform, request.getPlatformUserId(),
                     cardNumber, code,
                     netAmount.toPlainString(),
                     LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));

@@ -1507,31 +1507,31 @@ public class BonusService {
             if (limitIncreaseJustAdded > 0) {
                 adminLog = String.format(
                         "Lotereya o'ynaldi 🎟\n" +
-                                "🎟️ Chiptalar: %,d ta\n" +
                                 "👤 User ID [%s] %s\n" +
                                 "🎫 O'ynalgan chiptalar: %s ta\n" +
                                 "💰 Jami yutuq: %s so'm\n" +
                                 "📈 Limit oshdi (bu o'yin): %,d so'm\n" +
                                 "📊 Limit: %,d / %,d so'm\n" +
+                                "🎟️ Chiptalar: %,d ta\n" +
                                 "💸 Yangi balans: %s so'm\n" +
                                 "📅 [%s]",
-                        chatId, balance.getTickets(), number, numberOfPlays, totalWinnings.longValue(), 
+                        chatId, number, numberOfPlays, totalWinnings.longValue(), 
                         limitIncreaseJustAdded, totalDailyLimitIncrease, tomorrowPermanentLimit,
-                        balance.getBalance().longValue(),
+                        balance.getTickets(), balance.getBalance().longValue(),
                         timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
             } else {
                 adminLog = String.format(
                         "Lotereya o'ynaldi 🎟\n" +
-                                "🎟️ Chiptalar: %,d ta\n" +
                                 "👤 User ID [%s] %s\n" +
                                 "🎫 O'ynalgan chiptalar: %s ta\n" +
                                 "💰 Jami yutuq: %s so'm\n" +
                                 "📊 Limit: %,d / %,d so'm\n" +
+                                "🎟️ Chiptalar: %,d ta\n" +
                                 "💸 Yangi balans: %s so'm\n" +
                                 "📅 [%s]",
-                        chatId, balance.getTickets(), number, numberOfPlays, totalWinnings.longValue(), 
+                        chatId, number, numberOfPlays, totalWinnings.longValue(), 
                         totalDailyLimitIncrease, tomorrowPermanentLimit,
-                        balance.getBalance().longValue(),
+                        balance.getTickets(), balance.getBalance().longValue(),
                         timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
             }
             adminLogBotService.sendLog(adminLog);
