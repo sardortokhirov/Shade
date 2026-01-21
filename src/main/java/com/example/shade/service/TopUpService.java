@@ -634,7 +634,7 @@ public class TopUpService {
 
                 String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
                 String logMessage = String.format(
-                        "🆔: %d  To'lov yakunlandi ✅\n" +
+                        "🆔: %d To'lov skrinshoti tasdiqlandi ✅\n" +
                                 "🌐 #%s: " + "%s\n" +
                                 "💸 Miqdor: %,d UZS\n" +
                                 "💸 Miqdor: %,d RUB\n" +
@@ -660,7 +660,7 @@ public class TopUpService {
                 Optional<DailyUserStats> dailyStatsOpt = dailyUserStatsRepository.findByChatIdAndDate(request.getChatId(), today);
                 Long dailyTopUpAmount = dailyStatsOpt.map(DailyUserStats::getDailyTopUpAmount).orElse(0L);
                 String logMessageAdmin = String.format(
-                        "🆔: %d  To'lov yakunlandi ✅\n" +
+                        "🆔: %d To'lov skrinshoti tasdiqlandi ✅\n" +
                                 "👤: [%d] %s\n" +
                                 "🌐 #%s %s🇺🇿:%s\n" +
                                 "💸 Miqdor: %,d UZS\n" +
@@ -911,7 +911,7 @@ public class TopUpService {
                 Optional<DailyUserStats> dailyStatsOptForTopUp = dailyUserStatsRepository.findByChatIdAndDate(request.getChatId(), todayForTopUp);
                 Long dailyTopUpAmountForLog = dailyStatsOptForTopUp.map(DailyUserStats::getDailyTopUpAmount).orElse(0L);
                 String adminLogMessage = String.format(
-                        "🆔: %d  To'lov yakunlandi ✅\n" +
+                        "🆔: %d To'lov skrinshoti tasdiqlandi ✅\n" +
                                 "👤: [%d] %s\n" +
                                 "🌐 #%s %s🇺🇿:%s\n" +
                                 "💸 Miqdor: %,d UZS\n" +
@@ -1117,7 +1117,7 @@ public class TopUpService {
                 Optional<DailyUserStats> dailyStatsOptForTopUp = dailyUserStatsRepository.findByChatIdAndDate(request.getChatId(), todayForTopUp);
                 Long dailyTopUpAmountForLog = dailyStatsOptForTopUp.map(DailyUserStats::getDailyTopUpAmount).orElse(0L);
                 String adminLogMessage = String.format(
-                        "🆔: %d  To'lov yakunlandi ✅\n" +
+                        "🆔: %d To'lov skrinshoti tasdiqlandi ✅\n" +
                                 "👤: [%d] %s\n" +
                                 "🌐 #%s %s🇺🇿:%s\n" +
                                 "💸 Miqdor: %,d UZS\n" +
