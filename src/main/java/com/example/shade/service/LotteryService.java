@@ -94,7 +94,8 @@ public class LotteryService {
 
     @Transactional
     public Map<Long, BigDecimal> playLotteryWithDetails(Long chatId, Long numberOfPlays) {
-        UserBalance balance = userBalanceRepository.findById(chatId)
+        // Use pessimistic lock to prevent concurrent lottery plays
+        UserBalance balance = userBalanceRepository.findByIdWithLock(chatId)
                 .orElseThrow(() -> new IllegalStateException("User balance not found: " + chatId));
         Long minTickets = configurationService.getMinTickets();
         Long maxTickets = configurationService.getMaxTickets();

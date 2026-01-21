@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.http.*;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.DigestUtils;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
@@ -1353,6 +1354,7 @@ public class BonusService {
     }
 
     @Async("bonusProcessingExecutor")
+    @Transactional
     public void playLottery(Long chatId) {
         // Send immediate feedback to user
         messageSender.sendMessage(chatId,
@@ -1360,14 +1362,15 @@ public class BonusService {
         
         try {
             // Safe pattern: get existing balance or create new one if truly doesn't exist
-            Optional<UserBalance> balanceOpt = userBalanceRepository.findById(chatId);
+            // Use pessimistic lock to prevent concurrent lottery plays
+            Optional<UserBalance> balanceOpt = userBalanceRepository.findByIdWithLock(chatId);
             UserBalance balance;
             if (balanceOpt.isPresent()) {
                 balance = balanceOpt.get();
             } else {
                 // Double-check to prevent race condition overwrites
                 if (userBalanceRepository.existsById(chatId)) {
-                    balance = userBalanceRepository.findById(chatId)
+                    balance = userBalanceRepository.findByIdWithLock(chatId)
                             .orElseThrow(() -> new IllegalStateException(
                                     "UserBalance exists but not accessible for chatId: " + chatId));
                 } else {
