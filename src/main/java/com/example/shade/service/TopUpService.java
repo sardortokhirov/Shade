@@ -662,7 +662,7 @@ public class TopUpService {
                 String logMessageAdmin = String.format(
                         "🆔: %d To'lov yakunlandi ✅\n" +
                                 "👤: [%d] %s\n" +
-                                "🌐 #%s %s🇺🇿:%s\n" +
+                                "🌐 #%s: %s\n" +
                                 "💸 Miqdor: %,d UZS\n" +
                                 "💸 Miqdor: %,d RUB\n" +
                                 "💳 Karta: %s\n" +
@@ -675,7 +675,6 @@ public class TopUpService {
                         chatId,
                         number,
                         request.getPlatform(),
-                        request.getCurrency().toString(),
                         request.getPlatformUserId(),
                         request.getUniqueAmount(),
                         rubAmount,
@@ -913,7 +912,7 @@ public class TopUpService {
                 String adminLogMessage = String.format(
                         "🆔: %d To'lov skrinshoti tasdiqlandi ✅\n" +
                                 "👤: [%d] %s\n" +
-                                "🌐 #%s %s🇺🇿:%s\n" +
+                                "🌐 #%s: %s\n" +
                                 "💸 Miqdor: %,d UZS\n" +
                                 "💸 Miqdor: %,d RUB\n" +
                                 "💳 Karta: %s\n" +
@@ -925,7 +924,6 @@ public class TopUpService {
                         request.getId(),
                         request.getChatId(), number,
                         request.getPlatform(),
-                        request.getCurrency().toString(),
                         request.getPlatformUserId(),
                         request.getUniqueAmount(),
                         rubAmount,
@@ -1117,7 +1115,7 @@ public class TopUpService {
                 String adminLogMessage = String.format(
                         "🆔: %d To'lov skrinshoti tasdiqlandi ✅\n" +
                                 "👤: [%d] %s\n" +
-                                "🌐 #%s %s🇺🇿:%s\n" +
+                                "🌐 #%s: %s\n" +
                                 "💸 Miqdor: %,d UZS\n" +
                                 "💸 Miqdor: %,d RUB\n" +
                                 "💳 Karta: %s\n" +
@@ -1129,7 +1127,6 @@ public class TopUpService {
                         request.getId(),
                         request.getChatId(), number,
                         request.getPlatform(),
-                        request.getCurrency().toString(),
                         request.getPlatformUserId(),
                         request.getUniqueAmount(),
                         rubAmount,

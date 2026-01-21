@@ -982,13 +982,13 @@ public class BonusService {
                     String message = String.format(
                             "🆔: %d  Bonus To'lov yakunlandi ✅\n" +
                                     "👤: [%d] %s\n" +
-                                    "🌐 #%s %s🇺🇿:%s\n" +
+                                    "🌐 #%s: %s\n" +
                                     "💸 Miqdor: %,d UZS\n" +
                                     "\n🏦: %,d %s\n" +
                                     "\n📊 Limit: %,d / %,d so'm\n" +
                                     "📅 [%s]",
                             request.getId(), request.getChatId(), number,
-                            request.getPlatform(), request.getCurrency().toString(), request.getPlatformUserId(),
+                            request.getPlatform(), request.getPlatformUserId(),
                             request.getAmount(),
                             cashdeskBalance != null && cashdeskBalance.getBalance() != null 
                                     ? cashdeskBalance.getBalance().longValue() : 0L,
@@ -1017,13 +1017,13 @@ public class BonusService {
                     String message = String.format(
                             "🆔: %d  Bonus To'lov yakunlandi ✅\n" +
                                     "👤: [%d] %s\n" +
-                                    "🌐 #%s %s🇺🇿:%s\n" +
+                                    "🌐 #%s: %s\n" +
                                     "💸 Miqdor: %,d UZS\n" +
                                     "\n🏦: %,d %s\n" +
                                     "\n📊 Limit: %,d / %,d so'm\n" +
                                     "📅 [%s]",
                             request.getId(), request.getChatId(), number,
-                            request.getPlatform(), platformData.getCurrency().toString(), request.getPlatformUserId(),
+                            request.getPlatform(), request.getPlatformUserId(),
                             request.getAmount(),
                             transferSuccessful.getLimit().longValue(), platformData.getCurrency().toString(),
                             totalLimit, availableLimit,
@@ -1123,12 +1123,12 @@ public class BonusService {
                         String message = String.format(
                                 "🆔: %d  Bonus To'lov yakunlandi ✅\n" +
                                         "👤: [%d] %s\n" +
-                                        "🌐 #%s %s🇺🇿:%s\n" +
+                                        "🌐 #%s: %s\n" +
                                         "💸 Miqdor: %,d UZS\n" +
                                         "\n📊 Limit: %,d / %,d so'm\n" +
                                         "📅 [%s]",
                                 request.getId(), request.getChatId(), number,
-                                request.getPlatform(), request.getCurrency().toString(), request.getPlatformUserId(),
+                                request.getPlatform(), request.getPlatformUserId(),
                                 request.getAmount(),
                                 totalLimit, availableLimit,
                                 timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
@@ -1153,13 +1153,13 @@ public class BonusService {
                         String message = String.format(
                                 "🆔: %d  Bonus To'lov yakunlandi ✅\n" +
                                         "👤: [%d] %s\n" +
-                                        "🌐 #%s %s🇺🇿:%s\n" +
+                                        "🌐 #%s: %s\n" +
                                         "💸 Miqdor: %,d UZS\n" +
                                         "\n🏦: %,d %s\n" +
                                         "\n📊 Limit: %,d / %,d so'm\n" +
                                         "📅 [%s]",
                                 request.getId(), request.getChatId(), number,
-                                request.getPlatform(), platformData.getCurrency().toString(), request.getPlatformUserId(),
+                                request.getPlatform(), request.getPlatformUserId(),
                                 request.getAmount(),
                                 cashdeskBalance.getLimit().longValue(), platformData.getCurrency().toString(),
                                 totalLimit, availableLimit,
