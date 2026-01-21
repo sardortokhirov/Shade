@@ -57,9 +57,12 @@ public class LottoBotService {
 
     public void logBonusTopUpWin(Long chatId, Long amount, String platform, LocalDateTime timestamp) {
         String date = timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        String maskedChatId = chatId.toString().length() >= 7
+                ? chatId.toString().substring(0, 3).concat("***").concat(chatId.toString().substring(6))
+                : chatId.toString();
         String logMessage = String.format(
                 languageSessionService.getTranslation(chatId, "lotto.message.bonus_topup_win"),
-                amount, date, platform, amount
+                amount, amount, platform, date, maskedChatId
         );
 
         List<AdminChat> adminChats = adminChatRepository.findByReceiveNotificationsTrue();
