@@ -204,12 +204,21 @@ public class DailyStatsService {
     }
 
     /**
-     * Calculates available limit including carryover:
-     * availableLimit = (permanentLimit + carryover) - dailyTransfers
+     * Calculates available limit respecting Pay Toggle and deposits:
+     * 
+     * When Pay Toggle OFF (default - deposits required):
+     *   availableLimit = min(effectiveDailyLimit, dailyTopUpAmount) - dailyTransfers
+     *   This ensures 0 when no deposits are made today
+     * 
+     * When Pay Toggle ON (deposits ignored):
+     *   availableLimit = (permanentLimit + carryover) - dailyTransfers
+     *   Uses carryover from previous day's unused limit
      * 
      * Where:
+     * - effectiveDailyLimit = DL + TD + LD (base + permanent increase + daily increase)
      * - permanentLimit = DL + TD (base limit + permanent increase from top-ups)
      * - carryover = temporary limit from previous day's unused limit
+     * - dailyTopUpAmount = deposits made today
      * - dailyTransfers = amount already transferred today
      * 
      * Note: permanentIncrease comes from top-ups (never resets)
@@ -222,12 +231,32 @@ public class DailyStatsService {
         Long permanentIncreaseLong = permanentIncrease.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
         Long carryover = stats.getCarryoverAmount() != null ? stats.getCarryoverAmount() : 0L;
         Long dailyTransfers = stats.getDailyTransferAmount() != null ? stats.getDailyTransferAmount() : 0L;
+        Long dailyTopUpAmount = stats.getDailyTopUpAmount() != null ? stats.getDailyTopUpAmount() : 0L;
         
-        // Calculate permanent limit (DL + TD)
-        Long permanentLimit = dailyLimit + permanentIncreaseLong;
+        Long available;
         
-        // Calculate total available limit (permanent + carryover - transfers)
-        Long available = permanentLimit + carryover - dailyTransfers;
+        if (!featureService.isPayToggleEnabled()) {
+            // Pay Toggle OFF: deposits are required
+            // Calculate effective daily limit (base + permanent + daily increase)
+            Long dailyLimitIncrease = stats.getDailyLimitIncrease() != null ? stats.getDailyLimitIncrease() : 0L;
+            Long effectiveDailyLimit = dailyLimit + permanentIncreaseLong + dailyLimitIncrease;
+            
+            // Available limit is constrained by deposits: min(effectiveLimit, deposits) - transfers
+            available = Math.min(effectiveDailyLimit, dailyTopUpAmount) - dailyTransfers;
+            
+            logger.debug("getAvailableLimit for chatId {} (Pay Toggle OFF): effectiveLimit={}, dailyTopUps={}, dailyTransfers={}, available={}", 
+                    chatId, effectiveDailyLimit, dailyTopUpAmount, dailyTransfers, available);
+        } else {
+            // Pay Toggle ON: deposits are ignored, use carryover logic
+            // Calculate permanent limit (DL + TD)
+            Long permanentLimit = dailyLimit + permanentIncreaseLong;
+            
+            // Calculate total available limit (permanent + carryover - transfers)
+            available = permanentLimit + carryover - dailyTransfers;
+            
+            logger.debug("getAvailableLimit for chatId {} (Pay Toggle ON): permanentLimit={}, carryover={}, dailyTransfers={}, available={}", 
+                    chatId, permanentLimit, carryover, dailyTransfers, available);
+        }
         
         return Math.max(0L, available); // Ensure non-negative
     }
