@@ -907,13 +907,16 @@ public class BonusService {
                         "💰 *Summa:* `%,d so‘m`\n" +
                         "👤 *Foydalanuvchi:* `%d`\n" +
                         "📞 *Telefon:* `%s`\n\n" +
-                        "*Tasdiqlaysizmi?*",
+                        "*Tasdiqlaysizmi?*\n\n" +
+                        "📅 [%s]",
                 request.getId(),
                 request.getPlatform(),
                 escapeMarkdown(request.getPlatformUserId()),
                 request.getAmount(),
                 chatId,
-                escapeMarkdown(number));
+                escapeMarkdown(number),
+                LocalDateTime.now(ZoneId.of("GMT+5"))
+                        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
         adminLogBotService.sendWithdrawRequestToAdmins(chatId, message, request.getId(),
                 createAdminApprovalKeyboard(chatId, request.getId(), request.getChatId()));
@@ -960,16 +963,36 @@ public class BonusService {
                     BigDecimal permanentIncrease = userLimitIncreaseService.getPermanentLimitIncrease(request.getChatId());
                     Long permanentLimitIncrease = permanentIncrease.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
                     
+                    // Retrieve bank balance for mostbet
+                    BalanceLimit cashdeskBalance = null;
+                    try {
+                        String apiKey = platformData.getApiKey();
+                        String secret = platformData.getSecret();
+                        String cashpointId = platformData.getWorkplaceId();
+                        if (apiKey != null && secret != null && cashpointId != null) {
+                            MostbetService.BalanceResponse balanceResponse = mostbetService.getBalance(apiKey, secret, cashpointId);
+                            if (balanceResponse != null) {
+                                cashdeskBalance = new BalanceLimit(new BigDecimal(balanceResponse.balance()), null);
+                            }
+                        }
+                    } catch (Exception e) {
+                        logger.warn("Failed to retrieve balance for mostbet platform: {}", e.getMessage());
+                    }
+                    
                     String message = String.format(
                             "🆔: %d  Bonus To'lov yakunlandi ✅\n" +
                                     "👤: [%d] %s\n" +
                                     "🌐 #%s %s🇺🇿:%s\n" +
                                     "💸 Miqdor: %,d UZS\n" +
+                                    "\n🏦: %,d %s\n" +
                                     "\n📊 Limit: %,d / %,d so'm\n" +
                                     "📅 [%s]",
                             request.getId(), request.getChatId(), number,
                             request.getPlatform(), request.getCurrency().toString(), request.getPlatformUserId(),
                             request.getAmount(),
+                            cashdeskBalance != null && cashdeskBalance.getBalance() != null 
+                                    ? cashdeskBalance.getBalance().longValue() : 0L,
+                            request.getCurrency().toString(),
                             totalLimit, availableLimit,
                             LocalDateTime.now(ZoneId.of("GMT+5"))
                                     .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
@@ -1446,14 +1469,22 @@ public class BonusService {
 
             // Get total daily limit increase after this play
             Long totalDailyLimitIncrease = 0L;
+            Long permanentIncreaseLong = 0L;
             try {
                 Long effectiveDailyLimit = dailyStatsService.getEffectiveDailyLimitReadOnly(chatId);
                 Long baseLimit = configurationService.getDailyBonusTransferLimit();
                 BigDecimal permanentIncrease = userLimitIncreaseService.getPermanentLimitIncrease(chatId);
-                Long permanentIncreaseLong = permanentIncrease.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
+                permanentIncreaseLong = permanentIncrease.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
                 totalDailyLimitIncrease = effectiveDailyLimit - baseLimit - permanentIncreaseLong;
             } catch (Exception e) {
                 logger.warn("Failed to get total daily limit increase for chatId {}: {}", chatId, e.getMessage());
+                // Still try to get permanent limit for the log
+                try {
+                    BigDecimal permanentIncrease = userLimitIncreaseService.getPermanentLimitIncrease(chatId);
+                    permanentIncreaseLong = permanentIncrease.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
+                } catch (Exception ex) {
+                    logger.warn("Failed to get permanent limit increase for chatId {}: {}", chatId, ex.getMessage());
+                }
             }
 
             StringBuilder winningsLog = new StringBuilder();
@@ -1474,10 +1505,11 @@ public class BonusService {
                                 "💰 Jami yutuq: %s so'm\n" +
                                 "📈 Limit oshdi (bu o'yin): %,d so'm\n" +
                                 "📊 Jami limit oshishi: %,d so'm\n" +
+                                "🔒 Jami doimiy limit: %,d so'm\n" +
                                 "💸 Yangi balans: %s so'm\n" +
                                 "📅 [%s]",
                         chatId, number, numberOfPlays, totalWinnings.longValue(), 
-                        limitIncreaseJustAdded, totalDailyLimitIncrease,
+                        limitIncreaseJustAdded, totalDailyLimitIncrease, permanentIncreaseLong,
                         balance.getBalance().longValue(),
                         timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
             } else {
@@ -1486,9 +1518,11 @@ public class BonusService {
                                 "👤 User ID [%s] %s\n" +
                                 "🎫 O'ynalgan chiptalar: %s ta\n" +
                                 "💰 Jami yutuq: %s so'm\n" +
+                                "🔒 Jami doimiy limit: %,d so'm\n" +
                                 "💸 Yangi balans: %s so'm\n" +
                                 "📅 [%s]",
-                        chatId, number, numberOfPlays, totalWinnings.longValue(), balance.getBalance().longValue(),
+                        chatId, number, numberOfPlays, totalWinnings.longValue(), permanentIncreaseLong,
+                        balance.getBalance().longValue(),
                         timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
             }
             adminLogBotService.sendLog(adminLog);

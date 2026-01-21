@@ -199,14 +199,16 @@ public class WithdrawService {
             requestRepository.save(request);
 
             String logMessage = String.format(
-                    "#%d Withdraw ✅\n" +
-                            "👤%d | ☎%s | 🌐%s:%s\n" +
-                            "💳%s | 🔑%s\n" +
-                            "💵%,d UZS\n" +
-                            "📅%s",
+                    "🆔: %d Pul yechib olish tasdiqlandi ✅\n" +
+                            "👤: [%d] %s\n" +
+                            "🌐 #%s %s🇺🇿:%s\n" +
+                            "💳 Karta: %s\n" +
+                            "🔑 Kod: %s\n" +
+                            "💵 Tushgan: %,d\n" +
+                            "📅 [%s]",
                     request.getId(),
                     chatId, number,
-                    platform, userId,
+                    platform, request.getCurrency().toString(), userId,
                     cardNumber, code,
                     request.getUniqueAmount(),
                     LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
@@ -225,11 +227,15 @@ public class WithdrawService {
             requestRepository.save(request);
 
             String logMessage = String.format(
-                    "#%d Withdraw ❌\n" +
-                            "👤%d | ☎%s | 🌐%s:%s\n" +
-                            "💵%,d UZS | 💳%s | 🔑%s\n" +
-                            "📅%s",
-                    request.getId(), chatId, number, platform, userId,
+                    "🆔: %d Pul yechib olish rad etildi ❌\n" +
+                            "👤: [%d] %s\n" +
+                            "🌐 #%s %s🇺🇿:%s\n" +
+                            "💵 Tushgan: %,d\n" +
+                            "💳 Karta: %s\n" +
+                            "🔑 Kod: %s\n" +
+                            "📅 [%s]",
+                    request.getId(), chatId, number,
+                    platform, request.getCurrency().toString(), userId,
                     request.getUniqueAmount(), cardNumber, code,
                     LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
             adminLogBotService.sendLog(logMessage);
@@ -666,17 +672,20 @@ public class WithdrawService {
                     .replace("-", "\\-");
 
             String logMessage = String.format(
-                    "*#%d Withdraw \uD83D\uDCB8*\n" +
-                            "*👤%s | ☎%s | 🌐%s:%s*\n" +
-                            "*💳%s | 🔑%s*\n" +
-                            "*💵%s UZS*\n" +
-                            "*📅%s*",
+                    "#Pul yechish so'rovi 💸\n\n" +
+                            "🆔: %d\n" +
+                            "👤: %s\n" +
+                            "📞: %s\n" +
+                            "🌐 #%s %s🇺🇿:%s\n" +
+                            "💳 Karta: %s\n" +
+                            "🔑 Kod: %s\n" +
+                            "💵 Berish: %s\n" +
+                            "📅 %s",
                     request.getId(),
-                    chatId.toString(), escapeMarkdown(number),
-                    escapeMarkdown(platform),
-                    escapeMarkdown(request.getPlatformUserId()),
-                    escapeMarkdown(escapedCardNumber),
-                    escapeMarkdown(code),
+                    chatId.toString(),
+                    number,
+                    platform, request.getCurrency().toString(), request.getPlatformUserId(),
+                    cardNumber, code,
                     netAmount.toPlainString(),
                     LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
