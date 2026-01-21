@@ -920,7 +920,6 @@ public class TopUpService {
                                 "💳 Bizniki: %s\n" +
                                 "🎟️ Chiptalar: %d (+ %d )\n" +
                                 "\n🏦: %,d %s\n" +
-                                "\n📈+%,d\n" +
                                 "📊 Limit: %,d / %,d so'm\n" +
                                 "📅 [%s]",
                         request.getId(),
@@ -936,7 +935,6 @@ public class TopUpService {
                         tickets,
                         transferSuccessful.getLimit().longValue(),
                         request.getCurrency().toString(),
-                        limitIncrease,
                         totalLimit, availableLimit,
                         LocalDateTime.now(ZoneId.of("GMT+5"))
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
@@ -1126,7 +1124,6 @@ public class TopUpService {
                                 "💳 Bizniki: %s\n" +
                                 "🎟️ Chiptalar: %d (+ %d )\n" +
                                 "\n🏦: %,d %s\n" +
-                                "\n📈+%,d\n" +
                                 "📊 Limit: %,d / %,d so'm\n" +
                                 "📅 [%s]",
                         request.getId(),
@@ -1142,7 +1139,6 @@ public class TopUpService {
                         tickets,
                         transferSuccessful.getLimit().longValue(),
                         request.getCurrency().toString(),
-                        limitIncrease,
                         totalLimit, availableLimit,
                         LocalDateTime.now(ZoneId.of("GMT+5"))
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));

@@ -1445,10 +1445,14 @@ public class BonusService {
             Long numberOfPlays = Math.min(availableTickets, maxTickets);
             Map<Long, BigDecimal> ticketWinnings = lotteryService.playLotteryWithDetails(chatId, numberOfPlays);
 
-            balance.setTickets(balance.getTickets() - numberOfPlays);
+            // NOTE: playLotteryWithDetails already deducts tickets and adds winnings to balance
+            // We only need to calculate totalWinnings for logging/display and update lastLotteryPlayTime
             BigDecimal totalWinnings = ticketWinnings.values().stream()
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
-            balance.setBalance(balance.getBalance().add(totalWinnings));
+            
+            // Re-fetch the updated balance to get correct values after playLotteryWithDetails modified it
+            balance = userBalanceRepository.findById(chatId)
+                    .orElseThrow(() -> new IllegalStateException("UserBalance not found after lottery play: " + chatId));
             balance.setLastLotteryPlayTime(LocalDateTime.now(ZoneId.of("GMT+5")));
             userBalanceRepository.save(balance);
 
@@ -1507,7 +1511,7 @@ public class BonusService {
                                 "🎫 O'ynalgan chiptalar: %s ta\n" +
                                 "💰 Jami yutuq: %s so'm\n" +
                                 "📈 Limit oshdi (bu o'yin): %,d so'm\n" +
-                                "📊 Limit: %,d / %,d so'm (Jami oshishi / Doimiy)\n" +
+                                "📊 Limit: %,d / %,d so'm\n" +
                                 "💸 Yangi balans: %s so'm\n" +
                                 "📅 [%s]",
                         chatId, number, numberOfPlays, totalWinnings.longValue(), 
@@ -1520,7 +1524,7 @@ public class BonusService {
                                 "👤 User ID [%s] %s\n" +
                                 "🎫 O'ynalgan chiptalar: %s ta\n" +
                                 "💰 Jami yutuq: %s so'm\n" +
-                                "📊 Limit: %,d / %,d so'm (Jami oshishi / Doimiy)\n" +
+                                "📊 Limit: %,d / %,d so'm\n" +
                                 "💸 Yangi balans: %s so'm\n" +
                                 "📅 [%s]",
                         chatId, number, numberOfPlays, totalWinnings.longValue(), 
