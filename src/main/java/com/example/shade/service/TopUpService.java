@@ -656,6 +656,8 @@ public class TopUpService {
 
                 Long totalLimit = dailyStatsService.getEffectiveDailyLimit(request.getChatId());
                 Long availableLimit = dailyStatsService.getAvailableLimit(request.getChatId());
+                Long carryover = dailyStatsService.getCarryoverAmount(request.getChatId());
+                String formattedLimit = dailyStatsService.formatLimitWithCarryover(totalLimit, carryover);
                 LocalDate today = LocalDate.now(ZoneId.of("GMT+5"));
                 Optional<DailyUserStats> dailyStatsOpt = dailyUserStatsRepository.findByChatIdAndDate(request.getChatId(), today);
                 Long dailyTopUpAmount = dailyStatsOpt.map(DailyUserStats::getDailyTopUpAmount).orElse(0L);
@@ -669,7 +671,7 @@ public class TopUpService {
                                 "💳 Bizniki: %s\n" +
                                 "🎟️ Chiptalar: %d (+ %d )\n" +
                                 "\n🏦: %,d %s\n" +
-                                "\n📊 Limit: %,d / %,d so'm\n" +
+                                "\n📊 Limit: %s / %,d so'm\n" +
                                 "📅 [%s]",
                         request.getId(),
                         chatId,
@@ -684,7 +686,7 @@ public class TopUpService {
                         tickets,
                         transferSuccessful.getLimit().longValue(),
                         request.getCurrency().toString(),
-                        totalLimit, availableLimit,
+                        formattedLimit, availableLimit,
                         LocalDateTime.now(ZoneId.of("GMT+5"))
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                 adminLogBotService.sendLog(logMessageAdmin);
@@ -890,6 +892,8 @@ public class TopUpService {
                 String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
                 Long totalLimit = dailyStatsService.getEffectiveDailyLimit(request.getChatId());
                 Long availableLimit = dailyStatsService.getAvailableLimit(request.getChatId());
+                Long carryover = dailyStatsService.getCarryoverAmount(request.getChatId());
+                String formattedLimit = dailyStatsService.formatLimitWithCarryover(totalLimit, carryover);
                 String logMessage = String.format(
                         " 🆔: %d To'lov skrinshoti tasdiqlandi ✅\n" +
                                 "👤ID [%s] %s\n" +
@@ -900,7 +904,7 @@ public class TopUpService {
                                 "🔐 Admin kartasi: `%s`\n" +
                                 "🎟️ Chiptalar: %d (+ %d )\n\n" +
                                 "📈 Limit oshdi: %,d so'm\n" +
-                                "📊 Limit: %,d / %,d so'm\n" +
+                                "📊 Limit: %s / %,d so'm\n" +
                                 "📅 [%s] ",
                         request.getId(),
                         request.getChatId(), number,
@@ -913,7 +917,7 @@ public class TopUpService {
                         balance.getTickets(),
                         tickets,
                         limitIncrease,
-                        totalLimit, availableLimit,
+                        formattedLimit, availableLimit,
                         LocalDateTime.now(ZoneId.of("GMT+5"))
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                 LocalDate todayForTopUp = LocalDate.now(ZoneId.of("GMT+5"));
@@ -929,7 +933,7 @@ public class TopUpService {
                                 "💳 Bizniki: %s\n" +
                                 "🎟️ Chiptalar: %d (+ %d )\n" +
                                 "\n🏦: %,d %s\n" +
-                                "📊 Limit: %,d / %,d so'm\n" +
+                                "📊 Limit: %s / %,d so'm\n" +
                                 "📅 [%s]",
                         request.getId(),
                         request.getChatId(), number,
@@ -943,7 +947,7 @@ public class TopUpService {
                         tickets,
                         transferSuccessful.getLimit().longValue(),
                         request.getCurrency().toString(),
-                        totalLimit, availableLimit,
+                        formattedLimit, availableLimit,
                         LocalDateTime.now(ZoneId.of("GMT+5"))
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
@@ -1099,6 +1103,8 @@ public class TopUpService {
                 String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
                 Long totalLimit = dailyStatsService.getEffectiveDailyLimit(request.getChatId());
                 Long availableLimit = dailyStatsService.getAvailableLimit(request.getChatId());
+                Long carryover = dailyStatsService.getCarryoverAmount(request.getChatId());
+                String formattedLimit = dailyStatsService.formatLimitWithCarryover(totalLimit, carryover);
                 String logMessage = String.format(
                         " 🆔: %d To'lov skrinshoti tasdiqlandi ✅\n" +
                                 "👤ID [%s] %s\n" +
@@ -1109,7 +1115,7 @@ public class TopUpService {
                                 "🔐 Admin kartasi: `%s`\n" +
                                 "🎟️ Chiptalar: %d (+ %d )\n\n" +
                                 "📈 Limit oshdi: %,d so'm\n" +
-                                "📊 Limit: %,d / %,d so'm\n" +
+                                "📊 Limit: %s / %,d so'm\n" +
                                 "📅 [%s] ",
                         request.getId(),
                         request.getChatId(), number,
@@ -1122,7 +1128,7 @@ public class TopUpService {
                         balance.getTickets(),
                         tickets,
                         limitIncrease,
-                        totalLimit, availableLimit,
+                        formattedLimit, availableLimit,
                         LocalDateTime.now(ZoneId.of("GMT+5"))
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                 LocalDate todayForTopUp = LocalDate.now(ZoneId.of("GMT+5"));
@@ -1138,7 +1144,7 @@ public class TopUpService {
                                 "💳 Bizniki: %s\n" +
                                 "🎟️ Chiptalar: %d (+ %d )\n" +
                                 "\n🏦: %,d %s\n" +
-                                "📊 Limit: %,d / %,d so'm\n" +
+                                "📊 Limit: %s / %,d so'm\n" +
                                 "📅 [%s]",
                         request.getId(),
                         request.getChatId(), number,
@@ -1152,7 +1158,7 @@ public class TopUpService {
                         tickets,
                         transferSuccessful.getLimit().longValue(),
                         request.getCurrency().toString(),
-                        totalLimit, availableLimit,
+                        formattedLimit, availableLimit,
                         LocalDateTime.now(ZoneId.of("GMT+5"))
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 

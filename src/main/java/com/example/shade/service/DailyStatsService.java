@@ -298,6 +298,37 @@ public class DailyStatsService {
     }
 
     /**
+     * Gets the current carryover amount for today
+     * Carryover is the unused limit from previous day that can be used today
+     */
+    public Long getCarryoverAmount(Long chatId) {
+        DailyUserStats stats = getOrCreateTodayStats(chatId);
+        return stats.getCarryoverAmount() != null ? stats.getCarryoverAmount() : 0L;
+    }
+
+    /**
+     * Formats limit with carryover for display
+     * Returns "effectiveLimit(+carryover)" if carryover > 0, otherwise just "effectiveLimit"
+     * Example: "3,000(+15)" or "3,000"
+     */
+    public String formatLimitWithCarryover(Long effectiveLimit, Long carryover) {
+        if (carryover != null && carryover > 0) {
+            return String.format("%,d(+%,d)", effectiveLimit, carryover);
+        }
+        return String.format("%,d", effectiveLimit);
+    }
+
+    /**
+     * Gets formatted limit string with carryover for a user
+     * Convenience method that fetches both values and formats them
+     */
+    public String getFormattedLimitWithCarryover(Long chatId) {
+        Long effectiveLimit = getEffectiveDailyLimit(chatId);
+        Long carryover = getCarryoverAmount(chatId);
+        return formatLimitWithCarryover(effectiveLimit, carryover);
+    }
+
+    /**
      * Checks if user can transfer the requested amount
      */
     public boolean canTransfer(Long chatId, Long amount) {
