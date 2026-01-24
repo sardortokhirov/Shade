@@ -672,20 +672,20 @@ public class WithdrawService {
                     .replace("-", "\\-");
 
             String logMessage = String.format(
-                    "#Pul yechish so'rovi 💸\n\n" +
-                            "🆔: %d\n" +
-                            "👤: %s\n" +
-                            "📞: %s\n" +
-                            "🌐 #%s: %s\n" +
-                            "💳 Karta: %s\n" +
-                            "🔑 Kod: %s\n" +
-                            "💵 Berish: %s\n" +
+                    "*#Pul yechish so'rovi 💸*\n\n" +
+                            "🆔: `%d`\n" +
+                            "👤: `%s`\n" +
+                            "📞: `%s`\n" +
+                            "🌐 *#%s:* `%s`\n" +
+                            "💳 *Karta:* `%s`\n" +
+                            "🔑 *Kod:* `%s`\n" +
+                            "💵 *Berish:* `%s`\n" +
                             "📅 %s",
                     request.getId(),
                     chatId.toString(),
-                    number,
-                    platform, request.getPlatformUserId(),
-                    cardNumber, code,
+                    escapeMarkdown(number),
+                    platform, escapeMarkdown(request.getPlatformUserId()),
+                    escapedCardNumber, escapeMarkdown(code),
                     netAmount.toPlainString(),
                     LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 

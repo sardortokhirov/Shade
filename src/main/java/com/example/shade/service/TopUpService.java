@@ -733,6 +733,14 @@ public class TopUpService {
     }
 
     private void handleTransferFailure(Long chatId, HizmatRequest request, AdminCard adminCard) {
+        // Ensure status is PENDING_SCREENSHOT to allow admin retry
+        // This handles case where transfer failed after approval attempt
+        if (request.getStatus() != RequestStatus.PENDING_SCREENSHOT) {
+            request.setStatus(RequestStatus.PENDING_SCREENSHOT);
+            requestRepository.save(request);
+            logger.info("Reverted request {} status to PENDING_SCREENSHOT after transfer failure", request.getId());
+        }
+        
         ExchangeRate latest = exchangeRateRepository.findLatest()
                 .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
         long rubAmount = BigDecimal.valueOf(request.getUniqueAmount())
@@ -821,9 +829,7 @@ public class TopUpService {
                 .longValue() / 1000;
 
         if (approve) {
-            request.setStatus(RequestStatus.APPROVED);
-            requestRepository.save(request);
-
+            // Attempt transfer FIRST, only set APPROVED status after success
             String platformName = request.getPlatform();
             Platform platform = platformRepository.findByName(platformName)
                     .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
@@ -834,6 +840,10 @@ public class TopUpService {
                 transferSuccessful = transferToPlatform(request, adminCard);
             }
             if (transferSuccessful != null) {
+                // Transfer succeeded - NOW set status to APPROVED
+                request.setStatus(RequestStatus.APPROVED);
+                requestRepository.save(request);
+                
                 Optional<UserBalance> balanceOpt = userBalanceRepository.findById(request.getChatId());
                 UserBalance balance;
                 if (balanceOpt.isPresent()) {
@@ -938,24 +948,27 @@ public class TopUpService {
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
                 adminLogBotService.sendLog(adminLogMessage);
+                Long userChatId = request.getChatId();
                 SendMessage successMessage = new SendMessage();
-                successMessage.setChatId(requestId);
+                successMessage.setChatId(userChatId);
                 successMessage.setText(logMessage +
                         (tickets > 0 ? String.format(
-                                languageSessionService.getTranslation(requestId, "topup.message.tickets_received"),
+                                languageSessionService.getTranslation(userChatId, "topup.message.tickets_received"),
                                 tickets) : ""));
-                successMessage.setReplyMarkup(createMainMenuOnlyKeyboard(requestId));
-                messageSender.sendMessage(successMessage, requestId);
+                successMessage.setReplyMarkup(createMainMenuOnlyKeyboard(userChatId));
+                messageSender.sendMessage(successMessage, userChatId);
+                logger.info("Sent approval message to user chatId {} for request {}", userChatId, requestId);
             } else {
-                handleTransferFailure(requestId, request, adminCard);
+                handleTransferFailure(request.getChatId(), request, adminCard);
             }
         } else {
             request.setStatus(RequestStatus.CANCELED);
             requestRepository.save(request);
 
-            String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
+            Long userChatId = request.getChatId();
+            String number = blockedUserRepository.findByChatId(userChatId).get().getPhoneNumber();
             String logMessage = String.format(
-                    languageSessionService.getTranslation(requestId, "topup.message.screenshot_rejected"),
+                    languageSessionService.getTranslation(userChatId, "topup.message.screenshot_rejected"),
                     request.getId(),
                     request.getPlatform(),
                     request.getPlatformUserId(),
@@ -974,7 +987,7 @@ public class TopUpService {
                             "💳 Bizniki: `%s`\n" +
                             "📅 [%s] ",
                     request.getId(),
-                    request.getChatId(), number,
+                    userChatId, number,
                     request.getPlatform(),
                     request.getPlatformUserId(),
                     request.getUniqueAmount(),
@@ -984,12 +997,13 @@ public class TopUpService {
                     LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
             adminLogBotService.sendLog(adminMessage);
-            messageSender.sendMessage(requestId, logMessage);
+            messageSender.sendMessage(userChatId, logMessage);
+            logger.info("Sent rejection message to user chatId {} for request {}", userChatId, requestId);
         }
 
-        sessionService.clearMessageIds(requestId);
-        sessionService.setUserData(requestId, PAYMENT_ATTEMPTS_KEY, "0");
-        sendMainMenu(requestId);
+        sessionService.clearMessageIds(request.getChatId());
+        sessionService.setUserData(request.getChatId(), PAYMENT_ATTEMPTS_KEY, "0");
+        sendMainMenu(request.getChatId());
     }
 
     public void handleScreenshotApprovalChat(Long adminChatId, Long requestId, boolean approve) {
@@ -1020,9 +1034,7 @@ public class TopUpService {
                 .longValue() / 1000;
 
         if (approve) {
-            request.setStatus(RequestStatus.APPROVED);
-            requestRepository.save(request);
-
+            // Attempt transfer FIRST, only set APPROVED status after success
             String platformName = request.getPlatform();
             Platform platform = platformRepository.findByName(platformName)
                     .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
@@ -1037,6 +1049,10 @@ public class TopUpService {
                 transferSuccessful = transferToPlatform(request, adminCard);
             }
             if (transferSuccessful != null) {
+                // Transfer succeeded - NOW set status to APPROVED
+                request.setStatus(RequestStatus.APPROVED);
+                requestRepository.save(request);
+                
                 Optional<UserBalance> balanceOpt = userBalanceRepository.findById(requestId);
                 UserBalance balance;
                 if (balanceOpt.isPresent()) {
@@ -1141,24 +1157,27 @@ public class TopUpService {
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
                 adminLogBotService.sendLog(adminLogMessage);
+                Long userChatId = request.getChatId();
                 SendMessage successMessage = new SendMessage();
-                successMessage.setChatId(requestId);
+                successMessage.setChatId(userChatId);
                 successMessage.setText(logMessage +
                         (tickets > 0 ? String.format(
-                                languageSessionService.getTranslation(requestId, "topup.message.tickets_received"),
+                                languageSessionService.getTranslation(userChatId, "topup.message.tickets_received"),
                                 tickets) : ""));
-                successMessage.setReplyMarkup(createMainMenuOnlyKeyboard(requestId));
-                messageSender.sendMessage(successMessage, requestId);
+                successMessage.setReplyMarkup(createMainMenuOnlyKeyboard(userChatId));
+                messageSender.sendMessage(successMessage, userChatId);
+                logger.info("Sent approval message to user chatId {} for request {}", userChatId, requestId);
             } else {
-                handleTransferFailure(requestId, request, adminCard);
+                handleTransferFailure(request.getChatId(), request, adminCard);
             }
         } else {
             request.setStatus(RequestStatus.CANCELED);
             requestRepository.save(request);
 
-            String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
+            Long userChatId = request.getChatId();
+            String number = blockedUserRepository.findByChatId(userChatId).get().getPhoneNumber();
             String logMessage = String.format(
-                    languageSessionService.getTranslation(requestId, "topup.message.screenshot_rejected"),
+                    languageSessionService.getTranslation(userChatId, "topup.message.screenshot_rejected"),
                     request.getId(),
                     request.getPlatform(),
                     request.getPlatformUserId(),
@@ -1177,7 +1196,7 @@ public class TopUpService {
                             "💳 Bizniki: `%s`\n" +
                             "📅 [%s] ",
                     request.getId(),
-                    request.getChatId(), number,
+                    userChatId, number,
                     request.getPlatform(),
                     request.getPlatformUserId(),
                     request.getUniqueAmount(),
@@ -1187,12 +1206,13 @@ public class TopUpService {
                     LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
             adminLogBotService.sendLog(adminMessage);
-            messageSender.sendMessage(requestId, logMessage);
+            messageSender.sendMessage(userChatId, logMessage);
+            logger.info("Sent rejection message to user chatId {} for request {}", userChatId, requestId);
         }
 
-        sessionService.clearMessageIds(requestId);
-        sessionService.setUserData(requestId, PAYMENT_ATTEMPTS_KEY, "0");
-        sendMainMenu(requestId);
+        sessionService.clearMessageIds(request.getChatId());
+        sessionService.setUserData(request.getChatId(), PAYMENT_ATTEMPTS_KEY, "0");
+        sendMainMenu(request.getChatId());
     }
 
     public BalanceLimit getCashdeskBalance(String hash, String cashierPass, String cashdeskId) {
