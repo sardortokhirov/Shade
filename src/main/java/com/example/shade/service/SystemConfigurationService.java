@@ -33,6 +33,7 @@ public class SystemConfigurationService {
     private static final Long DEFAULT_TICKET_CALCULATION = 10_000L;
     private static final Long DEFAULT_DAILY_BONUS_TRANSFER_LIMIT = 100_000L;
     private static final BigDecimal DEFAULT_TOP_UP_DAILY_LIMIT_INCREASE_PERCENTAGE = BigDecimal.ZERO;
+    private static final BigDecimal DEFAULT_DEPOSIT_DAILY_LIMIT_INCREASE_PERCENTAGE = BigDecimal.ZERO;
     private static final Boolean DEFAULT_HUMO_ENABLED = true;
     private static final Long DEFAULT_LOTTERY_COOLDOWN_SECONDS = 300L;
 
@@ -52,6 +53,7 @@ public class SystemConfigurationService {
                     config.setTicketCalculationAmount(DEFAULT_TICKET_CALCULATION);
                     config.setDailyBonusTransferLimit(DEFAULT_DAILY_BONUS_TRANSFER_LIMIT);
                     config.setTopUpDailyLimitIncreasePercentage(DEFAULT_TOP_UP_DAILY_LIMIT_INCREASE_PERCENTAGE);
+                    config.setDepositDailyLimitIncreasePercentage(DEFAULT_DEPOSIT_DAILY_LIMIT_INCREASE_PERCENTAGE);
                     config.setHumoEnabled(DEFAULT_HUMO_ENABLED);
                     config.setLotteryCooldownSeconds(DEFAULT_LOTTERY_COOLDOWN_SECONDS);
                     config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
@@ -132,6 +134,13 @@ public class SystemConfigurationService {
                 : DEFAULT_TOP_UP_DAILY_LIMIT_INCREASE_PERCENTAGE;
     }
 
+    public BigDecimal getDepositDailyLimitIncreasePercentage() {
+        SystemConfiguration config = getConfiguration();
+        return config.getDepositDailyLimitIncreasePercentage() != null 
+                ? config.getDepositDailyLimitIncreasePercentage() 
+                : DEFAULT_DEPOSIT_DAILY_LIMIT_INCREASE_PERCENTAGE;
+    }
+
     public Boolean getHumoEnabled() {
         SystemConfiguration config = getConfiguration();
         return config.getHumoEnabled() != null ? config.getHumoEnabled() : DEFAULT_HUMO_ENABLED;
@@ -159,6 +168,7 @@ public class SystemConfigurationService {
         config.setTicketCalculationAmount(current.getTicketCalculationAmount());
         config.setDailyBonusTransferLimit(current.getDailyBonusTransferLimit());
         config.setTopUpDailyLimitIncreasePercentage(current.getTopUpDailyLimitIncreasePercentage());
+        config.setDepositDailyLimitIncreasePercentage(current.getDepositDailyLimitIncreasePercentage());
         config.setHumoEnabled(enabled);
         config.setLotteryCooldownSeconds(current.getLotteryCooldownSeconds());
         config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));

@@ -54,6 +54,10 @@ public class SystemConfiguration {
     @JsonSerialize(using = BigDecimalPlainSerializer.class)
     private BigDecimal topUpDailyLimitIncreasePercentage = BigDecimal.ZERO;
 
+    @Column(name = "deposit_daily_limit_increase_percentage", nullable = false, precision = 9, scale = 8)
+    @JsonSerialize(using = BigDecimalPlainSerializer.class)
+    private BigDecimal depositDailyLimitIncreasePercentage = BigDecimal.ZERO;
+
     @Column(name = "humo_enabled", nullable = false)
     private Boolean humoEnabled = true;
 

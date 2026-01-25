@@ -139,6 +139,19 @@ public class DailyStatsService {
                     "To enable permanent limit increases, set topUpDailyLimitIncreasePercentage > 0 in system configuration.", chatId);
         }
         
+        // Calculate and add daily limit increase based on configured percentage (resets daily)
+        BigDecimal dailyPercentage = configurationService.getDepositDailyLimitIncreasePercentage();
+        if (dailyPercentage.compareTo(BigDecimal.ZERO) > 0) {
+            Long dailyIncrease = BigDecimal.valueOf(amount)
+                    .multiply(dailyPercentage)
+                    .divide(BigDecimal.valueOf(100), 0, java.math.RoundingMode.HALF_UP)
+                    .longValue();
+            Long currentDailyIncrease = stats.getDailyLimitIncrease() != null ? stats.getDailyLimitIncrease() : 0L;
+            stats.setDailyLimitIncrease(currentDailyIncrease + dailyIncrease);
+            logger.info("Added daily limit increase {} ({}% of {}) for chatId {}. Total daily increase: {}", 
+                    dailyIncrease, dailyPercentage, amount, chatId, currentDailyIncrease + dailyIncrease);
+        }
+        
         stats.setLastUpdated(LocalDateTime.now(GMT_PLUS_5));
         statsRepository.save(stats);
         logger.info("Added top-up amount {} for chatId {} on date {}. Carryover decreased from {} to {}", 
@@ -295,37 +308,6 @@ public class DailyStatsService {
         BigDecimal permanentIncrease = userLimitIncreaseService.getPermanentLimitIncrease(chatId);
         Long permanentIncreaseLong = permanentIncrease.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
         return dailyLimit + permanentIncreaseLong;
-    }
-
-    /**
-     * Gets the current carryover amount for today
-     * Carryover is the unused limit from previous day that can be used today
-     */
-    public Long getCarryoverAmount(Long chatId) {
-        DailyUserStats stats = getOrCreateTodayStats(chatId);
-        return stats.getCarryoverAmount() != null ? stats.getCarryoverAmount() : 0L;
-    }
-
-    /**
-     * Formats limit with carryover for display
-     * Returns "effectiveLimit(+carryover)" if carryover > 0, otherwise just "effectiveLimit"
-     * Example: "3,000(+15)" or "3,000"
-     */
-    public String formatLimitWithCarryover(Long effectiveLimit, Long carryover) {
-        if (carryover != null && carryover > 0) {
-            return String.format("%,d(+%,d)", effectiveLimit, carryover);
-        }
-        return String.format("%,d", effectiveLimit);
-    }
-
-    /**
-     * Gets formatted limit string with carryover for a user
-     * Convenience method that fetches both values and formats them
-     */
-    public String getFormattedLimitWithCarryover(Long chatId) {
-        Long effectiveLimit = getEffectiveDailyLimit(chatId);
-        Long carryover = getCarryoverAmount(chatId);
-        return formatLimitWithCarryover(effectiveLimit, carryover);
     }
 
     /**

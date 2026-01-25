@@ -268,25 +268,20 @@ public class BonusService {
                 .orElse(UserBalance.builder().chatId(chatId).tickets(0L).balance(BigDecimal.ZERO).build());
         Long availableLimit = dailyStatsService.getAvailableLimit(chatId);
         Long effectiveDailyLimit = dailyStatsService.getEffectiveDailyLimit(chatId);
-        Long carryover = dailyStatsService.getCarryoverAmount(chatId);
         
         // Null-safety checks and default values
         Long tickets = balance.getTickets() != null ? balance.getTickets() : 0L;
         Long balanceValue = balance.getBalance() != null ? balance.getBalance().longValue() : 0L;
         Long availableLimitSafe = availableLimit != null ? availableLimit : 0L;
         Long effectiveDailyLimitSafe = effectiveDailyLimit != null ? effectiveDailyLimit : 0L;
-        Long carryoverSafe = carryover != null ? carryover : 0L;
-        
-        // Format limit with carryover: "3000(+15)" or just "3000" if no carryover
-        String formattedLimit = dailyStatsService.formatLimitWithCarryover(effectiveDailyLimitSafe, carryoverSafe);
         
         // Detailed logging for debugging
-        logger.info("Bonus menu calculation for chatId {}: tickets={}, balance={}, availableLimit={} (Foyadalanish mumkin), effectiveDailyLimit={}, carryover={}, formattedLimit={} (Umumiy limit)", 
-                chatId, tickets, balanceValue, availableLimitSafe, effectiveDailyLimitSafe, carryoverSafe, formattedLimit);
+        logger.info("Bonus menu calculation for chatId {}: tickets={}, balance={}, availableLimit={} (Foyadalanish mumkin), effectiveDailyLimit={} (Umumiy limit)", 
+                chatId, tickets, balanceValue, availableLimitSafe, effectiveDailyLimitSafe);
         
         // Verify parameter order matches message format
-        logger.debug("Bonus menu format parameters: 1.tickets={}, 2.balance={}, 3.availableLimit={}, 4.formattedLimit={}", 
-                tickets, balanceValue, availableLimitSafe, formattedLimit);
+        logger.debug("Bonus menu format parameters: 1.tickets={}, 2.balance={}, 3.availableLimit={}, 4.effectiveDailyLimit={}", 
+                tickets, balanceValue, availableLimitSafe, effectiveDailyLimitSafe);
         
         SendMessage message = new SendMessage();
         message.setChatId(chatId);
@@ -294,7 +289,7 @@ public class BonusService {
                 tickets, 
                 balanceValue, 
                 availableLimitSafe,
-                formattedLimit));
+                effectiveDailyLimitSafe));
         message.setReplyMarkup(createBonusMenuKeyboard(chatId));
         messageSender.sendMessage(message, chatId);
     }
@@ -961,8 +956,6 @@ public class BonusService {
                 if (transferSuccessful == null) {
                     Long totalLimit = dailyStatsService.getEffectiveDailyLimit(request.getChatId());
                     Long availableLimit = dailyStatsService.getAvailableLimit(request.getChatId());
-                    Long carryover = dailyStatsService.getCarryoverAmount(request.getChatId());
-                    String formattedLimit = dailyStatsService.formatLimitWithCarryover(totalLimit, carryover);
                     LocalDate today = LocalDate.now(ZoneId.of("GMT+5"));
                     Optional<DailyUserStats> dailyStatsOpt = dailyUserStatsRepository.findByChatIdAndDate(request.getChatId(), today);
                     Long dailyTransferAmount = dailyStatsOpt.map(DailyUserStats::getDailyTransferAmount).orElse(0L);
@@ -992,7 +985,7 @@ public class BonusService {
                                     "🌐 #%s: %s\n" +
                                     "💸 Miqdor: %,d UZS\n" +
                                     "\n🏦: %,d %s\n" +
-                                    "\n📊 Limit: %s / %,d so'm\n" +
+                                    "\n📊 Limit: %,d / %,d so'm\n" +
                                     "📅 [%s]",
                             request.getId(), request.getChatId(), number,
                             request.getPlatform(), request.getPlatformUserId(),
@@ -1000,7 +993,7 @@ public class BonusService {
                             cashdeskBalance != null && cashdeskBalance.getBalance() != null 
                                     ? cashdeskBalance.getBalance().longValue() : 0L,
                             request.getCurrency().toString(),
-                            formattedLimit, availableLimit,
+                            totalLimit, availableLimit,
                             LocalDateTime.now(ZoneId.of("GMT+5"))
                                     .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                     String bonusMessage = String.format(
@@ -1013,8 +1006,6 @@ public class BonusService {
                 } else {
                     Long totalLimit = dailyStatsService.getEffectiveDailyLimit(request.getChatId());
                     Long availableLimit = dailyStatsService.getAvailableLimit(request.getChatId());
-                    Long carryover = dailyStatsService.getCarryoverAmount(request.getChatId());
-                    String formattedLimit = dailyStatsService.formatLimitWithCarryover(totalLimit, carryover);
                     LocalDateTime timestamp = LocalDateTime.now(ZoneId.of("GMT+5"));
                     LocalDate today = LocalDate.now(ZoneId.of("GMT+5"));
                     Optional<DailyUserStats> dailyStatsOpt = dailyUserStatsRepository.findByChatIdAndDate(request.getChatId(), today);
@@ -1029,13 +1020,13 @@ public class BonusService {
                                     "🌐 #%s: %s\n" +
                                     "💸 Miqdor: %,d UZS\n" +
                                     "\n🏦: %,d %s\n" +
-                                    "\n📊 Limit: %s / %,d so'm\n" +
+                                    "\n📊 Limit: %,d / %,d so'm\n" +
                                     "📅 [%s]",
                             request.getId(), request.getChatId(), number,
                             request.getPlatform(), request.getPlatformUserId(),
                             request.getAmount(),
                             transferSuccessful.getLimit().longValue(), platformData.getCurrency().toString(),
-                            formattedLimit, availableLimit,
+                            totalLimit, availableLimit,
                             timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                     String bonusMessage = String.format(
                             languageSessionService.getTranslation(request.getChatId(), "message.bonus_approved"),
@@ -1122,8 +1113,6 @@ public class BonusService {
                     if (cashdeskBalance == null) {
                         Long totalLimit = dailyStatsService.getEffectiveDailyLimit(request.getChatId());
                         Long availableLimit = dailyStatsService.getAvailableLimit(request.getChatId());
-                        Long carryover = dailyStatsService.getCarryoverAmount(request.getChatId());
-                        String formattedLimit = dailyStatsService.formatLimitWithCarryover(totalLimit, carryover);
                         LocalDate today = LocalDate.now(ZoneId.of("GMT+5"));
                         Optional<DailyUserStats> dailyStatsOpt = dailyUserStatsRepository.findByChatIdAndDate(request.getChatId(), today);
                         Long dailyTransferAmount = dailyStatsOpt.map(DailyUserStats::getDailyTransferAmount).orElse(0L);
@@ -1136,12 +1125,12 @@ public class BonusService {
                                         "👤: [%d] %s\n" +
                                         "🌐 #%s: %s\n" +
                                         "💸 Miqdor: %,d UZS\n" +
-                                        "\n📊 Limit: %s / %,d so'm\n" +
+                                        "\n📊 Limit: %,d / %,d so'm\n" +
                                         "📅 [%s]",
                                 request.getId(), request.getChatId(), number,
                                 request.getPlatform(), request.getPlatformUserId(),
                                 request.getAmount(),
-                                formattedLimit, availableLimit,
+                                totalLimit, availableLimit,
                                 timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                         String bonusMessage = String.format(
                                 languageSessionService.getTranslation(request.getChatId(), "message.bonus_approved"),
@@ -1154,8 +1143,6 @@ public class BonusService {
                     } else {
                         Long totalLimit = dailyStatsService.getEffectiveDailyLimit(request.getChatId());
                         Long availableLimit = dailyStatsService.getAvailableLimit(request.getChatId());
-                        Long carryover = dailyStatsService.getCarryoverAmount(request.getChatId());
-                        String formattedLimit = dailyStatsService.formatLimitWithCarryover(totalLimit, carryover);
                         LocalDate today = LocalDate.now(ZoneId.of("GMT+5"));
                         Optional<DailyUserStats> dailyStatsOpt = dailyUserStatsRepository.findByChatIdAndDate(request.getChatId(), today);
                         Long dailyTransferAmount = dailyStatsOpt.map(DailyUserStats::getDailyTransferAmount).orElse(0L);
@@ -1169,13 +1156,13 @@ public class BonusService {
                                         "🌐 #%s: %s\n" +
                                         "💸 Miqdor: %,d UZS\n" +
                                         "\n🏦: %,d %s\n" +
-                                        "\n📊 Limit: %s / %,d so'm\n" +
+                                        "\n📊 Limit: %,d / %,d so'm\n" +
                                         "📅 [%s]",
                                 request.getId(), request.getChatId(), number,
                                 request.getPlatform(), request.getPlatformUserId(),
                                 request.getAmount(),
                                 cashdeskBalance.getLimit().longValue(), platformData.getCurrency().toString(),
-                                formattedLimit, availableLimit,
+                                totalLimit, availableLimit,
                                 timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                         String bonusMessage = String.format(
                                 languageSessionService.getTranslation(request.getChatId(), "message.bonus_approved"),
@@ -1516,10 +1503,6 @@ public class BonusService {
 
             String number = blockedUserRepository.findByChatId(chatId).get().getPhoneNumber();
             LocalDateTime timestamp = LocalDateTime.now(ZoneId.of("GMT+5"));
-            Long effectiveLimit = dailyStatsService.getEffectiveDailyLimit(chatId);
-            Long availableLimit = dailyStatsService.getAvailableLimit(chatId);
-            Long carryover = dailyStatsService.getCarryoverAmount(chatId);
-            String formattedLimit = dailyStatsService.formatLimitWithCarryover(effectiveLimit, carryover);
             String adminLog;
             if (limitIncreaseJustAdded > 0) {
                 adminLog = String.format(
@@ -1528,12 +1511,12 @@ public class BonusService {
                                 "🎫 O'ynalgan chiptalar: %s ta\n" +
                                 "💰 Jami yutuq: %s so'm\n" +
                                 "📈 Limit oshdi (bu o'yin): %,d so'm\n" +
-                                "📊 Limit: %s / %,d so'm\n" +
+                                "📊 Limit: %,d / %,d so'm\n" +
                                 "🎟️ Chiptalar: %,d ta\n" +
                                 "💸 Yangi balans: %s so'm\n" +
                                 "📅 [%s]",
                         chatId, number, numberOfPlays, totalWinnings.longValue(), 
-                        limitIncreaseJustAdded, formattedLimit, availableLimit,
+                        limitIncreaseJustAdded, totalDailyLimitIncrease, tomorrowPermanentLimit,
                         balance.getTickets(), balance.getBalance().longValue(),
                         timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
             } else {
@@ -1542,12 +1525,12 @@ public class BonusService {
                                 "👤 User ID [%s] %s\n" +
                                 "🎫 O'ynalgan chiptalar: %s ta\n" +
                                 "💰 Jami yutuq: %s so'm\n" +
-                                "📊 Limit: %s / %,d so'm\n" +
+                                "📊 Limit: %,d / %,d so'm\n" +
                                 "🎟️ Chiptalar: %,d ta\n" +
                                 "💸 Yangi balans: %s so'm\n" +
                                 "📅 [%s]",
                         chatId, number, numberOfPlays, totalWinnings.longValue(), 
-                        formattedLimit, availableLimit,
+                        totalDailyLimitIncrease, tomorrowPermanentLimit,
                         balance.getTickets(), balance.getBalance().longValue(),
                         timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
             }
