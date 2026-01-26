@@ -20,7 +20,7 @@ public class LotteryPrize {
     @Column(name = "name")
     private String name;
 
-    @Column(name = "amount", nullable = false)
+    @Column(name = "amount", nullable = false, precision = 30, scale = 2)
     private BigDecimal amount;
 
     @Column(name = "number_of_prize", nullable = false)

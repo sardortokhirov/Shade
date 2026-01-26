@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -27,9 +28,9 @@ public class LottoBotService {
         this.languageSessionService = languageSessionService;
     }
 
-    public void logWin(long numberOfTickets, Long userId, Long amount) {
-        if (amount <= 3600) {
-            logger.info("Win amount {} for userId {} is not greater than 20,000; no log sent", amount, userId);
+    public void logWin(long numberOfTickets, Long userId, BigDecimal amount) {
+        if (amount == null || amount.compareTo(BigDecimal.valueOf(3600)) <= 0) {
+            logger.info("Win amount {} for userId {} is not greater than 3,600; no log sent", amount, userId);
             return;
         }
 
@@ -38,9 +39,10 @@ public class LottoBotService {
                 : userId.toString();
         String date = LocalDateTime.now(ZoneId.of("GMT+5"))
                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        String amountStr = amount.toPlainString();
         String logMessage = String.format(
                 languageSessionService.getTranslation(userId, "lotto.message.win_log"),
-                numberOfTickets, amount, maskedUserId, date, getRandomCongratulations(userId)
+                numberOfTickets, amountStr, maskedUserId, date, getRandomCongratulations(userId)
         );
 
         List<AdminChat> adminChats = adminChatRepository.findByReceiveNotificationsTrue();

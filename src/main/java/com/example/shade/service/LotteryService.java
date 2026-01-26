@@ -34,6 +34,23 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class LotteryService {
+
+    /** Result of an in-memory lottery draw: winnings per ticket and prize count decrements to persist. */
+    private static record DrawResult(Map<Long, BigDecimal> winnings, Map<Long, Integer> prizeIdToDecrement) {}
+
+    /** Mutable in-memory prize state for the draw loop (no JPA in hot path). */
+    private static class PrizeState {
+        final long id;
+        final BigDecimal amount;
+        int count;
+
+        PrizeState(long id, BigDecimal amount, int count) {
+            this.id = id;
+            this.amount = amount;
+            this.count = count;
+        }
+    }
+
     private static final Logger logger = LoggerFactory.getLogger(LotteryService.class);
     private final UserBalanceRepository userBalanceRepository;
     private final LotteryPrizeRepository lotteryPrizeRepository;
@@ -45,6 +62,66 @@ public class LotteryService {
     private final LanguageSessionService languageSessionService;
     private final Random random = new Random();
     private final SystemConfigurationService configurationService;
+
+    /**
+     * Builds mutable in-memory prize state from entities (only valid prizes: amount > 0 and count > 0).
+     */
+    private static List<PrizeState> buildPrizeState(List<LotteryPrize> prizes) {
+        List<PrizeState> state = new ArrayList<>();
+        for (LotteryPrize p : prizes) {
+            if (p.getAmount().compareTo(BigDecimal.ZERO) > 0 && p.getNumberOfPrize() != null && p.getNumberOfPrize() > 0) {
+                state.add(new PrizeState(p.getId(), p.getAmount(), p.getNumberOfPrize()));
+            }
+        }
+        return state;
+    }
+
+    /**
+     * Performs all draws in memory: O(1) ticket selection (swap-with-last), weighted prize pick, no DB.
+     * Returns winnings (ticket -> amount) and prizeIdToDecrement (prize id -> count to subtract).
+     */
+    private DrawResult drawInMemory(long numberOfPlays, List<PrizeState> prizes) {
+        int n = (int) numberOfPlays;
+        Map<Long, BigDecimal> winnings = new HashMap<>();
+        Map<Long, Integer> prizeIdToDecrement = new HashMap<>();
+
+        long[] tickets = new long[n];
+        for (int i = 0; i < n; i++) {
+            tickets[i] = i + 1;
+        }
+        int size = n;
+
+        for (int i = 0; i < n; i++) {
+            int totalWeight = 0;
+            for (PrizeState p : prizes) {
+                if (p.count > 0) totalWeight += p.count;
+            }
+            if (totalWeight == 0) {
+                logger.warn("No prizes left during draw. Breaking after {} plays.", i);
+                break;
+            }
+
+            int idx = random.nextInt(size);
+            long selectedTicket = tickets[idx];
+            tickets[idx] = tickets[size - 1];
+            size--;
+
+            int r = random.nextInt(totalWeight);
+            int cum = 0;
+            for (PrizeState p : prizes) {
+                if (p.count <= 0) continue;
+                cum += p.count;
+                if (r < cum) {
+                    winnings.put(selectedTicket, p.amount);
+                    p.count--;
+                    prizeIdToDecrement.merge(p.id, 1, Integer::sum);
+                    break;
+                }
+            }
+        }
+
+        return new DrawResult(winnings, prizeIdToDecrement);
+    }
 
     public void awardTickets(Long chatId, Long amount) {
         Optional<UserBalance> balanceOpt = userBalanceRepository.findById(chatId);
@@ -94,7 +171,6 @@ public class LotteryService {
 
     @Transactional
     public Map<Long, BigDecimal> playLotteryWithDetails(Long chatId, Long numberOfPlays) {
-        // Use pessimistic lock to prevent concurrent lottery plays
         UserBalance balance = userBalanceRepository.findByIdWithLock(chatId)
                 .orElseThrow(() -> new IllegalStateException("User balance not found: " + chatId));
         Long minTickets = configurationService.getMinTickets();
@@ -103,68 +179,31 @@ public class LotteryService {
             throw new IllegalStateException(String.format("Invalid ticket count: %d. Must be between %d and %d",
                     balance.getTickets(), minTickets, maxTickets));
         }
+
         List<LotteryPrize> prizes = lotteryPrizeRepository.findAll();
         if (prizes.isEmpty()) {
             throw new IllegalStateException("No lottery prizes configured");
         }
-
-        // Filter prizes with non-zero amount and available count
-        List<LotteryPrize> validPrizes = prizes.stream()
-                .filter(prize -> prize.getAmount().compareTo(BigDecimal.ZERO) > 0 && prize.getNumberOfPrize() > 0)
-                .collect(Collectors.toList());
-        if (validPrizes.isEmpty()) {
+        List<PrizeState> prizeState = buildPrizeState(prizes);
+        if (prizeState.isEmpty()) {
             logger.error("No valid prizes with non-zero amount and available count for chatId {}.", chatId);
             throw new IllegalStateException(
                     languageSessionService.getTranslation(chatId, "lottery.message.no_valid_prizes"));
         }
 
-        Map<Long, BigDecimal> winnings = new HashMap<>();
-        // Generate ticket IDs from 1 to numberOfPlays
-        List<Long> ticketIds = new ArrayList<>();
-        for (long i = 1; i <= numberOfPlays; i++) {
-            ticketIds.add(i);
+        DrawResult result = drawInMemory(numberOfPlays, prizeState);
+        Map<Long, BigDecimal> winnings = result.winnings();
+
+        for (Map.Entry<Long, Integer> e : result.prizeIdToDecrement().entrySet()) {
+            lotteryPrizeRepository.decrementNumberOfPrize(e.getKey(), e.getValue());
         }
 
-        for (long i = 0; i < numberOfPlays && !ticketIds.isEmpty(); i++) {
-            // Check if any prizes are still available
-            validPrizes = validPrizes.stream()
-                    .filter(prize -> prize.getNumberOfPrize() > 0)
-                    .collect(Collectors.toList());
-            if (validPrizes.isEmpty()) {
-                logger.warn("No prizes left for chatId {}. Breaking loop.", chatId);
-                break;
-            }
-
-            // Select a random ticket ID
-            Long selectedTicket = ticketIds.get(random.nextInt(ticketIds.size()));
-
-            // Determine prize (weighted by numberOfPrize)
-            int totalPrizeCount = validPrizes.stream().mapToInt(LotteryPrize::getNumberOfPrize).sum();
-            int randomPrizeValue = random.nextInt(totalPrizeCount);
-            int currentPrizeCount = 0;
-            LotteryPrize selectedPrize = validPrizes.get(0); // Default to first valid prize
-            for (LotteryPrize prize : validPrizes) {
-                currentPrizeCount += prize.getNumberOfPrize();
-                if (randomPrizeValue < currentPrizeCount) {
-                    selectedPrize = prize;
-                    break;
-                }
-            }
-
-            BigDecimal winAmount = selectedPrize.getAmount();
-            selectedPrize.setNumberOfPrize(selectedPrize.getNumberOfPrize() - 1); // Decrease prize count
-            lotteryPrizeRepository.save(selectedPrize); // Persist updated prize count
-            winnings.put(selectedTicket, winAmount);
-            ticketIds.remove(selectedTicket); // Remove played ticket
-        }
-
-        // Update balance
         BigDecimal totalWinnings = winnings.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
         balance.setTickets(balance.getTickets() - numberOfPlays);
         balance.setBalance(balance.getBalance().add(totalWinnings));
         userBalanceRepository.save(balance);
-        if (totalWinnings.longValue() >= 3600) {
-            lottoBotService.logWin(numberOfPlays, chatId, totalWinnings.longValue());
+        if (totalWinnings.compareTo(BigDecimal.valueOf(3600)) >= 0) {
+            lottoBotService.logWin(numberOfPlays, chatId, totalWinnings);
         }
         logger.info("Played {} tickets for chatId {}, won {} times with total {} UZS", numberOfPlays, chatId,
                 winnings.size(), totalWinnings);
@@ -177,58 +216,18 @@ public class LotteryService {
         if (prizes.isEmpty()) {
             throw new IllegalStateException("No lottery prizes configured");
         }
-
-        // Filter prizes with non-zero amount and available count
-        List<LotteryPrize> validPrizes = prizes.stream()
-                .filter(prize -> prize.getAmount().compareTo(BigDecimal.ZERO) > 0 && prize.getNumberOfPrize() > 0)
-                .collect(Collectors.toList());
-        if (validPrizes.isEmpty()) {
+        List<PrizeState> prizeState = buildPrizeState(prizes);
+        if (prizeState.isEmpty()) {
             logger.error("No valid prizes with non-zero amount and available count for chatId {}.", chatId);
             throw new IllegalStateException(
                     languageSessionService.getTranslation(chatId, "lottery.message.no_valid_prizes"));
         }
 
-        Map<Long, BigDecimal> winnings = new HashMap<>();
-        // Generate ticket IDs from 1 to numberOfPlays
-        List<Long> ticketIds = new ArrayList<>();
-        for (long i = 1; i <= numberOfPlays; i++) {
-            ticketIds.add(i);
+        DrawResult result = drawInMemory(numberOfPlays, prizeState);
+        for (Map.Entry<Long, Integer> e : result.prizeIdToDecrement().entrySet()) {
+            lotteryPrizeRepository.decrementNumberOfPrize(e.getKey(), e.getValue());
         }
-
-        for (long i = 0; i < numberOfPlays && !ticketIds.isEmpty(); i++) {
-            // Check if any prizes are still available
-            validPrizes = validPrizes.stream()
-                    .filter(prize -> prize.getNumberOfPrize() > 0)
-                    .collect(Collectors.toList());
-            if (validPrizes.isEmpty()) {
-                logger.warn("No prizes left for chatId {}. Breaking loop.", chatId);
-                break;
-            }
-
-            // Select a random ticket ID
-            Long selectedTicket = ticketIds.get(random.nextInt(ticketIds.size()));
-
-            // Determine prize (weighted by numberOfPrize)
-            int totalPrizeCount = validPrizes.stream().mapToInt(LotteryPrize::getNumberOfPrize).sum();
-            int randomPrizeValue = random.nextInt(totalPrizeCount);
-            int currentPrizeCount = 0;
-            LotteryPrize selectedPrize = validPrizes.get(0); // Default to first valid prize
-            for (LotteryPrize prize : validPrizes) {
-                currentPrizeCount += prize.getNumberOfPrize();
-                if (randomPrizeValue < currentPrizeCount) {
-                    selectedPrize = prize;
-                    break;
-                }
-            }
-
-            BigDecimal winAmount = selectedPrize.getAmount();
-            selectedPrize.setNumberOfPrize(selectedPrize.getNumberOfPrize() - 1); // Persist updated prize count
-            lotteryPrizeRepository.save(selectedPrize);
-            winnings.put(selectedTicket, winAmount);
-            ticketIds.remove(selectedTicket); // Remove played ticket
-        }
-
-        return winnings;
+        return result.winnings();
     }
 
     public UserBalance getBalance(Long chatId) {

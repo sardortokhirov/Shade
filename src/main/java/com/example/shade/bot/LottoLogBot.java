@@ -121,8 +121,8 @@ public class LottoLogBot extends TelegramLongPollingBot {
 
             StringBuilder winningsLog = new StringBuilder("🎉 Lotereya natijalari:\n");
             ticketWinnings.forEach((ticketNumber, amount) ->
-                    winningsLog.append(String.format("%d UZS\n", amount.longValue())));
-            winningsLog.append(String.format("Jami yutuq: %,d so‘m\nYangi balans: %,d so‘m", totalWinnings.longValue(), 0));
+                    winningsLog.append(String.format("%s UZS\n", amount.toPlainString())));
+            winningsLog.append(String.format("Jami yutuq: %s so‘m\nYangi balans: %s so‘m", totalWinnings.toPlainString(), "0"));
 
             messageSender.sendMessage(chatId.toString(), winningsLog.toString(), createLotteryMenu());
         } catch (NumberFormatException e) {

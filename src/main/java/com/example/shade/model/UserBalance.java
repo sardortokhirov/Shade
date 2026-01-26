@@ -21,7 +21,7 @@ public class UserBalance {
     @Column(name = "tickets", nullable = false)
     private Long tickets;
 
-    @Column(name = "balance", nullable = false)
+    @Column(name = "balance", nullable = false, precision = 30, scale = 2)
     private BigDecimal balance;
 
     @Column(name = "last_lottery_play_time", nullable = true)
