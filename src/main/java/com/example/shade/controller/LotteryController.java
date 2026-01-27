@@ -2,6 +2,7 @@ package com.example.shade.controller;
 
 import com.example.shade.bot.AdminBotMessageSender;
 import com.example.shade.bot.MessageSender;
+import com.example.shade.dto.LotteryPrizeRequest;
 import com.example.shade.dto.LotteryTicketBundleRequest;
 import com.example.shade.dto.OverallBalanceTicketsDTO;
 import com.example.shade.model.LotteryPrize;
@@ -54,12 +55,47 @@ public class LotteryController {
     }
 
     @PostMapping("/lottery/prizes")
-    public ResponseEntity<LotteryPrize> addPrize(
-            @RequestBody LotteryPrize prize,
+    public ResponseEntity<?> addPrize(
+            @RequestBody LotteryPrizeRequest requestBody,
             HttpServletRequest request) {
         if (!authenticate(request)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
         }
+
+        // Validate amount
+        if (requestBody.getAmount() == null || requestBody.getAmount().trim().isEmpty()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Amount is required and cannot be empty");
+        }
+
+        BigDecimal amount;
+        try {
+            amount = new BigDecimal(requestBody.getAmount().trim());
+            if (amount.compareTo(BigDecimal.ZERO) < 0) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body("Amount must be greater than or equal to 0");
+            }
+        } catch (NumberFormatException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Invalid amount format: " + requestBody.getAmount());
+        }
+
+        // Validate numberOfPrize
+        if (requestBody.getNumberOfPrize() == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("numberOfPrize is required");
+        }
+        if (requestBody.getNumberOfPrize() < 0) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("numberOfPrize must be greater than or equal to 0");
+        }
+
+        // Map DTO to entity
+        LotteryPrize prize = new LotteryPrize();
+        prize.setName(requestBody.getName());
+        prize.setAmount(amount);
+        prize.setNumberOfPrize(requestBody.getNumberOfPrize());
+
         LotteryPrize savedPrize = lotteryPrizeRepository.save(prize);
         return ResponseEntity.ok(savedPrize);
     }
