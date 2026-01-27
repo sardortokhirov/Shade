@@ -121,8 +121,8 @@ public class LottoLogBot extends TelegramLongPollingBot {
 
             StringBuilder winningsLog = new StringBuilder("🎉 Lotereya natijalari:\n");
             ticketWinnings.forEach((ticketNumber, amount) ->
-                    winningsLog.append(String.format("%s UZS\n", amount.toPlainString())));
-            winningsLog.append(String.format("Jami yutuq: %s so‘m\nYangi balans: %s so‘m", totalWinnings.toPlainString(), "0"));
+                    winningsLog.append(String.format("%s UZS\n", formatWholeNumber(amount))));
+            winningsLog.append(String.format("Jami yutuq: %s UZS\nYangi balans: %s UZS", formatWholeNumber(totalWinnings), "0"));
 
             messageSender.sendMessage(chatId.toString(), winningsLog.toString(), createLotteryMenu());
         } catch (NumberFormatException e) {
@@ -142,5 +142,13 @@ public class LottoLogBot extends TelegramLongPollingBot {
         rows.add(row);
         markup.setKeyboard(rows);
         return markup;
+    }
+
+    /**
+     * Formats BigDecimal as whole number (no decimals) for lottery win messages.
+     */
+    private String formatWholeNumber(BigDecimal amount) {
+        if (amount == null) return "0";
+        return amount.setScale(0, java.math.RoundingMode.DOWN).toPlainString();
     }
 }

@@ -39,7 +39,7 @@ public class LottoBotService {
                 : userId.toString();
         String date = LocalDateTime.now(ZoneId.of("GMT+5"))
                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-        String amountStr = amount.toPlainString();
+        String amountStr = formatWholeNumber(amount);
         String logMessage = String.format(
                 languageSessionService.getTranslation(userId, "lotto.message.win_log"),
                 numberOfTickets, amountStr, maskedUserId, date, getRandomCongratulations(userId)
@@ -83,5 +83,13 @@ public class LottoBotService {
         int index = RANDOM.nextInt(4) + 1; // Random index from 1 to 4
         String translationKey = "lotto.congratulations." + index;
         return languageSessionService.getTranslation(chatId, translationKey);
+    }
+
+    /**
+     * Formats BigDecimal as whole number (no decimals) for lottery win messages.
+     */
+    private String formatWholeNumber(BigDecimal amount) {
+        if (amount == null) return "0";
+        return amount.setScale(0, java.math.RoundingMode.DOWN).toPlainString();
     }
 }

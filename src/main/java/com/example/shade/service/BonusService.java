@@ -1496,9 +1496,9 @@ public class BonusService {
 
             StringBuilder winningsLog = new StringBuilder();
             ticketWinnings.forEach(
-                    (ticketNumber, amount) -> winningsLog.append(String.format("%s so'm\n", amount.toPlainString())));
+                    (ticketNumber, amount) -> winningsLog.append(String.format("%s UZS\n", formatWholeNumber(amount))));
             winningsLog.append(String.format(languageSessionService.getTranslation(chatId, "message.lottery_results"),
-                    "", totalWinnings.toPlainString(), balance.getBalance().toPlainString()));
+                    "", formatWholeNumber(totalWinnings), formatWholeNumber(balance.getBalance())));
             messageSender.sendMessage(chatId, winningsLog.toString());
 
             String number = blockedUserRepository.findByChatId(chatId).get().getPhoneNumber();
@@ -1509,13 +1509,13 @@ public class BonusService {
                         "Lotereya o'ynaldi 🎟\n" +
                                 "👤 User ID [%s] %s\n" +
                                 "🎫 O'ynalgan chiptalar: %s ta\n" +
-                                "💰 Jami yutuq: %s so'm\n" +
+                                "💰 Jami yutuq: %s UZS\n" +
                                 "📈 Limit oshdi (bu o'yin): %,d so'm\n" +
                                 "📊 Limit: %,d / %,d so'm\n" +
                                 "🎟️ Chiptalar: %,d ta\n" +
-                                "💸 Yangi balans: %s so'm\n" +
+                                "💸 Yangi balans: %s UZS\n" +
                                 "📅 [%s]",
-                        chatId, number, numberOfPlays, totalWinnings.toPlainString(),
+                        chatId, number, numberOfPlays, formatWholeNumber(totalWinnings),
                         limitIncreaseJustAdded, totalDailyLimitIncrease, tomorrowPermanentLimit,
                         balance.getTickets(), balance.getBalance().toPlainString(),
                         timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
@@ -1524,14 +1524,14 @@ public class BonusService {
                         "Lotereya o'ynaldi 🎟\n" +
                                 "👤 User ID [%s] %s\n" +
                                 "🎫 O'ynalgan chiptalar: %s ta\n" +
-                                "💰 Jami yutuq: %s so'm\n" +
+                                "💰 Jami yutuq: %s UZS\n" +
                                 "📊 Limit: %,d / %,d so'm\n" +
                                 "🎟️ Chiptalar: %,d ta\n" +
-                                "💸 Yangi balans: %s so'm\n" +
+                                "💸 Yangi balans: %s UZS\n" +
                                 "📅 [%s]",
-                        chatId, number, numberOfPlays, totalWinnings.toPlainString(),
+                        chatId, number, numberOfPlays, formatWholeNumber(totalWinnings),
                         totalDailyLimitIncrease, tomorrowPermanentLimit,
-                        balance.getTickets(), balance.getBalance().toPlainString(),
+                        balance.getTickets(), formatWholeNumber(balance.getBalance()),
                         timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
             }
             adminLogBotService.sendLog(adminLog);
@@ -1833,5 +1833,13 @@ public class BonusService {
         return balanceObj != null
                 ? new BalanceLimit(new BigDecimal(balanceObj.toString()), new BigDecimal(limitObj.toString()))
                 : null;
+    }
+
+    /**
+     * Formats BigDecimal as whole number (no decimals) for lottery win messages.
+     */
+    private String formatWholeNumber(BigDecimal amount) {
+        if (amount == null) return "0";
+        return amount.setScale(0, java.math.RoundingMode.DOWN).toPlainString();
     }
 }
