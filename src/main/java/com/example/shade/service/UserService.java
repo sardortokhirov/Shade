@@ -260,14 +260,19 @@ public class UserService {
         Optional<DailyUserStats> dailyStatsOpt = dailyUserStatsRepository.findByChatIdAndDate(chatId, today);
         Long dailyTopUpAmount = dailyStatsOpt.map(DailyUserStats::getDailyTopUpAmount).orElse(0L);
         Long dailyTransferAmount = dailyStatsOpt.map(DailyUserStats::getDailyTransferAmount).orElse(0L);
-        Long dailyLimitIncrease = dailyStatsOpt.map(DailyUserStats::getDailyLimitIncrease).orElse(0L);
+        
+        // Get daily limit increase with 8 decimal precision
+        BigDecimal dailyLimitIncreaseBD = dailyStatsOpt.map(DailyUserStats::getDailyLimitIncrease).orElse(BigDecimal.ZERO);
+        Long dailyLimitIncrease = dailyLimitIncreaseBD.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
+        String dailyLimitIncreaseFormatted = dailyLimitIncreaseBD.setScale(8, java.math.RoundingMode.HALF_UP).toPlainString();
+        
         LocalDate dailyStatsDate = dailyStatsOpt.map(DailyUserStats::getDate).orElse(null);
         LocalDateTime dailyStatsLastUpdated = dailyStatsOpt.map(DailyUserStats::getLastUpdated).orElse(null);
         LocalDateTime lastUpdated = dailyStatsLastUpdated; // Keep for backward compatibility
         
         // Build detailed limit breakdown string
         String limitBreakdown = buildLimitBreakdown(baseDailyLimit, permanentLimitIncreaseBD, permanentLimitIncrease, 
-                dailyLimitIncrease, effectiveDailyLimit, dailyTopUpAmount, dailyTransferAmount, availableLimit);
+                dailyLimitIncreaseBD, dailyLimitIncrease, effectiveDailyLimit, dailyTopUpAmount, dailyTransferAmount, availableLimit);
         
         return new UserDetailDTO(
                 chatId,
@@ -287,6 +292,8 @@ public class UserService {
                 dailyTopUpAmount,
                 dailyTransferAmount,
                 dailyLimitIncrease,
+                dailyLimitIncreaseBD,
+                dailyLimitIncreaseFormatted,
                 dailyStatsDate,
                 dailyStatsLastUpdated,
                 lastLotteryPlayTime,
@@ -300,13 +307,14 @@ public class UserService {
      * Builds a detailed limit breakdown string for admin display
      */
     private String buildLimitBreakdown(Long baseDailyLimit, BigDecimal permanentLimitIncreaseBD, 
-            Long permanentLimitIncrease, Long dailyLimitIncrease, Long effectiveDailyLimit,
-            Long dailyTopUpAmount, Long dailyTransferAmount, Long availableLimit) {
+            Long permanentLimitIncrease, BigDecimal dailyLimitIncreaseBD, Long dailyLimitIncrease, 
+            Long effectiveDailyLimit, Long dailyTopUpAmount, Long dailyTransferAmount, Long availableLimit) {
         StringBuilder breakdown = new StringBuilder();
         breakdown.append("Base Daily Limit: ").append(String.format("%,d", baseDailyLimit)).append(" UZS\n");
         breakdown.append("Permanent Increase (rounded): ").append(String.format("%,d", permanentLimitIncrease)).append(" UZS\n");
         breakdown.append("Permanent Increase (precise, 8 decimals): ").append(permanentLimitIncreaseBD.setScale(8, java.math.RoundingMode.HALF_UP).toPlainString()).append(" UZS\n");
-        breakdown.append("Daily Limit Increase (from lottery): ").append(String.format("%,d", dailyLimitIncrease)).append(" UZS\n");
+        breakdown.append("Daily Limit Increase (rounded): ").append(String.format("%,d", dailyLimitIncrease)).append(" UZS\n");
+        breakdown.append("Daily Limit Increase (precise, 8 decimals): ").append(dailyLimitIncreaseBD.setScale(8, java.math.RoundingMode.HALF_UP).toPlainString()).append(" UZS\n");
         breakdown.append("Effective Daily Limit: ").append(String.format("%,d", effectiveDailyLimit))
                 .append(" UZS (= ").append(baseDailyLimit).append(" + ").append(permanentLimitIncrease)
                 .append(" + ").append(dailyLimitIncrease).append(")\n");
@@ -574,7 +582,7 @@ public class UserService {
             DailyUserStats dailyStats = stats.get();
             dailyStats.setDailyTopUpAmount(0L);
             dailyStats.setDailyTransferAmount(0L);
-            dailyStats.setDailyLimitIncrease(0L);
+            dailyStats.setDailyLimitIncrease(BigDecimal.ZERO);
             dailyStats.setLastUpdated(LocalDateTime.now());
             dailyUserStatsRepository.save(dailyStats);
             logger.info("Reset daily stats for chatId {} on date {}", chatId, today);

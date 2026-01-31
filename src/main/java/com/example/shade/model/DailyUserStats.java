@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -37,8 +38,8 @@ public class DailyUserStats {
     @Column(name = "daily_transfer_amount", nullable = false)
     private Long dailyTransferAmount = 0L;
 
-    @Column(name = "daily_limit_increase", nullable = false)
-    private Long dailyLimitIncrease = 0L;
+    @Column(name = "daily_limit_increase", nullable = false, precision = 30, scale = 8)
+    private BigDecimal dailyLimitIncrease = BigDecimal.ZERO;
 
     @Column(name = "carryover_amount", nullable = false)
     private Long carryoverAmount = 0L;

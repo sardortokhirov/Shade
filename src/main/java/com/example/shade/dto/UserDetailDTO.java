@@ -29,7 +29,9 @@ public class UserDetailDTO {
     private List<String> platformsUsed;
     private Long dailyTopUpAmount;
     private Long dailyTransferAmount;
-    private Long dailyLimitIncrease;
+    private Long dailyLimitIncrease; // Rounded value (for backward compatibility)
+    private BigDecimal dailyLimitIncreasePrecise; // Precise decimal value with 8 decimal places
+    private String dailyLimitIncreaseFormatted; // Formatted string with 8 decimal places
     private LocalDate dailyStatsDate; // Date of daily stats record
     private LocalDateTime dailyStatsLastUpdated; // Last update time from daily_user_stats table
     private LocalDateTime lastLotteryPlayTime;

@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -17,7 +18,7 @@ public class DailyUserStatsDTO {
     private LocalDate date;
     private Long dailyTopUpAmount;
     private Long dailyTransferAmount;
-    private Long dailyLimitIncrease;
+    private BigDecimal dailyLimitIncrease;  // 8 decimal precision
     private Long carryoverAmount;
     private LocalDateTime lastUpdated;
 }
