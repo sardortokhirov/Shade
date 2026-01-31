@@ -2,13 +2,11 @@ package com.example.shade;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.context.MessageSource;
+import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.web.client.RestTemplate;
-import org.telegram.telegrambots.meta.TelegramBotsApi;
-import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
-import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
+
+import java.time.Duration;
 
 @SpringBootApplication
 public class ShadeApplication {
@@ -16,10 +14,13 @@ public class ShadeApplication {
     public static void main(String[] args) {
         SpringApplication.run(ShadeApplication.class, args);
     }
-    @Bean
-    public RestTemplate restTemplate() {
-        return new RestTemplate();
-    }
 
+    @Bean
+    public RestTemplate restTemplate(RestTemplateBuilder builder) {
+        return builder
+                .connectTimeout(Duration.ofSeconds(10))  // Connection timeout: 10 seconds
+                .readTimeout(Duration.ofSeconds(30))     // Read timeout: 30 seconds
+                .build();
+    }
 
 }
