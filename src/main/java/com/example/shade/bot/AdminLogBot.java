@@ -5,6 +5,7 @@ import com.example.shade.repository.AdminChatRepository;
 import com.example.shade.repository.BlockedUserRepository;
 import com.example.shade.service.AdminLogBotService;
 import com.example.shade.service.BonusService;
+import com.example.shade.service.CallbackDeduplicationService;
 import com.example.shade.service.TopUpService;
 import com.example.shade.service.WithdrawService;
 import lombok.RequiredArgsConstructor;
@@ -13,9 +14,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
+import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updates.DeleteWebhook;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageReplyMarkup;
+import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
@@ -37,6 +40,7 @@ public class AdminLogBot extends TelegramLongPollingBot {
     private final BonusService bonusService;
     private final TopUpService topUpService;
     private final BlockedUserRepository blockedUserRepository;
+    private final CallbackDeduplicationService callbackDeduplicationService;
 
     @Value("${telegram.admin.log.bot.token}")
     private String botToken;
@@ -101,7 +105,24 @@ public class AdminLogBot extends TelegramLongPollingBot {
             if (update.hasMessage() && update.getMessage().hasText()) {
                 handleTextMessage(update.getMessage().getText(), update.getMessage().getChatId(), update.getMessage().getMessageId());
             } else if (update.hasCallbackQuery()) {
-                handleCallbackQuery(update.getCallbackQuery().getData(), update.getCallbackQuery().getMessage().getChatId(), update.getCallbackQuery().getMessage().getMessageId());
+                CallbackQuery callbackQuery = update.getCallbackQuery();
+                String callbackId = callbackQuery.getId();
+                Long chatId = callbackQuery.getMessage().getChatId();
+                
+                // Deduplicate - skip if already processed (prevents multiple clicks issue)
+                if (!callbackDeduplicationService.tryProcess(callbackId)) {
+                    logger.debug("Duplicate admin callback ignored for chatId {}: {}", chatId, callbackId);
+                    return;
+                }
+                
+                // Answer callback to dismiss loading indicator
+                try {
+                    execute(new AnswerCallbackQuery(callbackId));
+                } catch (Exception e) {
+                    logger.warn("Failed to answer admin callback {}: {}", callbackId, e.getMessage());
+                }
+                
+                handleCallbackQuery(callbackQuery.getData(), chatId, callbackQuery.getMessage().getMessageId());
             }
         } catch (Exception e) {
             logger.error("Error processing update: {}", update, e);

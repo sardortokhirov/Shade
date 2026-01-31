@@ -2,10 +2,12 @@ package com.example.shade.bot;
 
 import com.example.shade.model.Platform;
 import com.example.shade.service.AdminBotService;
+import com.example.shade.service.CallbackDeduplicationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Update;
 
 import java.util.HashMap;
@@ -18,6 +20,7 @@ public class ShadeAdminUpdateHandler {
 
     private final AdminBotService adminBotService;
     private final AdminBotMessageSender adminBotMessageSender;
+    private final CallbackDeduplicationService callbackDeduplicationService;
     private final Map<Long, BotState> userStates = new HashMap<>();
     private final Map<Long, Map<String, Object>> userContext = new HashMap<>();
 
@@ -39,6 +42,16 @@ public class ShadeAdminUpdateHandler {
             if (update.hasMessage()) {
                 return handleMessage(update);
             } else if (update.hasCallbackQuery()) {
+                CallbackQuery callbackQuery = update.getCallbackQuery();
+                String callbackId = callbackQuery.getId();
+                Long chatId = callbackQuery.getMessage().getChatId();
+                
+                // Deduplicate - skip if already processed (prevents multiple clicks issue)
+                if (!callbackDeduplicationService.tryProcess(callbackId)) {
+                    log.debug("Duplicate admin panel callback ignored for chatId {}: {}", chatId, callbackId);
+                    return true; // Return true to indicate we "handled" it (by skipping)
+                }
+                
                 handleCallbackQuery(update);
                 return true;
             }

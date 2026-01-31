@@ -10,10 +10,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
+import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.GetFile;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.api.methods.updates.DeleteWebhook;
+import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.PhotoSize;
 import org.telegram.telegrambots.meta.api.objects.Update;
@@ -49,6 +51,7 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
     private final AdminChatRepository adminChatRepository;
     private final ShadeAdminUpdateHandler adminUpdateHandler;
     private final AdminBotService adminBotService;
+    private final CallbackDeduplicationService callbackDeduplicationService;
 
     @Value("${telegram.bot.token}")
     private String botToken;
@@ -125,6 +128,14 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                 // It should only run if notifications are ON, OR if the user is currently in a
                 // state machine.
                 if (adminUpdateHandler.isUserInAdminState(chatId) || (isAdmin && adminChatOpt.get().isSettings())) {
+                    // Answer callback query for admin callbacks to dismiss loading indicator
+                    if (update.hasCallbackQuery()) {
+                        try {
+                            execute(new AnswerCallbackQuery(update.getCallbackQuery().getId()));
+                        } catch (TelegramApiException e) {
+                            logger.warn("Failed to answer admin callback: {}", e.getMessage());
+                        }
+                    }
                     if (adminUpdateHandler.handleUpdate(update)) {
                         return; // Admin logic handled the update (e.g., button click, state input)
                     }
@@ -177,7 +188,23 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                         return;
                     }
                     if (update.hasCallbackQuery() && "AWAITING_LANGUAGE".equals(sessionService.getUserState(chatId))) {
-                        handleLanguageSelection(update.getCallbackQuery().getData(), chatId);
+                        CallbackQuery callbackQuery = update.getCallbackQuery();
+                        String callbackId = callbackQuery.getId();
+                        
+                        // Deduplicate - skip if already processed
+                        if (!callbackDeduplicationService.tryProcess(callbackId)) {
+                            logger.debug("Duplicate language callback ignored for chatId {}", chatId);
+                            return;
+                        }
+                        
+                        // Answer callback
+                        try {
+                            execute(new AnswerCallbackQuery(callbackId));
+                        } catch (TelegramApiException e) {
+                            logger.warn("Failed to answer language callback: {}", e.getMessage());
+                        }
+                        
+                        handleLanguageSelection(callbackQuery.getData(), chatId);
                         return;
                     }
                     return;
@@ -281,7 +308,23 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                     }
                 }
             } else if (update.hasCallbackQuery()) {
-                handleCallbackQuery(update.getCallbackQuery().getData(), chatId);
+                CallbackQuery callbackQuery = update.getCallbackQuery();
+                String callbackId = callbackQuery.getId();
+                
+                // Deduplicate - skip if already processed (prevents multiple clicks issue)
+                if (!callbackDeduplicationService.tryProcess(callbackId)) {
+                    logger.debug("Duplicate callback ignored for chatId {}: {}", chatId, callbackId);
+                    return;
+                }
+                
+                // Answer callback to dismiss loading indicator on user's device
+                try {
+                    execute(new AnswerCallbackQuery(callbackId));
+                } catch (TelegramApiException e) {
+                    logger.warn("Failed to answer callback {}: {}", callbackId, e.getMessage());
+                }
+                
+                handleCallbackQuery(callbackQuery.getData(), chatId);
             }
         } catch (Exception e) {
             logger.error("Error processing update: {}", update, e);
