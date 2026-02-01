@@ -697,6 +697,9 @@ public class WithdrawService {
                     LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))));
 
             adminLogBotService.sendWithdrawRequestToAdmins(chatId, logMessage, request.getId());
+            
+            // Send main menu after withdraw request is sent
+            sendMainMenu(chatId);
         }
     }
 
