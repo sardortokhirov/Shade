@@ -1261,8 +1261,7 @@ public class BonusService {
         balance.setBalance(balance.getBalance().add(BigDecimal.valueOf(request.getAmount())));
         userBalanceRepository.save(balance);
 
-        dailyStatsService.subtractTransferAmount(request.getChatId(), request.getAmount());
-        dailyStatsService.addTopUpAmount(request.getChatId(), request.getAmount()); // Refund deposit amount
+        // Do NOT restore transfer amount or deposit amount - user loses limit on reject
 
         String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
         String errorLogMessage = String.format(
