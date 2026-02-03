@@ -124,8 +124,9 @@ public class TopUpService {
                 sessionService.addNavigationState(chatId, "TOPUP_AMOUNT_INPUT");
                 initiateTopUpRequest(chatId);
             }
-            case "TOPUP_AMOUNT_10000000" -> {
-                sessionService.setUserData(chatId, "amount", "10000000");
+            case "TOPUP_AMOUNT_MAX" -> {
+                long maxAmount = configurationService.getTopUpMaxAmount();
+                sessionService.setUserData(chatId, "amount", String.valueOf(maxAmount));
                 sessionService.setUserState(chatId, "TOPUP_CONFIRMATION");
                 sessionService.addNavigationState(chatId, "TOPUP_AMOUNT_INPUT");
                 initiateTopUpRequest(chatId);
@@ -1655,7 +1656,7 @@ public class TopUpService {
         String maxButtonText = String.format("%,d сум", maxAmount);
         rows.add(List.of(
                 createButton(minButtonText, "TOPUP_AMOUNT_MIN"),
-                createButton(maxButtonText, "TOPUP_AMOUNT_10000000")));
+                createButton(maxButtonText, "TOPUP_AMOUNT_MAX")));
         rows.add(createNavigationButtons(chatId));
         markup.setKeyboard(rows);
         return markup;
