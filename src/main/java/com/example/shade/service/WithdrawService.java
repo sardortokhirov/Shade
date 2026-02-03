@@ -448,7 +448,14 @@ public class WithdrawService {
             return;
         }
 
-        String platformName = sessionService.getUserData(chatId, "platform").replace("_", "");
+        String platformData = sessionService.getUserData(chatId, "platform");
+        if (platformData == null || platformData.isBlank()) {
+            logger.warn("No platform in session for chatId {} when validating userId", chatId);
+            sessionService.setUserState(chatId, "WITHDRAW_PLATFORM_SELECTION");
+            sendPlatformSelection(chatId);
+            return;
+        }
+        String platformName = platformData.replace("_", "");
         Platform platform = platformRepository.findByName(platformName)
                 .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
 
