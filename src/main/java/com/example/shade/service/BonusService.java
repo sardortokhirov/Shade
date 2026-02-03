@@ -866,7 +866,8 @@ public class BonusService {
         }
         balance.setBalance(balance.getBalance().subtract(new BigDecimal(amount.longValue())));
         userBalanceRepository.save(balance);
-        dailyStatsService.subtractTopUpAmount(chatId, amount.longValue()); // Reserve limit (commit only on success)
+        dailyStatsService.subtractTopUpAmount(chatId, amount.longValue());
+        dailyStatsService.addTransferAmount(chatId, amount.longValue()); // Decrease limit immediately; never restored on reject/fail
 
         request.setAmount(amount.longValue());
         request.setUniqueAmount(amount.longValue());
@@ -946,8 +947,6 @@ public class BonusService {
                 request.setStatus(RequestStatus.BONUS_APPROVED);
                 request.setTransactionId(UUID.randomUUID().toString());
                 requestRepository.save(request);
-                dailyStatsService.addTransferAmount(request.getChatId(), request.getAmount());
-                dailyStatsService.addTopUpAmount(request.getChatId(), request.getAmount()); // release reservation
                 // messageSender.animateAndDeleteMessages(request.getChatId(),
                 // sessionService.getMessageIds(request.getChatId()), "OPEN");
                 sessionService.clearMessageIds(request.getChatId());
@@ -1100,8 +1099,6 @@ public class BonusService {
                     request.setStatus(RequestStatus.BONUS_APPROVED);
                     request.setTransactionId(UUID.randomUUID().toString());
                     requestRepository.save(request);
-                    dailyStatsService.addTransferAmount(request.getChatId(), request.getAmount());
-                    dailyStatsService.addTopUpAmount(request.getChatId(), request.getAmount());
                     logger.info("✅ Platform transfer completed: chatId={}, userId={}, amount={}", request.getChatId(),
                             userId, amount);
                     // messageSender.animateAndDeleteMessages(request.getChatId(),
@@ -1262,8 +1259,7 @@ public class BonusService {
         balance.setBalance(balance.getBalance().add(BigDecimal.valueOf(request.getAmount())));
         userBalanceRepository.save(balance);
 
-        // Release reservation (limit was never committed - only reserved at creation)
-        dailyStatsService.addTopUpAmount(request.getChatId(), request.getAmount());
+        // Limit not restored on reject; it was consumed at request creation
 
         String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
         String errorLogMessage = String.format(
