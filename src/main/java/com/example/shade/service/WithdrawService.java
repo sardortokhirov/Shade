@@ -763,17 +763,23 @@ public class WithdrawService {
     }
 
     private void sendCardInput(Long chatId, String fullName) {
+        String platformUserId = sessionService.getUserData(chatId, "platformUserId");
+        String platformUserIdDisplay = platformUserId != null ? platformUserId : "—";
+
         List<HizmatRequest> recentRequests = requestRepository.findLatestUniqueCardNumbersByChatId(chatId);
         SendMessage message = new SendMessage();
         message.setChatId(chatId.toString());
         if (!recentRequests.isEmpty() && recentRequests.get(0).getCardNumber() != null) {
             HizmatRequest latestRequest = recentRequests.get(0);
             sessionService.setUserData(chatId, "cardNumber", latestRequest.getCardNumber());
-            message.setText(languageSessionService.getTranslation(chatId, "withdraw.message.card_input_with_recent"));
+            message.setText(String.format(
+                    languageSessionService.getTranslation(chatId, "withdraw.message.card_input_with_recent"),
+                    fullName, platformUserIdDisplay));
             message.setReplyMarkup(createSavedCardKeyboard(chatId, recentRequests));
         } else {
-            message.setText(String.format(languageSessionService.getTranslation(chatId, "withdraw.message.card_input"),
-                    fullName));
+            message.setText(String.format(
+                    languageSessionService.getTranslation(chatId, "withdraw.message.card_input"),
+                    fullName, platformUserIdDisplay));
             message.setReplyMarkup(createNavigationKeyboard(chatId));
         }
         messageSender.sendMessage(message, chatId);
