@@ -1490,17 +1490,23 @@ public class TopUpService {
     }
 
     private void sendCardInput(Long chatId, String fullName) {
+        String platformUserId = sessionService.getUserData(chatId, "platformUserId");
+        String platformUserIdDisplay = platformUserId != null ? platformUserId : "—";
+
         List<HizmatRequest> recentRequests = requestRepository.findLatestUniqueCardNumbersByChatId(chatId);
         SendMessage message = new SendMessage();
         message.setChatId(chatId);
         if (!recentRequests.isEmpty() && recentRequests.get(0).getCardNumber() != null) {
             HizmatRequest latestRequest = recentRequests.get(0);
             sessionService.setUserData(chatId, "cardNumber", latestRequest.getCardNumber());
-            message.setText(languageSessionService.getTranslation(chatId, "topup.message.enter_card_with_history"));
+            message.setText(String.format(
+                    languageSessionService.getTranslation(chatId, "topup.message.enter_card_with_history"),
+                    fullName, platformUserIdDisplay));
             message.setReplyMarkup(createSavedCardKeyboard(recentRequests, chatId));
         } else {
-            message.setText(
-                    String.format(languageSessionService.getTranslation(chatId, "topup.message.enter_card"), fullName));
+            message.setText(String.format(
+                    languageSessionService.getTranslation(chatId, "topup.message.enter_card"),
+                    fullName, platformUserIdDisplay));
             message.setReplyMarkup(createNavigationKeyboard(chatId));
         }
         messageSender.sendMessage(message, chatId);
