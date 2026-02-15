@@ -326,8 +326,8 @@ public class TopUpService {
                             .build();
                     requestRepository.save(request);
 
-                    sessionService.setUserState(chatId, "TOPUP_APPROVE_USER");
-                    sendUserApproval(chatId, fullName, userId);
+                    // Skip "are you sure" confirmation — go straight to card input (payment part)
+                    handleApproveUser(chatId);
                 } else {
                     logger.warn("Invalid user profile for ID {} on platform {}. Response: {}", userId, platformName,
                             profile);
@@ -1485,15 +1485,6 @@ public class TopUpService {
         messageSender.sendMessage(message, chatId);
     }
 
-    private void sendUserApproval(Long chatId, String fullName, String userId) {
-        SendMessage message = new SendMessage();
-        message.setChatId(chatId);
-        message.setText(String.format(languageSessionService.getTranslation(chatId, "topup.message.user_approval"),
-                fullName, userId));
-        message.setReplyMarkup(createApprovalKeyboard(chatId));
-        messageSender.sendMessage(message, chatId);
-    }
-
     private void sendNoUserFound(Long chatId) {
         sendMessageWithNavigation(chatId, languageSessionService.getTranslation(chatId, "topup.message.no_user_found"));
     }
@@ -1629,19 +1620,6 @@ public class TopUpService {
             }
         }
 
-        rows.add(createNavigationButtons(chatId));
-        markup.setKeyboard(rows);
-        return markup;
-    }
-
-    private InlineKeyboardMarkup createApprovalKeyboard(Long chatId) {
-        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-        rows.add(List.of(
-                createButton(languageSessionService.getTranslation(chatId, "topup.button.correct"),
-                        "TOPUP_APPROVE_USER"),
-                createButton(languageSessionService.getTranslation(chatId, "topup.button.incorrect"),
-                        "TOPUP_REJECT_USER")));
         rows.add(createNavigationButtons(chatId));
         markup.setKeyboard(rows);
         return markup;

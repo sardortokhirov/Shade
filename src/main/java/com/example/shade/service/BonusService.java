@@ -1203,15 +1203,20 @@ public class BonusService {
         long rubAmount = BigDecimal.valueOf(request.getUniqueAmount())
                 .multiply(latest.getUzsToRub())
                 .longValue() / 1000;
+        String cardDisplay = request.getCardNumber() != null ? request.getCardNumber() : "—";
         String errorLogMessage = String.format(
-                "#%d Transfer ❌\n" +
-                        "👤%d | ☎%s | 🌐%s:%s\n" +
-                        "💰%,d UZS | %,d RUB\n" +
-                        "💳%s\n" +
-                        "📅%s",
+                "🆔: %d Transfer ❌\n" +
+                        "👤: [%d] %s\n" +
+                        "🌐 #%s %s🇺🇿:%s\n" +
+                        "💸 Miqdor: %,d UZS\n" +
+                        "💸 Miqdor: %,d RUB\n" +
+                        "💳 Karta: %s\n" +
+                        "📅 [%s]",
                 request.getId(),
-                request.getChatId(), number, request.getPlatform(), request.getPlatformUserId(),
-                request.getUniqueAmount(), rubAmount, request.getCardNumber(),
+                request.getChatId(), number,
+                request.getPlatform(), request.getCurrency().toString(), request.getPlatformUserId(),
+                request.getUniqueAmount(), rubAmount,
+                cardDisplay,
                 LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
