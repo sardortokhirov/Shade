@@ -20,6 +20,31 @@ public class UserLimitIncreaseService {
     private static final ZoneId GMT_PLUS_5 = ZoneId.of("GMT+5");
 
     /**
+     * Get per-user base daily limit override (UZS). Empty = use system default.
+     */
+    public java.util.Optional<Long> getBaseDailyLimitOverride(Long chatId) {
+        return repository.findByChatId(chatId)
+                .map(UserLimitIncrease::getBaseDailyLimitOverride)
+                .filter(java.util.Objects::nonNull);
+    }
+
+    /**
+     * Set per-user base daily limit override (UZS). Overrides system default for this user only.
+     */
+    @Transactional
+    public UserLimitIncrease setBaseDailyLimitOverride(Long chatId, Long baseDailyLimit) {
+        if (baseDailyLimit != null && baseDailyLimit < 0) {
+            throw new IllegalArgumentException("Base daily limit must be non-negative");
+        }
+        UserLimitIncrease limit = getOrCreate(chatId);
+        limit.setBaseDailyLimitOverride(baseDailyLimit);
+        limit.setLastUpdated(LocalDateTime.now(GMT_PLUS_5));
+        repository.save(limit);
+        logger.info("Set base daily limit override for chatId {} to {}", chatId, baseDailyLimit);
+        return limit;
+    }
+
+    /**
      * Get accumulated permanent limit increase for a user
      */
     public BigDecimal getPermanentLimitIncrease(Long chatId) {

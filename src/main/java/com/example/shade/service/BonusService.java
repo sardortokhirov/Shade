@@ -1476,7 +1476,7 @@ public class BonusService {
             // Get total daily limit increase after this play
             Long totalDailyLimitIncrease = 0L;
             Long permanentIncreaseLong = 0L;
-            Long baseLimit = configurationService.getDailyBonusTransferLimit();
+            Long baseLimit = dailyStatsService.getBaseDailyLimitForUser(chatId);
             Long tomorrowPermanentLimit = baseLimit; // Default to base limit if permanent increase retrieval fails
             try {
                 Long effectiveDailyLimit = dailyStatsService.getEffectiveDailyLimitReadOnly(chatId);

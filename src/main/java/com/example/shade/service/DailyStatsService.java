@@ -36,6 +36,14 @@ public class DailyStatsService {
     }
 
     /**
+     * Gets the base daily limit for a user (per-user override if set, otherwise system default).
+     */
+    public Long getBaseDailyLimitForUser(Long chatId) {
+        return userLimitIncreaseService.getBaseDailyLimitOverride(chatId)
+                .orElse(configurationService.getDailyBonusTransferLimit());
+    }
+
+    /**
      * Calculates carryover amount from yesterday's unused limit
      * Carryover = unused limit (effectiveDailyLimit - dailyTransfers), capped at available limit before transfers
      * When Pay Toggle + Promo are ON and user is promo registered, deposits are not required
@@ -51,7 +59,7 @@ public class DailyStatsService {
         DailyUserStats stats = yesterdayStats.get();
         
         // Calculate yesterday's effective daily limit (DL + TD + LD)
-        Long dailyLimit = configurationService.getDailyBonusTransferLimit();
+        Long dailyLimit = getBaseDailyLimitForUser(chatId);
         BigDecimal permanentIncrease = userLimitIncreaseService.getPermanentLimitIncrease(chatId);
         Long permanentIncreaseLong = permanentIncrease.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
         BigDecimal dailyLimitIncreaseBD = stats.getDailyLimitIncrease() != null ? stats.getDailyLimitIncrease() : BigDecimal.ZERO;
@@ -268,7 +276,7 @@ public class DailyStatsService {
      */
     public Long getAvailableLimit(Long chatId) {
         DailyUserStats stats = getOrCreateTodayStats(chatId);
-        Long dailyLimit = configurationService.getDailyBonusTransferLimit();
+        Long dailyLimit = getBaseDailyLimitForUser(chatId);
         BigDecimal permanentIncrease = userLimitIncreaseService.getPermanentLimitIncrease(chatId);
         Long permanentIncreaseLong = permanentIncrease.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
         Long carryover = stats.getCarryoverAmount() != null ? stats.getCarryoverAmount() : 0L;
@@ -310,7 +318,7 @@ public class DailyStatsService {
     public Long getAvailableLimitReadOnly(Long chatId) {
         LocalDate today = getTodayInGmtPlus5();
         DailyUserStats stats = statsRepository.findByChatIdAndDate(chatId, today).orElse(null);
-        Long dailyLimit = configurationService.getDailyBonusTransferLimit();
+        Long dailyLimit = getBaseDailyLimitForUser(chatId);
         BigDecimal permanentIncrease = userLimitIncreaseService.getPermanentLimitIncrease(chatId);
         Long permanentIncreaseLong = permanentIncrease.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
         Long carryover = (stats != null && stats.getCarryoverAmount() != null) ? stats.getCarryoverAmount() : 0L;
@@ -346,7 +354,7 @@ public class DailyStatsService {
      * This is what the user will have as minimum limit tomorrow
      */
     public Long getTomorrowPermanentLimit(Long chatId) {
-        Long dailyLimit = configurationService.getDailyBonusTransferLimit();
+        Long dailyLimit = getBaseDailyLimitForUser(chatId);
         BigDecimal permanentIncrease = userLimitIncreaseService.getPermanentLimitIncrease(chatId);
         Long permanentIncreaseLong = permanentIncrease.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
         return dailyLimit + permanentIncreaseLong;
@@ -367,7 +375,7 @@ public class DailyStatsService {
      */
     public Long getEffectiveDailyLimit(Long chatId) {
         DailyUserStats stats = getOrCreateTodayStats(chatId);
-        Long dailyLimit = configurationService.getDailyBonusTransferLimit();
+        Long dailyLimit = getBaseDailyLimitForUser(chatId);
         BigDecimal permanentIncrease = userLimitIncreaseService.getPermanentLimitIncrease(chatId);
         Long permanentIncreaseLong = permanentIncrease.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
         BigDecimal dailyLimitIncreaseBD = stats.getDailyLimitIncrease() != null ? stats.getDailyLimitIncrease() : BigDecimal.ZERO;
@@ -387,7 +395,7 @@ public class DailyStatsService {
     public Long getEffectiveDailyLimitReadOnly(Long chatId) {
         LocalDate today = getTodayInGmtPlus5();
         DailyUserStats stats = statsRepository.findByChatIdAndDate(chatId, today).orElse(null);
-        Long dailyLimit = configurationService.getDailyBonusTransferLimit();
+        Long dailyLimit = getBaseDailyLimitForUser(chatId);
         BigDecimal permanentIncrease = userLimitIncreaseService.getPermanentLimitIncrease(chatId);
         Long permanentIncreaseLong = permanentIncrease.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
         BigDecimal dailyLimitIncreaseBD = (stats != null && stats.getDailyLimitIncrease() != null) ? stats.getDailyLimitIncrease() : BigDecimal.ZERO;

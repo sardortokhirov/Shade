@@ -206,9 +206,15 @@ public class UserController {
         
         try {
             com.example.shade.model.UserLimitIncrease limit = userService.updateLimit(chatId, request.getPermanentLimitIncrease());
+            Long effectiveDailyLimit = dailyStatsService.getEffectiveDailyLimit(chatId);
+            DailyLimitUpdateResponse response = DailyLimitUpdateResponse.builder()
+                    .permanentLimitIncrease(limit.getAccumulatedLimitIncrease().setScale(0, java.math.RoundingMode.HALF_UP).longValue())
+                    .effectiveDailyLimit(effectiveDailyLimit)
+                    .lastUpdated(limit.getLastUpdated())
+                    .build();
             logger.info("LIMIT UPDATE SUCCESS - chatId: {}, new value: {}, client: {}", 
                     chatId, limit.getAccumulatedLimitIncrease(), clientInfo);
-            return ResponseEntity.ok(limit);
+            return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             logger.error("LIMIT UPDATE FAILED (Validation) - chatId: {}, error: {}, client: {}", 
                     chatId, e.getMessage(), clientInfo);
@@ -218,6 +224,34 @@ public class UserController {
                     chatId, e.getMessage(), clientInfo);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error updating limit: " + e.getMessage());
+        }
+    }
+
+    @PutMapping("/{chatId}/base-daily-limit")
+    public ResponseEntity<?> updateBaseDailyLimit(
+            @PathVariable Long chatId,
+            @RequestBody BaseDailyLimitRequest request,
+            HttpServletRequest httpRequest) {
+
+        if (!authenticate(httpRequest)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
+
+        if (request == null || request.getBaseDailyLimit() == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("baseDailyLimit is required");
+        }
+        if (request.getBaseDailyLimit() < 0) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("baseDailyLimit must be non-negative");
+        }
+
+        try {
+            BaseDailyLimitUpdateResponse response = userService.updateBaseDailyLimit(chatId, request.getBaseDailyLimit());
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error updating base daily limit: " + e.getMessage());
         }
     }
 

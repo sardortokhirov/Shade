@@ -36,7 +36,6 @@ public class UserService {
     private final UserLimitIncreaseService userLimitIncreaseService;
     private final DailyUserStatsRepository dailyUserStatsRepository;
     private final UserLimitIncreaseRepository userLimitIncreaseRepository;
-    private final SystemConfigurationService configurationService;
     private final FeatureService featureService;
 
     @Transactional(readOnly = true)
@@ -252,8 +251,8 @@ public class UserService {
         Long effectiveDailyLimit = dailyStatsService.getEffectiveDailyLimitReadOnly(chatId);
         Long availableLimit = dailyStatsService.getAvailableLimitReadOnly(chatId);
         
-        // Get base daily limit for detailed breakdown
-        Long baseDailyLimit = configurationService.getDailyBonusTransferLimit();
+        // Get base daily limit for detailed breakdown (per-user override or system default)
+        Long baseDailyLimit = dailyStatsService.getBaseDailyLimitForUser(chatId);
         
         // Get daily stats (read-only - don't create if doesn't exist)
         LocalDate today = LocalDate.now(java.time.ZoneId.of("GMT+5"));
@@ -495,6 +494,23 @@ public class UserService {
         userLimitIncreaseRepository.save(limitIncrease);
         
         return limitIncrease;
+    }
+
+    /**
+     * Sets per-user base daily limit override. Returns DTO with baseDailyLimit, effectiveDailyLimit, lastUpdated.
+     */
+    @Transactional
+    public BaseDailyLimitUpdateResponse updateBaseDailyLimit(Long chatId, Long baseDailyLimit) {
+        if (baseDailyLimit == null || baseDailyLimit < 0) {
+            throw new IllegalArgumentException("Base daily limit must be non-negative");
+        }
+        com.example.shade.model.UserLimitIncrease limit = userLimitIncreaseService.setBaseDailyLimitOverride(chatId, baseDailyLimit);
+        Long effectiveDailyLimit = dailyStatsService.getEffectiveDailyLimit(chatId);
+        return BaseDailyLimitUpdateResponse.builder()
+                .baseDailyLimit(baseDailyLimit)
+                .effectiveDailyLimit(effectiveDailyLimit)
+                .lastUpdated(limit.getLastUpdated())
+                .build();
     }
 
     @Transactional
