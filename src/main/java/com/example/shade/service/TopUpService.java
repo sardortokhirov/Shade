@@ -1570,6 +1570,10 @@ public class TopUpService {
         String platformName = sessionService.getUserData(chatId, "platform");
         if (platformName == null) return false;
         platformName = platformName.replace("_", "");
+        Optional<Platform> platformOpt = platformRepository.findByName(platformName);
+        if (platformOpt.isPresent()) {
+            return platformOpt.get().getCurrency() == Currency.RUB;
+        }
         String userId = sessionService.getUserData(chatId, "platformUserId");
         if (userId == null) return false;
         Optional<HizmatRequest> req = requestRepository.findTopByChatIdAndPlatformAndPlatformUserIdOrderByCreatedAtDesc(chatId, platformName, userId);
@@ -1726,8 +1730,8 @@ public class TopUpService {
             long maxRub = BigDecimal.valueOf(maxUzs).multiply(latest.getUzsToRub())
                     .divide(BigDecimal.valueOf(1000), 0, RoundingMode.UP).longValue();
             if (minRub < 1) minRub = 1;
-            String minButtonText = String.format("%,d RUB", minRub);
-            String maxButtonText = String.format("%,d RUB", maxRub);
+            String minButtonText = String.format(languageSessionService.getTranslation(chatId, "topup.button.min_rub"), minRub);
+            String maxButtonText = String.format(languageSessionService.getTranslation(chatId, "topup.button.max_rub"), maxRub);
             rows.add(List.of(
                     createButton(minButtonText, "TOPUP_AMOUNT_MIN"),
                     createButton(maxButtonText, "TOPUP_AMOUNT_MAX")));
