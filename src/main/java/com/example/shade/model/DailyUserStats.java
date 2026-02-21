@@ -44,8 +44,8 @@ public class DailyUserStats {
     @Column(name = "carryover_amount", nullable = false)
     private Long carryoverAmount = 0L;
 
-    /** Transfers made while promo was enabled; not counted against limit after promo is off. */
-    @Column(name = "daily_promo_transfer_amount", nullable = false)
+    /** Transfers made while promo was enabled; not counted against limit after promo is off. Nullable so Hibernate can add column on existing tables without DEFAULT. */
+    @Column(name = "daily_promo_transfer_amount", nullable = true)
     private Long dailyPromoTransferAmount = 0L;
 
     @Column(name = "last_updated", nullable = false)
