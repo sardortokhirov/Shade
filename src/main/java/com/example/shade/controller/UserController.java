@@ -4,6 +4,7 @@ import com.example.shade.dto.*;
 import com.example.shade.model.HizmatRequest;
 import com.example.shade.model.RequestStatus;
 import com.example.shade.model.RequestType;
+import com.example.shade.service.DailyStatsService;
 import com.example.shade.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,7 @@ import java.util.List;
 public class UserController {
     private static final Logger logger = LoggerFactory.getLogger(UserController.class);
     private final UserService userService;
+    private final DailyStatsService dailyStatsService;
 
     private boolean authenticate(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
@@ -216,6 +218,59 @@ public class UserController {
                     chatId, e.getMessage(), clientInfo);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error updating limit: " + e.getMessage());
+        }
+    }
+
+    @PutMapping("/{chatId}/daily-limit")
+    public ResponseEntity<?> updateDailyLimit(
+            @PathVariable Long chatId,
+            @RequestBody UpdateLimitRequest request,
+            HttpServletRequest httpRequest) {
+
+        if (!authenticate(httpRequest)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
+
+        String clientInfo = httpRequest.getRemoteAddr();
+        logger.info("DAILY LIMIT UPDATE REQUEST - chatId: {}, requested value: {}, client: {}",
+                chatId, request.getPermanentLimitIncrease(), clientInfo);
+
+        if (request.getPermanentLimitIncrease() != null && request.getPermanentLimitIncrease() == 0) {
+            try {
+                Long currentLimit = userService.getUserDetails(chatId).getPermanentLimitIncrease();
+                if (currentLimit != null && currentLimit > 0) {
+                    logger.warn("ATTEMPT TO RESET DAILY LIMIT VIA API - chatId: {}, current: {}, requested: 0, client: {}",
+                            chatId, currentLimit, clientInfo);
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                            .body(String.format("Cannot reset permanent limit increase to 0 when current limit is %d. " +
+                                    "Permanent limits should never be reset automatically. " +
+                                    "If this is intentional, contact system administrator.", currentLimit));
+                }
+            } catch (Exception e) {
+                logger.debug("Could not pre-validate daily limit reset for chatId {}: {}", chatId, e.getMessage());
+            }
+        }
+
+        try {
+            com.example.shade.model.UserLimitIncrease limit = userService.updateLimit(chatId, request.getPermanentLimitIncrease());
+            Long effectiveDailyLimit = dailyStatsService.getEffectiveDailyLimit(chatId);
+            DailyLimitUpdateResponse response = DailyLimitUpdateResponse.builder()
+                    .permanentLimitIncrease(limit.getAccumulatedLimitIncrease().setScale(0, java.math.RoundingMode.HALF_UP).longValue())
+                    .effectiveDailyLimit(effectiveDailyLimit)
+                    .lastUpdated(limit.getLastUpdated())
+                    .build();
+            logger.info("DAILY LIMIT UPDATE SUCCESS - chatId: {}, permanentLimit: {}, effectiveDailyLimit: {}, client: {}",
+                    chatId, limit.getAccumulatedLimitIncrease(), effectiveDailyLimit, clientInfo);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            logger.error("DAILY LIMIT UPDATE FAILED (Validation) - chatId: {}, error: {}, client: {}",
+                    chatId, e.getMessage(), clientInfo);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        } catch (Exception e) {
+            logger.error("DAILY LIMIT UPDATE FAILED (Error) - chatId: {}, error: {}, client: {}",
+                    chatId, e.getMessage(), clientInfo);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error updating daily limit: " + e.getMessage());
         }
     }
 
