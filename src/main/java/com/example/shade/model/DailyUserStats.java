@@ -44,6 +44,10 @@ public class DailyUserStats {
     @Column(name = "carryover_amount", nullable = false)
     private Long carryoverAmount = 0L;
 
+    /** Transfers made while promo was enabled; not counted against limit after promo is off. */
+    @Column(name = "daily_promo_transfer_amount", nullable = false)
+    private Long dailyPromoTransferAmount = 0L;
+
     @Column(name = "last_updated", nullable = false)
     private LocalDateTime lastUpdated;
 }

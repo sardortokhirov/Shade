@@ -21,6 +21,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMa
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDate;
@@ -118,15 +119,38 @@ public class TopUpService {
                 sendAmountInput(chatId);
             }
             case "TOPUP_AMOUNT_MIN" -> {
-                long minAmount = configurationService.getTopUpMinAmount();
-                sessionService.setUserData(chatId, "amount", String.valueOf(minAmount));
+                if (isRubTopUp(chatId)) {
+                    ExchangeRate latest = exchangeRateRepository.findLatest()
+                            .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
+                    long minUzs = configurationService.getTopUpMinAmount();
+                    long minRub = BigDecimal.valueOf(minUzs).multiply(latest.getUzsToRub())
+                            .divide(BigDecimal.valueOf(1000), 0, RoundingMode.DOWN).longValue();
+                    if (minRub < 1) minRub = 1;
+                    sessionService.setUserData(chatId, "amount", String.valueOf(minRub));
+                    sessionService.setUserData(chatId, "amountCurrency", "RUB");
+                } else {
+                    long minAmount = configurationService.getTopUpMinAmount();
+                    sessionService.setUserData(chatId, "amount", String.valueOf(minAmount));
+                    sessionService.setUserData(chatId, "amountCurrency", "UZS");
+                }
                 sessionService.setUserState(chatId, "TOPUP_CONFIRMATION");
                 sessionService.addNavigationState(chatId, "TOPUP_AMOUNT_INPUT");
                 initiateTopUpRequest(chatId);
             }
             case "TOPUP_AMOUNT_MAX" -> {
-                long maxAmount = configurationService.getTopUpMaxAmount();
-                sessionService.setUserData(chatId, "amount", String.valueOf(maxAmount));
+                if (isRubTopUp(chatId)) {
+                    ExchangeRate latest = exchangeRateRepository.findLatest()
+                            .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
+                    long maxUzs = configurationService.getTopUpMaxAmount();
+                    long maxRub = BigDecimal.valueOf(maxUzs).multiply(latest.getUzsToRub())
+                            .divide(BigDecimal.valueOf(1000), 0, RoundingMode.UP).longValue();
+                    sessionService.setUserData(chatId, "amount", String.valueOf(maxRub));
+                    sessionService.setUserData(chatId, "amountCurrency", "RUB");
+                } else {
+                    long maxAmount = configurationService.getTopUpMaxAmount();
+                    sessionService.setUserData(chatId, "amount", String.valueOf(maxAmount));
+                    sessionService.setUserData(chatId, "amountCurrency", "UZS");
+                }
                 sessionService.setUserState(chatId, "TOPUP_CONFIRMATION");
                 sessionService.addNavigationState(chatId, "TOPUP_AMOUNT_INPUT");
                 initiateTopUpRequest(chatId);
@@ -398,21 +422,42 @@ public class TopUpService {
     }
 
     private void handleAmountInput(Long chatId, String amountText) {
-        // messageSender.animateAndDeleteMessages(chatId,
-        // sessionService.getMessageIds(chatId), "OPEN");
         sessionService.clearMessageIds(chatId);
         try {
             long amount = Long.parseLong(amountText.replaceAll("[^\\d]", ""));
-            long minAmount = configurationService.getTopUpMinAmount();
-            long maxAmount = configurationService.getTopUpMaxAmount();
-            if (amount < minAmount || amount > maxAmount) {
-                String message = String.format(
-                        languageSessionService.getTranslation(chatId, "topup.message.invalid_amount_range"),
-                        minAmount, maxAmount);
-                sendMessageWithNavigation(chatId, message);
-                return;
+            boolean rub = isRubTopUp(chatId);
+            if (rub) {
+                ExchangeRate latest = exchangeRateRepository.findLatest()
+                        .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
+                long minUzs = configurationService.getTopUpMinAmount();
+                long maxUzs = configurationService.getTopUpMaxAmount();
+                long minRub = BigDecimal.valueOf(minUzs).multiply(latest.getUzsToRub())
+                        .divide(BigDecimal.valueOf(1000), 0, RoundingMode.DOWN).longValue();
+                long maxRub = BigDecimal.valueOf(maxUzs).multiply(latest.getUzsToRub())
+                        .divide(BigDecimal.valueOf(1000), 0, RoundingMode.UP).longValue();
+                if (minRub < 1) minRub = 1;
+                if (amount < minRub || amount > maxRub) {
+                    String message = String.format(
+                            languageSessionService.getTranslation(chatId, "topup.message.invalid_amount_range_rub"),
+                            minRub, maxRub);
+                    sendMessageWithNavigation(chatId, message);
+                    return;
+                }
+                sessionService.setUserData(chatId, "amount", String.valueOf(amount));
+                sessionService.setUserData(chatId, "amountCurrency", "RUB");
+            } else {
+                long minAmount = configurationService.getTopUpMinAmount();
+                long maxAmount = configurationService.getTopUpMaxAmount();
+                if (amount < minAmount || amount > maxAmount) {
+                    String message = String.format(
+                            languageSessionService.getTranslation(chatId, "topup.message.invalid_amount_range"),
+                            minAmount, maxAmount);
+                    sendMessageWithNavigation(chatId, message);
+                    return;
+                }
+                sessionService.setUserData(chatId, "amount", String.valueOf(amount));
+                sessionService.setUserData(chatId, "amountCurrency", "UZS");
             }
-            sessionService.setUserData(chatId, "amount", String.valueOf(amount));
             sessionService.setUserState(chatId, "TOPUP_CONFIRMATION");
             sessionService.addNavigationState(chatId, "TOPUP_AMOUNT_INPUT");
             initiateTopUpRequest(chatId);
@@ -440,9 +485,6 @@ public class TopUpService {
 
         String platformName = sessionService.getUserData(chatId, "platform").replace("_", "");
 
-        long amount = Long.parseLong(sessionService.getUserData(chatId, "amount"));
-        long uniqueAmount = generateUniqueAmount(amount);
-
         HizmatRequest request = requestRepository.findTopByChatIdAndPlatformAndPlatformUserIdOrderByCreatedAtDesc(
                 chatId, platformName, sessionService.getUserData(chatId, "platformUserId")).orElse(null);
         if (request == null) {
@@ -453,6 +495,18 @@ public class TopUpService {
             sendMainMenu(chatId);
             return;
         }
+
+        long amount;
+        if (request.getCurrency() == Currency.RUB) {
+            long rubAmount = Long.parseLong(sessionService.getUserData(chatId, "amount"));
+            ExchangeRate latest = exchangeRateRepository.findLatest()
+                    .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
+            amount = BigDecimal.valueOf(rubAmount).multiply(BigDecimal.valueOf(1000))
+                    .divide(latest.getUzsToRub(), 0, RoundingMode.HALF_UP).longValue();
+        } else {
+            amount = Long.parseLong(sessionService.getUserData(chatId, "amount"));
+        }
+        long uniqueAmount = generateUniqueAmount(amount);
 
         // Only get a new admin card if the request doesn't have one already
         AdminCard adminCard;
@@ -1512,16 +1566,44 @@ public class TopUpService {
         messageSender.sendMessage(message, chatId);
     }
 
+    private boolean isRubTopUp(Long chatId) {
+        String platformName = sessionService.getUserData(chatId, "platform");
+        if (platformName == null) return false;
+        platformName = platformName.replace("_", "");
+        String userId = sessionService.getUserData(chatId, "platformUserId");
+        if (userId == null) return false;
+        Optional<HizmatRequest> req = requestRepository.findTopByChatIdAndPlatformAndPlatformUserIdOrderByCreatedAtDesc(chatId, platformName, userId);
+        return req.map(r -> r.getCurrency() == Currency.RUB).orElse(false);
+    }
+
     private void sendAmountInput(Long chatId) {
         SendMessage message = new SendMessage();
         message.setChatId(chatId);
-        long minAmount = configurationService.getTopUpMinAmount();
-        long maxAmount = configurationService.getTopUpMaxAmount();
-        String messageText = String.format(
-                languageSessionService.getTranslation(chatId, "topup.message.enter_amount"),
-                minAmount, maxAmount);
-        message.setText(messageText);
-        message.setReplyMarkup(createAmountKeyboard(chatId));
+        boolean rub = isRubTopUp(chatId);
+        if (rub) {
+            ExchangeRate latest = exchangeRateRepository.findLatest()
+                    .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
+            long minUzs = configurationService.getTopUpMinAmount();
+            long maxUzs = configurationService.getTopUpMaxAmount();
+            long minRub = BigDecimal.valueOf(minUzs).multiply(latest.getUzsToRub())
+                    .divide(BigDecimal.valueOf(1000), 0, RoundingMode.DOWN).longValue();
+            long maxRub = BigDecimal.valueOf(maxUzs).multiply(latest.getUzsToRub())
+                    .divide(BigDecimal.valueOf(1000), 0, RoundingMode.UP).longValue();
+            if (minRub < 1) minRub = 1;
+            String messageText = String.format(
+                    languageSessionService.getTranslation(chatId, "topup.message.enter_amount_rub"),
+                    minRub, maxRub);
+            message.setText(messageText);
+            message.setReplyMarkup(createAmountKeyboard(chatId));
+        } else {
+            long minAmount = configurationService.getTopUpMinAmount();
+            long maxAmount = configurationService.getTopUpMaxAmount();
+            String messageText = String.format(
+                    languageSessionService.getTranslation(chatId, "topup.message.enter_amount"),
+                    minAmount, maxAmount);
+            message.setText(messageText);
+            message.setReplyMarkup(createAmountKeyboard(chatId));
+        }
         messageSender.sendMessage(message, chatId);
     }
 
@@ -1634,13 +1716,30 @@ public class TopUpService {
     private InlineKeyboardMarkup createAmountKeyboard(Long chatId) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-        long minAmount = configurationService.getTopUpMinAmount();
-        long maxAmount = configurationService.getTopUpMaxAmount();
-        String minButtonText = String.format("%,d сум", minAmount);
-        String maxButtonText = String.format("%,d сум", maxAmount);
-        rows.add(List.of(
-                createButton(minButtonText, "TOPUP_AMOUNT_MIN"),
-                createButton(maxButtonText, "TOPUP_AMOUNT_MAX")));
+        if (isRubTopUp(chatId)) {
+            ExchangeRate latest = exchangeRateRepository.findLatest()
+                    .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
+            long minUzs = configurationService.getTopUpMinAmount();
+            long maxUzs = configurationService.getTopUpMaxAmount();
+            long minRub = BigDecimal.valueOf(minUzs).multiply(latest.getUzsToRub())
+                    .divide(BigDecimal.valueOf(1000), 0, RoundingMode.DOWN).longValue();
+            long maxRub = BigDecimal.valueOf(maxUzs).multiply(latest.getUzsToRub())
+                    .divide(BigDecimal.valueOf(1000), 0, RoundingMode.UP).longValue();
+            if (minRub < 1) minRub = 1;
+            String minButtonText = String.format("%,d RUB", minRub);
+            String maxButtonText = String.format("%,d RUB", maxRub);
+            rows.add(List.of(
+                    createButton(minButtonText, "TOPUP_AMOUNT_MIN"),
+                    createButton(maxButtonText, "TOPUP_AMOUNT_MAX")));
+        } else {
+            long minAmount = configurationService.getTopUpMinAmount();
+            long maxAmount = configurationService.getTopUpMaxAmount();
+            String minButtonText = String.format("%,d сум", minAmount);
+            String maxButtonText = String.format("%,d сум", maxAmount);
+            rows.add(List.of(
+                    createButton(minButtonText, "TOPUP_AMOUNT_MIN"),
+                    createButton(maxButtonText, "TOPUP_AMOUNT_MAX")));
+        }
         rows.add(createNavigationButtons(chatId));
         markup.setKeyboard(rows);
         return markup;

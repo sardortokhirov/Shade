@@ -74,9 +74,11 @@ public class DailyStatsService {
             availableLimitBeforeTransfers = Math.min(effectiveDailyLimit, dailyTopUps + yesterdaysCarryover);
         }
         
-        // Calculate unused limit
+        // Calculate unused limit (when promo is off, do not count yesterday's promo transfers as consumed)
         Long dailyTransfers = stats.getDailyTransferAmount() != null ? stats.getDailyTransferAmount() : 0L;
-        Long unusedLimit = effectiveDailyLimit - dailyTransfers;
+        Long dailyPromoTransferAmount = stats.getDailyPromoTransferAmount() != null ? stats.getDailyPromoTransferAmount() : 0L;
+        long effectiveConsumedYesterday = Math.max(0L, dailyTransfers - dailyPromoTransferAmount);
+        Long unusedLimit = effectiveDailyLimit - effectiveConsumedYesterday;
         
         // Carryover = unused limit, but capped at available limit before transfers
         Long carryover = Math.max(0L, Math.min(unusedLimit, availableLimitBeforeTransfers));
@@ -106,6 +108,7 @@ public class DailyStatsService {
                             .dailyTransferAmount(0L)
                             .dailyLimitIncrease(BigDecimal.ZERO)
                             .carryoverAmount(carryover)
+                            .dailyPromoTransferAmount(0L)
                             .lastUpdated(LocalDateTime.now(GMT_PLUS_5))
                             .build();
                     return statsRepository.save(stats);
@@ -187,6 +190,15 @@ public class DailyStatsService {
         
         // Add to transfer amount (this tracks total transfers, not which limit was used)
         stats.setDailyTransferAmount(stats.getDailyTransferAmount() + amount);
+
+        // If transfer was made while promo was on, track it so we don't count it after promo is turned off
+        boolean payToggleEnabled = featureService.isPayToggleEnabled();
+        boolean promoEnabled = featureService.isPromoEnabled();
+        boolean isPromoUser = allowedPromoUserRepository.existsByChatId(chatId);
+        if (payToggleEnabled && promoEnabled && isPromoUser) {
+            long currentPromo = stats.getDailyPromoTransferAmount() != null ? stats.getDailyPromoTransferAmount() : 0L;
+            stats.setDailyPromoTransferAmount(currentPromo + amount);
+        }
         
         stats.setLastUpdated(LocalDateTime.now(GMT_PLUS_5));
         statsRepository.save(stats);
@@ -203,6 +215,10 @@ public class DailyStatsService {
     public void subtractTransferAmount(Long chatId, Long amount) {
         DailyUserStats stats = getOrCreateTodayStats(chatId);
         stats.setDailyTransferAmount(Math.max(0L, stats.getDailyTransferAmount() - amount));
+
+        // If the reverted transfer was counted as promo, reduce promo amount so we don't double-count
+        long currentPromo = stats.getDailyPromoTransferAmount() != null ? stats.getDailyPromoTransferAmount() : 0L;
+        stats.setDailyPromoTransferAmount(Math.max(0L, currentPromo - amount));
         
         // Restore carryover that was consumed (restore up to the refunded amount)
         // This is a heuristic: we restore carryover by the refunded amount, which may over-restore
@@ -269,6 +285,7 @@ public class DailyStatsService {
         boolean promoEnabled = featureService.isPromoEnabled();
         boolean isPromoUser = allowedPromoUserRepository.existsByChatId(chatId);
         
+        Long dailyPromoTransferAmount = stats.getDailyPromoTransferAmount() != null ? stats.getDailyPromoTransferAmount() : 0L;
         Long available;
         if (payToggleEnabled && promoEnabled && isPromoUser) {
             // Promo users with pay toggle ON can transfer up to effective limit without deposits
@@ -276,10 +293,11 @@ public class DailyStatsService {
             logger.debug("getAvailableLimit for chatId {} (PROMO MODE): effectiveLimit={}, dailyTransfers={}, available={}", 
                     chatId, effectiveDailyLimit, dailyTransfers, available);
         } else {
-            // Normal users: constrained by deposits + carryover
-            available = Math.min(effectiveDailyLimit, dailyTopUpAmount + carryover) - dailyTransfers;
-            logger.debug("getAvailableLimit for chatId {}: effectiveLimit={}, dailyTopUps={}, carryover={}, dailyTransfers={}, available={}", 
-                    chatId, effectiveDailyLimit, dailyTopUpAmount, carryover, dailyTransfers, available);
+            // Normal users: constrained by deposits + carryover. Do not count promo transfers after promo is off.
+            long effectiveConsumed = Math.max(0L, dailyTransfers - dailyPromoTransferAmount);
+            available = Math.min(effectiveDailyLimit, dailyTopUpAmount + carryover) - effectiveConsumed;
+            logger.debug("getAvailableLimit for chatId {}: effectiveLimit={}, dailyTopUps={}, carryover={}, dailyTransfers={}, promoTransfers={}, effectiveConsumed={}, available={}", 
+                    chatId, effectiveDailyLimit, dailyTopUpAmount, carryover, dailyTransfers, dailyPromoTransferAmount, effectiveConsumed, available);
         }
         
         return Math.max(0L, available); // Ensure non-negative
@@ -309,13 +327,15 @@ public class DailyStatsService {
         boolean promoEnabled = featureService.isPromoEnabled();
         boolean isPromoUser = allowedPromoUserRepository.existsByChatId(chatId);
         
+        Long dailyPromoTransferAmount = (stats != null && stats.getDailyPromoTransferAmount() != null) ? stats.getDailyPromoTransferAmount() : 0L;
         Long available;
         if (payToggleEnabled && promoEnabled && isPromoUser) {
             // Promo users with pay toggle ON can transfer up to effective limit without deposits
             available = effectiveDailyLimit - dailyTransfers;
         } else {
-            // Normal users: constrained by deposits + carryover
-            available = Math.min(effectiveDailyLimit, dailyTopUpAmount + carryover) - dailyTransfers;
+            // Normal users: constrained by deposits + carryover. Do not count promo transfers after promo is off.
+            long effectiveConsumed = Math.max(0L, dailyTransfers - dailyPromoTransferAmount);
+            available = Math.min(effectiveDailyLimit, dailyTopUpAmount + carryover) - effectiveConsumed;
         }
         
         return Math.max(0L, available); // Ensure non-negative
