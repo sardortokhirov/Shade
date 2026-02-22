@@ -22,9 +22,14 @@ public class UserLimitIncrease {
     @Builder.Default
     private BigDecimal accumulatedLimitIncrease = BigDecimal.ZERO;
 
-    /** Per-user base daily limit override (UZS). If null, system default is used. */
+    /** Per-user base daily limit override (UZS). If null, system default is used. @deprecated Use baseDailyLimitPercentage. */
+    @Deprecated
     @Column(name = "base_daily_limit_override", nullable = true)
     private Long baseDailyLimitOverride;
+
+    /** Base daily limit as percentage of system dailyBonusTransferLimit. Null = 100%. */
+    @Column(name = "base_daily_limit_percentage", nullable = true)
+    private Integer baseDailyLimitPercentage;
 
     @Column(name = "last_updated", nullable = false)
     private LocalDateTime lastUpdated;

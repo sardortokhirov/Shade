@@ -36,11 +36,13 @@ public class DailyStatsService {
     }
 
     /**
-     * Gets the base daily limit for a user (per-user override if set, otherwise system default).
+     * Gets the base daily limit for a user: system dailyBonusTransferLimit * (user percentage / 100).
+     * Default percentage is 100 when not set.
      */
     public Long getBaseDailyLimitForUser(Long chatId) {
-        return userLimitIncreaseService.getBaseDailyLimitOverride(chatId)
-                .orElse(configurationService.getDailyBonusTransferLimit());
+        long systemLimit = configurationService.getDailyBonusTransferLimit();
+        int percentage = userLimitIncreaseService.getBaseDailyLimitPercentage(chatId);
+        return (systemLimit * percentage) / 100;
     }
 
     /**

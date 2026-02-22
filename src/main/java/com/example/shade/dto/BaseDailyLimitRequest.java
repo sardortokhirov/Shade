@@ -8,6 +8,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class BaseDailyLimitRequest {
-    /** Per-user base daily limit in UZS (e.g. 5_000_000). Must be non-negative. */
-    private Long baseDailyLimit;
+    /** Base daily limit as percentage of system dailyBonusTransferLimit (e.g. 100 = 100%, 150 = 150%). */
+    private Integer percentage;
 }

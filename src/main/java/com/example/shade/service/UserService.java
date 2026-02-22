@@ -497,19 +497,22 @@ public class UserService {
     }
 
     /**
-     * Sets per-user base daily limit override. Returns DTO with baseDailyLimit, effectiveDailyLimit, lastUpdated.
+     * Sets per-user base daily limit as percentage of system limit. Returns DTO with calculated baseDailyLimit, effectiveDailyLimit, lastUpdated, percentage.
+     * User base = system dailyBonusTransferLimit * (percentage / 100).
      */
     @Transactional
-    public BaseDailyLimitUpdateResponse updateBaseDailyLimit(Long chatId, Long baseDailyLimit) {
-        if (baseDailyLimit == null || baseDailyLimit < 0) {
-            throw new IllegalArgumentException("Base daily limit must be non-negative");
+    public BaseDailyLimitUpdateResponse updateBaseDailyLimit(Long chatId, Integer percentage) {
+        if (percentage == null || percentage < 1 || percentage > 10000) {
+            throw new IllegalArgumentException("Percentage must be between 1 and 10000");
         }
-        com.example.shade.model.UserLimitIncrease limit = userLimitIncreaseService.setBaseDailyLimitOverride(chatId, baseDailyLimit);
+        com.example.shade.model.UserLimitIncrease limit = userLimitIncreaseService.setBaseDailyLimitPercentage(chatId, percentage);
+        Long baseDailyLimit = dailyStatsService.getBaseDailyLimitForUser(chatId);
         Long effectiveDailyLimit = dailyStatsService.getEffectiveDailyLimit(chatId);
         return BaseDailyLimitUpdateResponse.builder()
                 .baseDailyLimit(baseDailyLimit)
                 .effectiveDailyLimit(effectiveDailyLimit)
                 .lastUpdated(limit.getLastUpdated())
+                .percentage(percentage)
                 .build();
     }
 

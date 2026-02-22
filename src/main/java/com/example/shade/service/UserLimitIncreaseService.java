@@ -19,28 +19,33 @@ public class UserLimitIncreaseService {
     private final UserLimitIncreaseRepository repository;
     private static final ZoneId GMT_PLUS_5 = ZoneId.of("GMT+5");
 
+    /** Default percentage when not set (100% of system limit). */
+    public static final int DEFAULT_BASE_DAILY_LIMIT_PERCENTAGE = 100;
+
     /**
-     * Get per-user base daily limit override (UZS). Empty = use system default.
+     * Get per-user base daily limit as percentage of system limit. Returns {@link #DEFAULT_BASE_DAILY_LIMIT_PERCENTAGE} if not set.
      */
-    public java.util.Optional<Long> getBaseDailyLimitOverride(Long chatId) {
+    public int getBaseDailyLimitPercentage(Long chatId) {
         return repository.findByChatId(chatId)
-                .map(UserLimitIncrease::getBaseDailyLimitOverride)
-                .filter(java.util.Objects::nonNull);
+                .map(UserLimitIncrease::getBaseDailyLimitPercentage)
+                .filter(java.util.Objects::nonNull)
+                .orElse(DEFAULT_BASE_DAILY_LIMIT_PERCENTAGE);
     }
 
     /**
-     * Set per-user base daily limit override (UZS). Overrides system default for this user only.
+     * Set per-user base daily limit percentage (e.g. 100 = 100%, 150 = 150% of system limit).
+     * User base = system dailyBonusTransferLimit * (percentage / 100).
      */
     @Transactional
-    public UserLimitIncrease setBaseDailyLimitOverride(Long chatId, Long baseDailyLimit) {
-        if (baseDailyLimit != null && baseDailyLimit < 0) {
-            throw new IllegalArgumentException("Base daily limit must be non-negative");
+    public UserLimitIncrease setBaseDailyLimitPercentage(Long chatId, Integer percentage) {
+        if (percentage != null && (percentage < 1 || percentage > 10000)) {
+            throw new IllegalArgumentException("Base daily limit percentage must be between 1 and 10000");
         }
         UserLimitIncrease limit = getOrCreate(chatId);
-        limit.setBaseDailyLimitOverride(baseDailyLimit);
+        limit.setBaseDailyLimitPercentage(percentage);
         limit.setLastUpdated(LocalDateTime.now(GMT_PLUS_5));
         repository.save(limit);
-        logger.info("Set base daily limit override for chatId {} to {}", chatId, baseDailyLimit);
+        logger.info("Set base daily limit percentage for chatId {} to {}%", chatId, percentage);
         return limit;
     }
 

@@ -237,15 +237,15 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
         }
 
-        if (request == null || request.getBaseDailyLimit() == null) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("baseDailyLimit is required");
+        if (request == null || request.getPercentage() == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("percentage is required");
         }
-        if (request.getBaseDailyLimit() < 0) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("baseDailyLimit must be non-negative");
+        if (request.getPercentage() < 1 || request.getPercentage() > 10000) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("percentage must be between 1 and 10000");
         }
 
         try {
-            BaseDailyLimitUpdateResponse response = userService.updateBaseDailyLimit(chatId, request.getBaseDailyLimit());
+            BaseDailyLimitUpdateResponse response = userService.updateBaseDailyLimit(chatId, request.getPercentage());
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
