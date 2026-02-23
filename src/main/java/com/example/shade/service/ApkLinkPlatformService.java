@@ -53,6 +53,15 @@ public class ApkLinkPlatformService {
     }
 
     @Transactional
+    public Optional<ApkLinkPlatform> updateApkFileId(Long platformId, String apkFileId) {
+        if (platformId == null || apkFileId == null || apkFileId.isBlank()) return Optional.empty();
+        return platformRepository.findById(platformId).map(p -> {
+            p.setApkFileId(apkFileId);
+            return platformRepository.save(p);
+        });
+    }
+
+    @Transactional
     public void deletePlatform(Long id) {
         keywordRepository.findByPlatformIdOrderByKeywordAsc(id).forEach(keywordRepository::delete);
         platformRepository.deleteById(id);
