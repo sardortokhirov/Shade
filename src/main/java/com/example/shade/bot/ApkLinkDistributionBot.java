@@ -238,7 +238,12 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
                 .orElse(0);
         Optional<Long> remaining = cooldownService.getRemainingMinutesUser(userId, cooldownMinutes);
         if (remaining.isPresent()) {
-            sendCooldownMessage(chatId, remaining.get());
+            Optional<String> channelLink = configService.getApkChannelMessageLink();
+            if (channelLink.isPresent()) {
+                sendCooldownRedirectToChannel(chatId, channelLink.get());
+            } else {
+                sendCooldownMessage(chatId, remaining.get());
+            }
             return;
         }
         Optional<ApkLinkPlatform> platform = platformService.findPlatformById(platformId);
@@ -256,7 +261,12 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
                 .orElse(0);
         Optional<Long> remaining = cooldownService.getRemainingMinutesUser(userId, cooldownMinutes);
         if (remaining.isPresent()) {
-            sendCooldownMessage(chatId, remaining.get());
+            Optional<String> channelLink = configService.getApkChannelMessageLink();
+            if (channelLink.isPresent()) {
+                sendCooldownRedirectToChannel(chatId, channelLink.get());
+            } else {
+                sendCooldownMessage(chatId, remaining.get());
+            }
             return;
         }
         Optional<ApkLinkPlatform> platform = platformService.findPlatformById(platformId);
@@ -405,6 +415,14 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
 
     private void sendCooldownMessage(Long chatId, long remainingMinutes) {
         sendText(chatId, getMessage(chatId, "apk_link.cooldown", new Object[]{remainingMinutes}));
+    }
+
+    private void sendCooldownRedirectToChannel(Long chatId, String channelLink) {
+        String text = getMessage(chatId, "apk_link.cooldown_open_channel");
+        String buttonText = getMessage(chatId, "apk_link.button.open_channel");
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        rows.add(List.of(createUrlButton(buttonText, channelLink)));
+        sendMessageWithKeyboard(chatId, text, rows);
     }
 
     private String getMessage(Long chatId, String code) {
