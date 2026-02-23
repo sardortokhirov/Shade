@@ -18,4 +18,5 @@ public class ApkLinkBotConfigDTO {
     private Long apkChannelChatId;
     private Integer apkChannelMessageId;
     private String apkChannelMessageLink;
+    private Long mainApkChannelChatId;
 }

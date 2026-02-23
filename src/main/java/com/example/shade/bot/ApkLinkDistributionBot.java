@@ -297,6 +297,12 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
         if (keyword == null || keyword.isEmpty() || !text.trim().equals(keyword.trim())) {
             return;
         }
+        Long mainChatId = configService.getConfig()
+                .map(ApkLinkBotConfig::getMainApkChannelChatId)
+                .orElse(null);
+        if (mainChatId != null && !mainChatId.equals(chatId)) {
+            return;
+        }
         List<ApkLinkPlatform> withApk = platformService.findAllPlatforms().stream()
                 .filter(p -> (p.getApkFileId() != null && !p.getApkFileId().isEmpty())
                         || (p.getApkUrl() != null && !p.getApkUrl().isEmpty()))

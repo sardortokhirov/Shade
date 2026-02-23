@@ -54,6 +54,7 @@ public class ApkLinkBotController {
                     .apkChannelChatId(null)
                     .apkChannelMessageId(null)
                     .apkChannelMessageLink(null)
+                    .mainApkChannelChatId(null)
                     .build());
         }
         ApkLinkBotConfigDTO dto = ApkLinkBotConfigDTO.builder()
@@ -65,6 +66,7 @@ public class ApkLinkBotController {
                 .apkChannelChatId(config.getApkChannelChatId())
                 .apkChannelMessageId(config.getApkChannelMessageId())
                 .apkChannelMessageLink(configService.getApkChannelMessageLink().orElse(null))
+                .mainApkChannelChatId(config.getMainApkChannelChatId())
                 .build();
         return ResponseEntity.ok(dto);
     }
@@ -92,6 +94,27 @@ public class ApkLinkBotController {
                 .apkChannelChatId(saved.getApkChannelChatId())
                 .apkChannelMessageId(saved.getApkChannelMessageId())
                 .apkChannelMessageLink(configService.getApkChannelMessageLink().orElse(null))
+                .mainApkChannelChatId(saved.getMainApkChannelChatId())
+                .build();
+        return ResponseEntity.ok(dto);
+    }
+
+    @PutMapping("/config/main-apk-channel")
+    public ResponseEntity<?> setMainApkChannel(@RequestBody MainApkChannelRequest body, HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
+        ApkLinkBotConfig saved = configService.setMainApkChannelChatId(body.getMainApkChannelChatId());
+        ApkLinkBotConfigDTO dto = ApkLinkBotConfigDTO.builder()
+                .botTokenMasked(ApkLinkBotConfigService.maskToken(saved.getBotToken()))
+                .cooldownPrivateMinutes(saved.getCooldownPrivateMinutes())
+                .cooldownGroupMinutes(saved.getCooldownGroupMinutes())
+                .channelKeywordAllApk(saved.getChannelKeywordAllApk())
+                .groupKeywordAllApk(saved.getGroupKeywordAllApk())
+                .apkChannelChatId(saved.getApkChannelChatId())
+                .apkChannelMessageId(saved.getApkChannelMessageId())
+                .apkChannelMessageLink(configService.getApkChannelMessageLink().orElse(null))
+                .mainApkChannelChatId(saved.getMainApkChannelChatId())
                 .build();
         return ResponseEntity.ok(dto);
     }

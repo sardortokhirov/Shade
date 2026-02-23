@@ -36,12 +36,26 @@ public class ApkLinkBotConfigService {
     /**
      * Saves the channel message link (used by bot after posting all APKs in channel).
      * Does not change other config fields.
+     * If mainApkChannelChatId is null, sets it to this chatId so the first channel becomes main.
      */
     @Transactional
     public ApkLinkBotConfig saveApkChannelMessageLink(Long chatId, Integer messageId) {
         ApkLinkBotConfig config = getConfig().orElse(ApkLinkBotConfig.builder().build());
         config.setApkChannelChatId(chatId);
         config.setApkChannelMessageId(messageId);
+        if (config.getMainApkChannelChatId() == null) {
+            config.setMainApkChannelChatId(chatId);
+        }
+        return configRepository.save(config);
+    }
+
+    /**
+     * Sets or clears the main APK channel. Only this channel may trigger send-all-APKs when the keyword is posted.
+     */
+    @Transactional
+    public ApkLinkBotConfig setMainApkChannelChatId(Long mainApkChannelChatId) {
+        ApkLinkBotConfig config = getConfig().orElse(ApkLinkBotConfig.builder().build());
+        config.setMainApkChannelChatId(mainApkChannelChatId);
         return configRepository.save(config);
     }
 

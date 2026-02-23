@@ -36,4 +36,8 @@ public class ApkLinkBotConfig {
 
     @Column(name = "apk_channel_message_id")
     private Integer apkChannelMessageId;
+
+    /** Only this channel may trigger send-all-APKs and update the link; null = any channel. */
+    @Column(name = "main_apk_channel_chat_id")
+    private Long mainApkChannelChatId;
 }
