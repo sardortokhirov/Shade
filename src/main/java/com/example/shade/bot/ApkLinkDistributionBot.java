@@ -196,8 +196,15 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
         }
         String text = getMessage(chatId, "apk_link.select_platform");
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-        for (ApkLinkPlatform p : platforms) {
-            rows.add(List.of(createCallbackButton(p.getName(), PREFIX_PLATFORM + p.getId())));
+        for (int i = 0; i < platforms.size(); i += 2) {
+            List<InlineKeyboardButton> row = new ArrayList<>();
+            ApkLinkPlatform p0 = platforms.get(i);
+            row.add(createCallbackButton(p0.getName(), PREFIX_PLATFORM + p0.getId()));
+            if (i + 1 < platforms.size()) {
+                ApkLinkPlatform p1 = platforms.get(i + 1);
+                row.add(createCallbackButton(p1.getName(), PREFIX_PLATFORM + p1.getId()));
+            }
+            rows.add(row);
         }
         rows.add(List.of(createCallbackButton(getMessage(chatId, "apk_link.button.back"), BACK_MAIN)));
         sendMessageWithKeyboard(chatId, text, rows);
@@ -449,11 +456,20 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
         List<ApkLinkInvite> groups = inviteService.findAllGroups();
         String text = getMessage(chatId, "apk_link.group_channel_prompt");
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-        for (ApkLinkInvite ch : channels) {
-            rows.add(List.of(createUrlButton(ch.getName(), ch.getInviteLink())));
-        }
-        for (ApkLinkInvite gr : groups) {
-            rows.add(List.of(createUrlButton(gr.getName(), gr.getInviteLink())));
+        int maxRows = Math.max(channels.size(), groups.size());
+        for (int i = 0; i < maxRows; i++) {
+            List<InlineKeyboardButton> row = new ArrayList<>();
+            if (i < channels.size()) {
+                ApkLinkInvite ch = channels.get(i);
+                row.add(createUrlButton(ch.getName(), ch.getInviteLink()));
+            }
+            if (i < groups.size()) {
+                ApkLinkInvite gr = groups.get(i);
+                row.add(createUrlButton(gr.getName(), gr.getInviteLink()));
+            }
+            if (!row.isEmpty()) {
+                rows.add(row);
+            }
         }
         rows.add(List.of(createCallbackButton(getMessage(chatId, "apk_link.button.back"), BACK_MAIN)));
         sendMessageWithKeyboard(chatId, text, rows);
