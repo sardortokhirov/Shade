@@ -461,11 +461,13 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
             List<InlineKeyboardButton> row = new ArrayList<>();
             if (i < channels.size()) {
                 ApkLinkInvite ch = channels.get(i);
-                row.add(createUrlButton(ch.getName(), ch.getInviteLink()));
+                String channelLabel = "📢 " + (ch.getName() != null ? ch.getName() : "");
+                row.add(createUrlButton(channelLabel, ch.getInviteLink()));
             }
             if (i < groups.size()) {
                 ApkLinkInvite gr = groups.get(i);
-                row.add(createUrlButton(gr.getName(), gr.getInviteLink()));
+                String groupLabel = "👥 " + (gr.getName() != null ? gr.getName() : "");
+                row.add(createUrlButton(groupLabel, gr.getInviteLink()));
             }
             if (!row.isEmpty()) {
                 rows.add(row);
