@@ -1,20 +1,14 @@
 package com.example.shade.dto;
 
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
-@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ApkLinkPlatformDTO {
-    private Long id;
+public class ApkLinkInviteRequest {
     private String name;
-    private String linkUrl;
-    private String apkFileId;
-    private String apkUrl;
+    private String inviteLink;
     private Integer sortOrder;
-    private String apkFileName;
 }

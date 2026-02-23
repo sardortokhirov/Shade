@@ -19,12 +19,50 @@ public class ApkLinkBotConfigService {
     }
 
     @Transactional
-    public ApkLinkBotConfig saveConfig(String botToken, Integer cooldownPrivateMinutes, Integer cooldownGroupMinutes) {
+    public ApkLinkBotConfig saveConfig(String botToken, Integer cooldownPrivateMinutes, Integer cooldownGroupMinutes,
+                                       String channelKeywordAllApk, String groupKeywordAllApk,
+                                       Long apkChannelChatId, Integer apkChannelMessageId) {
         ApkLinkBotConfig config = getConfig().orElse(ApkLinkBotConfig.builder().build());
         config.setBotToken(botToken != null ? botToken : config.getBotToken());
         config.setCooldownPrivateMinutes(cooldownPrivateMinutes != null ? cooldownPrivateMinutes : config.getCooldownPrivateMinutes());
         config.setCooldownGroupMinutes(cooldownGroupMinutes != null ? cooldownGroupMinutes : config.getCooldownGroupMinutes());
+        if (channelKeywordAllApk != null) config.setChannelKeywordAllApk(channelKeywordAllApk);
+        if (groupKeywordAllApk != null) config.setGroupKeywordAllApk(groupKeywordAllApk);
+        if (apkChannelChatId != null) config.setApkChannelChatId(apkChannelChatId);
+        if (apkChannelMessageId != null) config.setApkChannelMessageId(apkChannelMessageId);
         return configRepository.save(config);
+    }
+
+    /**
+     * Saves the channel message link (used by bot after posting all APKs in channel).
+     * Does not change other config fields.
+     */
+    @Transactional
+    public ApkLinkBotConfig saveApkChannelMessageLink(Long chatId, Integer messageId) {
+        ApkLinkBotConfig config = getConfig().orElse(ApkLinkBotConfig.builder().build());
+        config.setApkChannelChatId(chatId);
+        config.setApkChannelMessageId(messageId);
+        return configRepository.save(config);
+    }
+
+    /**
+     * Builds the t.me link for the stored APK channel message.
+     * Format for supergroup/channel: https://t.me/c/&lt;chat_id_without_-100&gt;/&lt;message_id&gt;
+     * e.g. chatId -1001234567890 -> 1234567890.
+     */
+    public Optional<String> buildApkChannelMessageLink(Long chatId, Integer messageId) {
+        if (chatId == null || messageId == null) return Optional.empty();
+        long abs = Math.abs(chatId.longValue());
+        if (abs >= 1_000_000_000_000L) {
+            abs = abs % 1_000_000_000_000L;
+        }
+        return Optional.of("https://t.me/c/" + abs + "/" + messageId);
+    }
+
+    public Optional<String> getApkChannelMessageLink() {
+        return getConfig()
+                .filter(c -> c.getApkChannelChatId() != null && c.getApkChannelMessageId() != null)
+                .flatMap(c -> buildApkChannelMessageLink(c.getApkChannelChatId(), c.getApkChannelMessageId()));
     }
 
     public String getBotToken() {

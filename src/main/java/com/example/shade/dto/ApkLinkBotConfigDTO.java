@@ -13,4 +13,9 @@ public class ApkLinkBotConfigDTO {
     private String botTokenMasked;
     private Integer cooldownPrivateMinutes;
     private Integer cooldownGroupMinutes;
+    private String channelKeywordAllApk;
+    private String groupKeywordAllApk;
+    private Long apkChannelChatId;
+    private Integer apkChannelMessageId;
+    private String apkChannelMessageLink;
 }

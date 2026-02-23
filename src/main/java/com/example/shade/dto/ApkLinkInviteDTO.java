@@ -9,12 +9,10 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ApkLinkPlatformDTO {
+public class ApkLinkInviteDTO {
     private Long id;
     private String name;
-    private String linkUrl;
-    private String apkFileId;
-    private String apkUrl;
+    private String inviteLink;
+    private String type;
     private Integer sortOrder;
-    private String apkFileName;
 }

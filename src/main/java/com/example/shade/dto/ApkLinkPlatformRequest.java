@@ -13,4 +13,5 @@ public class ApkLinkPlatformRequest {
     private String apkFileId;
     private String apkUrl;
     private Integer sortOrder;
+    private String apkFileName;
 }

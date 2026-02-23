@@ -30,4 +30,7 @@ public class ApkLinkPlatform {
 
     @Column(name = "sort_order")
     private Integer sortOrder;
+
+    @Column(name = "apk_file_name", length = 512)
+    private String apkFileName;
 }

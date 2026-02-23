@@ -1,8 +1,11 @@
 package com.example.shade.bot;
 
+import com.example.shade.model.ApkLinkBotConfig;
+import com.example.shade.model.ApkLinkInvite;
 import com.example.shade.model.ApkLinkPlatform;
 import com.example.shade.service.ApkLinkBotConfigService;
 import com.example.shade.service.ApkLinkCooldownService;
+import com.example.shade.service.ApkLinkInviteService;
 import com.example.shade.service.ApkLinkPlatformService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -13,9 +16,13 @@ import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.groupadministration.GetChatMember;
 import org.telegram.telegrambots.meta.api.methods.send.SendDocument;
+import org.telegram.telegrambots.meta.api.methods.send.SendMediaGroup;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
+import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.media.InputMedia;
+import org.telegram.telegrambots.meta.api.objects.media.InputMediaDocument;
 import org.telegram.telegrambots.meta.api.objects.chatmember.ChatMember;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
@@ -25,18 +32,24 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
 public class ApkLinkDistributionBot extends TelegramLongPollingBot {
 
     private static final Logger logger = LoggerFactory.getLogger(ApkLinkDistributionBot.class);
+    private static final String MAIN_LINK_APK = "MAIN_LINK_APK";
+    private static final String MAIN_GROUP_CHANNEL = "MAIN_GROUP_CHANNEL";
+    private static final String MAIN_CONTACTS = "MAIN_CONTACTS";
+    private static final String BACK_MAIN = "BACK_MAIN";
     private static final String PREFIX_PLATFORM = "PLATFORM:";
     private static final String PREFIX_SEND_LINK = "SEND:link:";
     private static final String PREFIX_SEND_APK = "SEND:apk:";
 
     private final ApkLinkBotConfigService configService;
     private final ApkLinkPlatformService platformService;
+    private final ApkLinkInviteService inviteService;
     private final ApkLinkCooldownService cooldownService;
     private final MessageSource messageSource;
 
@@ -65,10 +78,12 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
                 Long chatId = update.getMessage().getChatId();
                 String chatType = update.getMessage().getChat().getType();
                 if ("private".equals(chatType)) {
-                    sendPlatformList(chatId);
+                    sendMainMenu(chatId);
                 } else if ("group".equals(chatType) || "supergroup".equals(chatType)) {
                     handleGroupMessage(update.getMessage().getText(), chatId,
                             update.getMessage().getFrom().getId());
+                } else if ("channel".equals(chatType)) {
+                    handleChannelMessage(update.getMessage().getText(), chatId);
                 }
             }
         } catch (Exception e) {
@@ -89,6 +104,22 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
             logger.warn("Failed to answer callback: {}", e.getMessage());
         }
 
+        if (BACK_MAIN.equals(data)) {
+            sendMainMenu(chatId);
+            return;
+        }
+        if (MAIN_LINK_APK.equals(data)) {
+            sendPlatformList(chatId);
+            return;
+        }
+        if (MAIN_GROUP_CHANNEL.equals(data)) {
+            sendGroupChannelScreen(chatId);
+            return;
+        }
+        if (MAIN_CONTACTS.equals(data)) {
+            sendContactsScreen(chatId);
+            return;
+        }
         if (data.startsWith(PREFIX_PLATFORM)) {
             String idStr = data.substring(PREFIX_PLATFORM.length()).trim();
             try {
@@ -120,6 +151,16 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
         }
     }
 
+    private void sendMainMenu(Long chatId) {
+        String text = getMessage("apk_link.main_menu", Locale.forLanguageTag("uz")) + "\n" +
+                getMessage("apk_link.main_menu", Locale.forLanguageTag("ru"));
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        rows.add(List.of(createCallbackButton(getMessage("apk_link.button.link_apk", Locale.forLanguageTag("uz")), MAIN_LINK_APK)));
+        rows.add(List.of(createCallbackButton(getMessage("apk_link.button.group_channel", Locale.forLanguageTag("uz")), MAIN_GROUP_CHANNEL)));
+        rows.add(List.of(createCallbackButton(getMessage("apk_link.button.contacts", Locale.forLanguageTag("uz")), MAIN_CONTACTS)));
+        sendMessageWithKeyboard(chatId, text, rows);
+    }
+
     private void sendPlatformList(Long chatId) {
         List<ApkLinkPlatform> platforms = platformService.findAllPlatforms();
         if (platforms.isEmpty()) {
@@ -130,11 +171,9 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
                 getMessage("apk_link.select_platform", Locale.forLanguageTag("ru"));
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         for (ApkLinkPlatform p : platforms) {
-            InlineKeyboardButton btn = new InlineKeyboardButton();
-            btn.setText(p.getName());
-            btn.setCallbackData(PREFIX_PLATFORM + p.getId());
-            rows.add(List.of(btn));
+            rows.add(List.of(createCallbackButton(p.getName(), PREFIX_PLATFORM + p.getId())));
         }
+        rows.add(List.of(createCallbackButton(getMessage("apk_link.button.back", Locale.forLanguageTag("uz")), BACK_MAIN)));
         sendMessageWithKeyboard(chatId, text, rows);
     }
 
@@ -155,7 +194,10 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
         apkBtn.setCallbackData(PREFIX_SEND_APK + platformId);
         row.add(linkBtn);
         row.add(apkBtn);
-        sendMessageWithKeyboard(chatId, text, List.of(row));
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        rows.add(row);
+        rows.add(List.of(createCallbackButton(getMessage("apk_link.button.back", Locale.forLanguageTag("uz")), BACK_MAIN)));
+        sendMessageWithKeyboard(chatId, text, rows);
     }
 
     private void handleSendLink(Long chatId, Long userId, Long platformId) {
@@ -190,8 +232,13 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
             sendText(chatId, "Platform not found.");
             return;
         }
-        ApkLinkPlatform p = platform.get();
         cooldownService.applyUserCooldown(userId);
+        Optional<String> channelLink = configService.getApkChannelMessageLink();
+        if (channelLink.isPresent()) {
+            sendText(chatId, channelLink.get());
+            return;
+        }
+        ApkLinkPlatform p = platform.get();
         if (p.getApkFileId() != null && !p.getApkFileId().isEmpty()) {
             sendDocumentByFileId(chatId, p.getApkFileId(), p.getName());
         } else if (p.getApkUrl() != null && !p.getApkUrl().isEmpty()) {
@@ -201,7 +248,92 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
         }
     }
 
+    private void handleChannelMessage(String text, Long chatId) {
+        if (text == null) return;
+        String keyword = configService.getConfig()
+                .map(ApkLinkBotConfig::getChannelKeywordAllApk)
+                .orElse(null);
+        if (keyword == null || keyword.isEmpty() || !text.trim().equals(keyword.trim())) {
+            return;
+        }
+        List<ApkLinkPlatform> withApk = platformService.findAllPlatforms().stream()
+                .filter(p -> (p.getApkFileId() != null && !p.getApkFileId().isEmpty())
+                        || (p.getApkUrl() != null && !p.getApkUrl().isEmpty()))
+                .collect(Collectors.toList());
+        if (withApk.isEmpty()) {
+            sendText(chatId, "No APKs configured.");
+            return;
+        }
+        try {
+            if (withApk.size() == 1) {
+                ApkLinkPlatform p = withApk.get(0);
+                String caption = p.getApkFileName() != null && !p.getApkFileName().isEmpty() ? p.getApkFileName() : p.getName();
+                SendDocument doc = new SendDocument();
+                doc.setChatId(chatId.toString());
+                if (p.getApkFileId() != null && !p.getApkFileId().isEmpty()) {
+                    doc.setDocument(new InputFile(p.getApkFileId()));
+                } else {
+                    doc.setDocument(new InputFile(p.getApkUrl()));
+                }
+                doc.setCaption(caption);
+                Message sent = execute(doc);
+                configService.saveApkChannelMessageLink(sent.getChatId(), sent.getMessageId());
+            } else {
+                final int batchSize = 10;
+                for (int i = 0; i < withApk.size(); i += batchSize) {
+                    List<ApkLinkPlatform> batch = withApk.subList(i, Math.min(i + batchSize, withApk.size()));
+                    if (batch.size() == 1) {
+                        ApkLinkPlatform p = batch.get(0);
+                        String caption = p.getApkFileName() != null && !p.getApkFileName().isEmpty() ? p.getApkFileName() : p.getName();
+                        SendDocument doc = new SendDocument();
+                        doc.setChatId(chatId.toString());
+                        doc.setDocument(p.getApkFileId() != null && !p.getApkFileId().isEmpty() ? new InputFile(p.getApkFileId()) : new InputFile(p.getApkUrl()));
+                        doc.setCaption(caption);
+                        Message sent = execute(doc);
+                        if (i == 0) configService.saveApkChannelMessageLink(sent.getChatId(), sent.getMessageId());
+                    } else {
+                        List<InputMedia> mediaList = new ArrayList<>();
+                        for (ApkLinkPlatform p : batch) {
+                            String media = p.getApkFileId() != null && !p.getApkFileId().isEmpty() ? p.getApkFileId() : p.getApkUrl();
+                            String caption = p.getApkFileName() != null && !p.getApkFileName().isEmpty() ? p.getApkFileName() : p.getName();
+                            InputMediaDocument input = new InputMediaDocument(media);
+                            input.setCaption(caption);
+                            mediaList.add(input);
+                        }
+                        SendMediaGroup group = new SendMediaGroup(chatId.toString(), mediaList);
+                        List<Message> sent = execute(group);
+                        if (!sent.isEmpty() && i == 0) {
+                            Message first = sent.get(0);
+                            configService.saveApkChannelMessageLink(first.getChatId(), first.getMessageId());
+                        }
+                    }
+                }
+            }
+        } catch (TelegramApiException e) {
+            logger.error("Failed to send APKs in channel: {}", e.getMessage());
+        }
+    }
+
     private void handleGroupMessage(String text, Long chatId, Long userId) {
+        String trimmed = text != null ? text.trim() : "";
+        Optional<ApkLinkBotConfig> configOpt = configService.getConfig();
+        String groupKeywordAllApk = configOpt.map(ApkLinkBotConfig::getGroupKeywordAllApk).orElse(null);
+        if (groupKeywordAllApk != null && !groupKeywordAllApk.isEmpty() && trimmed.equalsIgnoreCase(groupKeywordAllApk.trim())) {
+            int cooldownMinutes = configOpt.map(c -> c.getCooldownGroupMinutes() != null ? c.getCooldownGroupMinutes() : 0).orElse(0);
+            boolean isAdmin = isChatAdmin(chatId, userId);
+            if (!isAdmin) {
+                Optional<Long> remaining = cooldownService.getRemainingMinutesGroup(chatId, cooldownMinutes);
+                if (remaining.isPresent()) {
+                    sendCooldownMessage(chatId, remaining.get());
+                    return;
+                }
+                cooldownService.applyGroupCooldown(chatId);
+            }
+            configService.getApkChannelMessageLink()
+                    .ifPresentOrElse(link -> sendText(chatId, link),
+                            () -> sendText(chatId, "APK link not configured."));
+            return;
+        }
         Optional<ApkLinkPlatform> platformOpt = platformService.findPlatformByKeyword(text);
         if (platformOpt.isEmpty()) {
             return;
@@ -283,5 +415,46 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
         } catch (TelegramApiException e) {
             logger.error("Failed to send document: {}", e.getMessage());
         }
+    }
+
+    private void sendGroupChannelScreen(Long chatId) {
+        List<ApkLinkInvite> channels = inviteService.findAllChannels();
+        List<ApkLinkInvite> groups = inviteService.findAllGroups();
+        String text = getMessage("apk_link.group_channel_prompt", Locale.forLanguageTag("uz")) + "\n" +
+                getMessage("apk_link.group_channel_prompt", Locale.forLanguageTag("ru"));
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        for (ApkLinkInvite ch : channels) {
+            rows.add(List.of(createUrlButton(ch.getName(), ch.getInviteLink())));
+        }
+        for (ApkLinkInvite gr : groups) {
+            rows.add(List.of(createUrlButton(gr.getName(), gr.getInviteLink())));
+        }
+        rows.add(List.of(createCallbackButton(getMessage("apk_link.button.back", Locale.forLanguageTag("uz")), BACK_MAIN)));
+        sendMessageWithKeyboard(chatId, text, rows);
+    }
+
+    private void sendContactsScreen(Long chatId) {
+        String text = getMessage("contact.message.contact_prompt", Locale.forLanguageTag("uz")) + "\n" +
+                getMessage("contact.message.contact_prompt", Locale.forLanguageTag("ru"));
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        rows.add(List.of(createUrlButton(getMessage("contact.button.admin", Locale.forLanguageTag("uz")), "https://t.me/Boss9w")));
+        rows.add(List.of(createUrlButton(getMessage("contact.button.chat", Locale.forLanguageTag("uz")), "https://t.me/Abadiy_Kassa")));
+        rows.add(List.of(createCallbackButton(getMessage("apk_link.button.back", Locale.forLanguageTag("uz")), BACK_MAIN)));
+        sendMessageWithKeyboard(chatId, text, rows);
+    }
+
+    private InlineKeyboardButton createCallbackButton(String text, String callbackData) {
+        InlineKeyboardButton btn = new InlineKeyboardButton();
+        btn.setText(text);
+        btn.setCallbackData(callbackData);
+        return btn;
+    }
+
+    private InlineKeyboardButton createUrlButton(String text, String url) {
+        InlineKeyboardButton btn = new InlineKeyboardButton();
+        btn.setText(text);
+        String link = (url == null || url.isEmpty()) ? "#" : (url.startsWith("http") ? url : "https://" + url);
+        btn.setUrl(link);
+        return btn;
     }
 }

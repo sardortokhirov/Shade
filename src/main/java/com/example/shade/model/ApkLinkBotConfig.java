@@ -24,4 +24,16 @@ public class ApkLinkBotConfig {
 
     @Column(name = "cooldown_group_minutes")
     private Integer cooldownGroupMinutes;
+
+    @Column(name = "channel_keyword_all_apk", length = 255)
+    private String channelKeywordAllApk;
+
+    @Column(name = "group_keyword_all_apk", length = 255)
+    private String groupKeywordAllApk;
+
+    @Column(name = "apk_channel_chat_id")
+    private Long apkChannelChatId;
+
+    @Column(name = "apk_channel_message_id")
+    private Integer apkChannelMessageId;
 }

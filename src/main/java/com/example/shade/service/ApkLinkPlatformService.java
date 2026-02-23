@@ -27,25 +27,27 @@ public class ApkLinkPlatformService {
     }
 
     @Transactional
-    public ApkLinkPlatform createPlatform(String name, String linkUrl, String apkFileId, String apkUrl, Integer sortOrder) {
+    public ApkLinkPlatform createPlatform(String name, String linkUrl, String apkFileId, String apkUrl, Integer sortOrder, String apkFileName) {
         ApkLinkPlatform p = ApkLinkPlatform.builder()
                 .name(name)
                 .linkUrl(linkUrl)
                 .apkFileId(apkFileId)
                 .apkUrl(apkUrl)
                 .sortOrder(sortOrder != null ? sortOrder : 0)
+                .apkFileName(apkFileName)
                 .build();
         return platformRepository.save(p);
     }
 
     @Transactional
-    public Optional<ApkLinkPlatform> updatePlatform(Long id, String name, String linkUrl, String apkFileId, String apkUrl, Integer sortOrder) {
+    public Optional<ApkLinkPlatform> updatePlatform(Long id, String name, String linkUrl, String apkFileId, String apkUrl, Integer sortOrder, String apkFileName) {
         return platformRepository.findById(id).map(p -> {
             if (name != null) p.setName(name);
             if (linkUrl != null) p.setLinkUrl(linkUrl);
             if (apkFileId != null) p.setApkFileId(apkFileId);
             if (apkUrl != null) p.setApkUrl(apkUrl);
             if (sortOrder != null) p.setSortOrder(sortOrder);
+            if (apkFileName != null) p.setApkFileName(apkFileName);
             return platformRepository.save(p);
         });
     }

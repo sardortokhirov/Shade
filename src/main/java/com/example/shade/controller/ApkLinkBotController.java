@@ -2,8 +2,10 @@ package com.example.shade.controller;
 
 import com.example.shade.dto.*;
 import com.example.shade.model.ApkLinkBotConfig;
+import com.example.shade.model.ApkLinkInvite;
 import com.example.shade.model.ApkLinkPlatform;
 import com.example.shade.service.ApkLinkBotConfigService;
+import com.example.shade.service.ApkLinkInviteService;
 import com.example.shade.service.ApkLinkPlatformService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +26,7 @@ public class ApkLinkBotController {
 
     private final ApkLinkBotConfigService configService;
     private final ApkLinkPlatformService platformService;
+    private final ApkLinkInviteService inviteService;
 
     private boolean authenticate(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
@@ -46,12 +49,22 @@ public class ApkLinkBotController {
                     .botTokenMasked(null)
                     .cooldownPrivateMinutes(null)
                     .cooldownGroupMinutes(null)
+                    .channelKeywordAllApk(null)
+                    .groupKeywordAllApk(null)
+                    .apkChannelChatId(null)
+                    .apkChannelMessageId(null)
+                    .apkChannelMessageLink(null)
                     .build());
         }
         ApkLinkBotConfigDTO dto = ApkLinkBotConfigDTO.builder()
                 .botTokenMasked(ApkLinkBotConfigService.maskToken(config.getBotToken()))
                 .cooldownPrivateMinutes(config.getCooldownPrivateMinutes())
                 .cooldownGroupMinutes(config.getCooldownGroupMinutes())
+                .channelKeywordAllApk(config.getChannelKeywordAllApk())
+                .groupKeywordAllApk(config.getGroupKeywordAllApk())
+                .apkChannelChatId(config.getApkChannelChatId())
+                .apkChannelMessageId(config.getApkChannelMessageId())
+                .apkChannelMessageLink(configService.getApkChannelMessageLink().orElse(null))
                 .build();
         return ResponseEntity.ok(dto);
     }
@@ -64,12 +77,21 @@ public class ApkLinkBotController {
         ApkLinkBotConfig saved = configService.saveConfig(
                 body.getBotToken(),
                 body.getCooldownPrivateMinutes(),
-                body.getCooldownGroupMinutes()
+                body.getCooldownGroupMinutes(),
+                body.getChannelKeywordAllApk(),
+                body.getGroupKeywordAllApk(),
+                null,
+                null
         );
         ApkLinkBotConfigDTO dto = ApkLinkBotConfigDTO.builder()
                 .botTokenMasked(ApkLinkBotConfigService.maskToken(saved.getBotToken()))
                 .cooldownPrivateMinutes(saved.getCooldownPrivateMinutes())
                 .cooldownGroupMinutes(saved.getCooldownGroupMinutes())
+                .channelKeywordAllApk(saved.getChannelKeywordAllApk())
+                .groupKeywordAllApk(saved.getGroupKeywordAllApk())
+                .apkChannelChatId(saved.getApkChannelChatId())
+                .apkChannelMessageId(saved.getApkChannelMessageId())
+                .apkChannelMessageLink(configService.getApkChannelMessageLink().orElse(null))
                 .build();
         return ResponseEntity.ok(dto);
     }
@@ -95,7 +117,8 @@ public class ApkLinkBotController {
                 body.getLinkUrl(),
                 body.getApkFileId(),
                 body.getApkUrl(),
-                body.getSortOrder()
+                body.getSortOrder(),
+                body.getApkFileName()
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(toPlatformDTO(p));
     }
@@ -107,7 +130,7 @@ public class ApkLinkBotController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
         }
         return platformService.updatePlatform(id, body.getName(), body.getLinkUrl(),
-                        body.getApkFileId(), body.getApkUrl(), body.getSortOrder())
+                        body.getApkFileId(), body.getApkUrl(), body.getSortOrder(), body.getApkFileName())
                 .map(p -> ResponseEntity.ok(toPlatformDTO(p)))
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -165,6 +188,102 @@ public class ApkLinkBotController {
         return removed ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
     }
 
+    @GetMapping("/channels")
+    public ResponseEntity<?> listChannels(HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
+        List<ApkLinkInviteDTO> list = inviteService.findAllChannels().stream()
+                .map(this::toInviteDTO)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(list);
+    }
+
+    @PostMapping("/channels")
+    public ResponseEntity<?> createChannel(@RequestBody ApkLinkInviteRequest body, HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
+        ApkLinkInvite invite = inviteService.createChannel(body.getName(), body.getInviteLink(), body.getSortOrder());
+        return ResponseEntity.status(HttpStatus.CREATED).body(toInviteDTO(invite));
+    }
+
+    @PutMapping("/channels/{id}")
+    public ResponseEntity<?> updateChannel(@PathVariable Long id, @RequestBody ApkLinkInviteRequest body,
+                                           HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
+        return inviteService.updateInvite(id, body.getName(), body.getInviteLink(), body.getSortOrder())
+                .map(inv -> ResponseEntity.ok(toInviteDTO(inv)))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @DeleteMapping("/channels/{id}")
+    public ResponseEntity<?> deleteChannel(@PathVariable Long id, HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
+        if (inviteService.findById(id).isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        inviteService.deleteById(id);
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+    }
+
+    @GetMapping("/groups")
+    public ResponseEntity<?> listGroups(HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
+        List<ApkLinkInviteDTO> list = inviteService.findAllGroups().stream()
+                .map(this::toInviteDTO)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(list);
+    }
+
+    @PostMapping("/groups")
+    public ResponseEntity<?> createGroup(@RequestBody ApkLinkInviteRequest body, HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
+        ApkLinkInvite invite = inviteService.createGroup(body.getName(), body.getInviteLink(), body.getSortOrder());
+        return ResponseEntity.status(HttpStatus.CREATED).body(toInviteDTO(invite));
+    }
+
+    @PutMapping("/groups/{id}")
+    public ResponseEntity<?> updateGroup(@PathVariable Long id, @RequestBody ApkLinkInviteRequest body,
+                                         HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
+        return inviteService.updateInvite(id, body.getName(), body.getInviteLink(), body.getSortOrder())
+                .map(inv -> ResponseEntity.ok(toInviteDTO(inv)))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @DeleteMapping("/groups/{id}")
+    public ResponseEntity<?> deleteGroup(@PathVariable Long id, HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
+        if (inviteService.findById(id).isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        inviteService.deleteById(id);
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+    }
+
+    private ApkLinkInviteDTO toInviteDTO(ApkLinkInvite inv) {
+        return ApkLinkInviteDTO.builder()
+                .id(inv.getId())
+                .name(inv.getName())
+                .inviteLink(inv.getInviteLink())
+                .type(inv.getType())
+                .sortOrder(inv.getSortOrder())
+                .build();
+    }
+
     private ApkLinkPlatformDTO toPlatformDTO(ApkLinkPlatform p) {
         return ApkLinkPlatformDTO.builder()
                 .id(p.getId())
@@ -173,6 +292,7 @@ public class ApkLinkBotController {
                 .apkFileId(p.getApkFileId())
                 .apkUrl(p.getApkUrl())
                 .sortOrder(p.getSortOrder())
+                .apkFileName(p.getApkFileName())
                 .build();
     }
 }
