@@ -191,7 +191,7 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
     private void sendPlatformList(Long chatId) {
         List<ApkLinkPlatform> platforms = platformService.findAllPlatforms();
         if (platforms.isEmpty()) {
-            sendText(chatId, getMessage(chatId, "apk_link.select_platform") + " (no platforms configured)");
+            sendText(chatId, getMessage(chatId, "apk_link.select_platform") + " " + getMessage(chatId, "apk_link.no_platforms_configured"));
             return;
         }
         String text = getMessage(chatId, "apk_link.select_platform");
@@ -286,7 +286,7 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
                         || (p.getApkUrl() != null && !p.getApkUrl().isEmpty()))
                 .collect(Collectors.toList());
         if (withApk.isEmpty()) {
-            sendText(chatId, "No APKs configured.");
+            sendText(chatId, getMessage(chatId, "apk_link.no_apks_configured"));
             return;
         }
         try {
