@@ -6,6 +6,7 @@ import com.example.shade.model.ApkLinkPlatform;
 import com.example.shade.service.ApkLinkBotConfigService;
 import com.example.shade.service.ApkLinkCooldownService;
 import com.example.shade.service.ApkLinkInviteService;
+import com.example.shade.service.ApkLinkLanguageService;
 import com.example.shade.service.ApkLinkPlatformService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -46,8 +47,11 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
     private static final String PREFIX_PLATFORM = "PLATFORM:";
     private static final String PREFIX_SEND_LINK = "SEND:link:";
     private static final String PREFIX_SEND_APK = "SEND:apk:";
+    private static final String LANG_UZ = "LANG_UZ";
+    private static final String LANG_RU = "LANG_RU";
 
     private final ApkLinkBotConfigService configService;
+    private final ApkLinkLanguageService languageService;
     private final ApkLinkPlatformService platformService;
     private final ApkLinkInviteService inviteService;
     private final ApkLinkCooldownService cooldownService;
@@ -78,7 +82,11 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
                 Long chatId = update.getMessage().getChatId();
                 String chatType = update.getMessage().getChat().getType();
                 if ("private".equals(chatType)) {
-                    sendMainMenu(chatId);
+                    if (languageService.getLanguageCode(chatId).isEmpty()) {
+                        sendLanguageSelection(chatId);
+                    } else {
+                        sendMainMenu(chatId);
+                    }
                 } else if ("group".equals(chatType) || "supergroup".equals(chatType)) {
                     handleGroupMessage(update.getMessage().getText(), chatId,
                             update.getMessage().getFrom().getId());
@@ -104,6 +112,16 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
             logger.warn("Failed to answer callback: {}", e.getMessage());
         }
 
+        if (LANG_UZ.equals(data)) {
+            languageService.setLanguage(chatId, "uz");
+            sendMainMenu(chatId);
+            return;
+        }
+        if (LANG_RU.equals(data)) {
+            languageService.setLanguage(chatId, "ru");
+            sendMainMenu(chatId);
+            return;
+        }
         if (BACK_MAIN.equals(data)) {
             sendMainMenu(chatId);
             return;
@@ -126,7 +144,7 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
                 Long platformId = Long.parseLong(idStr);
                 sendLinkOrApkChoice(chatId, platformId);
             } catch (NumberFormatException e) {
-                sendText(chatId, "Invalid selection.");
+                sendText(chatId, getMessage(chatId, "apk_link.invalid_selection"));
             }
             return;
         }
@@ -136,7 +154,7 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
                 Long platformId = Long.parseLong(idStr);
                 handleSendLink(chatId, userId, platformId);
             } catch (NumberFormatException e) {
-                sendText(chatId, "Invalid selection.");
+                sendText(chatId, getMessage(chatId, "apk_link.invalid_selection"));
             }
             return;
         }
@@ -146,57 +164,64 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
                 Long platformId = Long.parseLong(idStr);
                 handleSendApk(chatId, userId, platformId);
             } catch (NumberFormatException e) {
-                sendText(chatId, "Invalid selection.");
+                sendText(chatId, getMessage(chatId, "apk_link.invalid_selection"));
             }
         }
     }
 
-    private void sendMainMenu(Long chatId) {
-        String text = getMessage("apk_link.main_menu", Locale.forLanguageTag("uz")) + "\n" +
-                getMessage("apk_link.main_menu", Locale.forLanguageTag("ru"));
+    private void sendLanguageSelection(Long chatId) {
+        String text = getMessage("apk_link.message.choose_language", Locale.forLanguageTag("uz")) + "\n" +
+                getMessage("apk_link.message.choose_language", Locale.forLanguageTag("ru"));
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-        rows.add(List.of(createCallbackButton(getMessage("apk_link.button.link_apk", Locale.forLanguageTag("uz")), MAIN_LINK_APK)));
-        rows.add(List.of(createCallbackButton(getMessage("apk_link.button.group_channel", Locale.forLanguageTag("uz")), MAIN_GROUP_CHANNEL)));
-        rows.add(List.of(createCallbackButton(getMessage("apk_link.button.contacts", Locale.forLanguageTag("uz")), MAIN_CONTACTS)));
+        rows.add(List.of(
+                createCallbackButton(getMessage("apk_link.button.language_uz", Locale.forLanguageTag("uz")), LANG_UZ),
+                createCallbackButton(getMessage("apk_link.button.language_ru", Locale.forLanguageTag("ru")), LANG_RU)));
+        sendMessageWithKeyboard(chatId, text, rows);
+    }
+
+    private void sendMainMenu(Long chatId) {
+        String text = getMessage(chatId, "apk_link.main_menu");
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        rows.add(List.of(createCallbackButton(getMessage(chatId, "apk_link.button.link_apk"), MAIN_LINK_APK)));
+        rows.add(List.of(createCallbackButton(getMessage(chatId, "apk_link.button.group_channel"), MAIN_GROUP_CHANNEL)));
+        rows.add(List.of(createCallbackButton(getMessage(chatId, "apk_link.button.contacts"), MAIN_CONTACTS)));
         sendMessageWithKeyboard(chatId, text, rows);
     }
 
     private void sendPlatformList(Long chatId) {
         List<ApkLinkPlatform> platforms = platformService.findAllPlatforms();
         if (platforms.isEmpty()) {
-            sendText(chatId, getMessage("apk_link.select_platform", Locale.ENGLISH) + " (no platforms configured)");
+            sendText(chatId, getMessage(chatId, "apk_link.select_platform") + " (no platforms configured)");
             return;
         }
-        String text = getMessage("apk_link.select_platform", Locale.forLanguageTag("uz")) + "\n" +
-                getMessage("apk_link.select_platform", Locale.forLanguageTag("ru"));
+        String text = getMessage(chatId, "apk_link.select_platform");
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         for (ApkLinkPlatform p : platforms) {
             rows.add(List.of(createCallbackButton(p.getName(), PREFIX_PLATFORM + p.getId())));
         }
-        rows.add(List.of(createCallbackButton(getMessage("apk_link.button.back", Locale.forLanguageTag("uz")), BACK_MAIN)));
+        rows.add(List.of(createCallbackButton(getMessage(chatId, "apk_link.button.back"), BACK_MAIN)));
         sendMessageWithKeyboard(chatId, text, rows);
     }
 
     private void sendLinkOrApkChoice(Long chatId, Long platformId) {
         Optional<ApkLinkPlatform> opt = platformService.findPlatformById(platformId);
         if (opt.isEmpty()) {
-            sendText(chatId, "Platform not found.");
+            sendText(chatId, getMessage(chatId, "apk_link.platform_not_found"));
             return;
         }
-        String text = getMessage("apk_link.choose_link_or_apk", Locale.forLanguageTag("uz")) + "\n" +
-                getMessage("apk_link.choose_link_or_apk", Locale.forLanguageTag("ru"));
+        String text = getMessage(chatId, "apk_link.choose_link_or_apk");
         List<InlineKeyboardButton> row = new ArrayList<>();
         InlineKeyboardButton linkBtn = new InlineKeyboardButton();
-        linkBtn.setText("Link");
+        linkBtn.setText(getMessage(chatId, "apk_link.button.link"));
         linkBtn.setCallbackData(PREFIX_SEND_LINK + platformId);
         InlineKeyboardButton apkBtn = new InlineKeyboardButton();
-        apkBtn.setText("APK");
+        apkBtn.setText(getMessage(chatId, "apk_link.button.apk"));
         apkBtn.setCallbackData(PREFIX_SEND_APK + platformId);
         row.add(linkBtn);
         row.add(apkBtn);
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         rows.add(row);
-        rows.add(List.of(createCallbackButton(getMessage("apk_link.button.back", Locale.forLanguageTag("uz")), BACK_MAIN)));
+        rows.add(List.of(createCallbackButton(getMessage(chatId, "apk_link.button.back"), BACK_MAIN)));
         sendMessageWithKeyboard(chatId, text, rows);
     }
 
@@ -211,7 +236,7 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
         }
         Optional<ApkLinkPlatform> platform = platformService.findPlatformById(platformId);
         if (platform.isEmpty()) {
-            sendText(chatId, "Platform not found.");
+            sendText(chatId, getMessage(chatId, "apk_link.platform_not_found"));
             return;
         }
         cooldownService.applyUserCooldown(userId);
@@ -229,7 +254,7 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
         }
         Optional<ApkLinkPlatform> platform = platformService.findPlatformById(platformId);
         if (platform.isEmpty()) {
-            sendText(chatId, "Platform not found.");
+            sendText(chatId, getMessage(chatId, "apk_link.platform_not_found"));
             return;
         }
         cooldownService.applyUserCooldown(userId);
@@ -244,7 +269,7 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
         } else if (p.getApkUrl() != null && !p.getApkUrl().isEmpty()) {
             sendText(chatId, p.getApkUrl());
         } else {
-            sendText(chatId, "APK not configured for this platform.");
+            sendText(chatId, getMessage(chatId, "apk_link.apk_not_configured"));
         }
     }
 
@@ -331,7 +356,7 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
             }
             configService.getApkChannelMessageLink()
                     .ifPresentOrElse(link -> sendText(chatId, link),
-                            () -> sendText(chatId, "APK link not configured."));
+                            () -> sendText(chatId, getMessage(chatId, "apk_link.link_not_configured")));
             return;
         }
         Optional<ApkLinkPlatform> platformOpt = platformService.findPlatformByKeyword(text);
@@ -372,17 +397,19 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
     }
 
     private void sendCooldownMessage(Long chatId, long remainingMinutes) {
-        String uz = getMessage("apk_link.cooldown_uz", new Object[]{remainingMinutes}, Locale.forLanguageTag("uz"));
-        String ru = getMessage("apk_link.cooldown_ru", new Object[]{remainingMinutes}, Locale.forLanguageTag("ru"));
-        sendText(chatId, uz + "\n" + ru);
+        sendText(chatId, getMessage(chatId, "apk_link.cooldown", new Object[]{remainingMinutes}));
+    }
+
+    private String getMessage(Long chatId, String code) {
+        return messageSource.getMessage(code, null, code, languageService.getLocale(chatId));
+    }
+
+    private String getMessage(Long chatId, String code, Object[] args) {
+        return messageSource.getMessage(code, args, code, languageService.getLocale(chatId));
     }
 
     private String getMessage(String code, Locale locale) {
         return messageSource.getMessage(code, null, code, locale);
-    }
-
-    private String getMessage(String code, Object[] args, Locale locale) {
-        return messageSource.getMessage(code, args, code, locale);
     }
 
     private void sendText(Long chatId, String text) {
@@ -420,8 +447,7 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
     private void sendGroupChannelScreen(Long chatId) {
         List<ApkLinkInvite> channels = inviteService.findAllChannels();
         List<ApkLinkInvite> groups = inviteService.findAllGroups();
-        String text = getMessage("apk_link.group_channel_prompt", Locale.forLanguageTag("uz")) + "\n" +
-                getMessage("apk_link.group_channel_prompt", Locale.forLanguageTag("ru"));
+        String text = getMessage(chatId, "apk_link.group_channel_prompt");
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         for (ApkLinkInvite ch : channels) {
             rows.add(List.of(createUrlButton(ch.getName(), ch.getInviteLink())));
@@ -429,17 +455,16 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
         for (ApkLinkInvite gr : groups) {
             rows.add(List.of(createUrlButton(gr.getName(), gr.getInviteLink())));
         }
-        rows.add(List.of(createCallbackButton(getMessage("apk_link.button.back", Locale.forLanguageTag("uz")), BACK_MAIN)));
+        rows.add(List.of(createCallbackButton(getMessage(chatId, "apk_link.button.back"), BACK_MAIN)));
         sendMessageWithKeyboard(chatId, text, rows);
     }
 
     private void sendContactsScreen(Long chatId) {
-        String text = getMessage("contact.message.contact_prompt", Locale.forLanguageTag("uz")) + "\n" +
-                getMessage("contact.message.contact_prompt", Locale.forLanguageTag("ru"));
+        String text = getMessage(chatId, "contact.message.contact_prompt");
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-        rows.add(List.of(createUrlButton(getMessage("contact.button.admin", Locale.forLanguageTag("uz")), "https://t.me/Boss9w")));
-        rows.add(List.of(createUrlButton(getMessage("contact.button.chat", Locale.forLanguageTag("uz")), "https://t.me/Abadiy_Kassa")));
-        rows.add(List.of(createCallbackButton(getMessage("apk_link.button.back", Locale.forLanguageTag("uz")), BACK_MAIN)));
+        rows.add(List.of(createUrlButton(getMessage(chatId, "contact.button.admin"), "https://t.me/Boss9w")));
+        rows.add(List.of(createUrlButton(getMessage(chatId, "contact.button.chat"), "https://t.me/Abadiy_Kassa")));
+        rows.add(List.of(createCallbackButton(getMessage(chatId, "apk_link.button.back"), BACK_MAIN)));
         sendMessageWithKeyboard(chatId, text, rows);
     }
 
