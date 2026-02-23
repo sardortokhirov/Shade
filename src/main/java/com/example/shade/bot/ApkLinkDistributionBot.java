@@ -242,7 +242,7 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
             if (channelLink.isPresent()) {
                 sendCooldownRedirectToChannel(chatId, channelLink.get());
             } else {
-                sendCooldownMessage(chatId, remaining.get());
+                sendCooldownMessageWithBackButton(chatId, remaining.get());
             }
             return;
         }
@@ -265,7 +265,7 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
             if (channelLink.isPresent()) {
                 sendCooldownRedirectToChannel(chatId, channelLink.get());
             } else {
-                sendCooldownMessage(chatId, remaining.get());
+                sendCooldownMessageWithBackButton(chatId, remaining.get());
             }
             return;
         }
@@ -414,7 +414,17 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
     }
 
     private void sendCooldownMessage(Long chatId, long remainingMinutes) {
-        sendText(chatId, getMessage(chatId, "apk_link.cooldown", new Object[]{remainingMinutes}));
+        String template = getMessage(chatId, "apk_link.cooldown");
+        String text = String.format(template, remainingMinutes);
+        sendText(chatId, text);
+    }
+
+    private void sendCooldownMessageWithBackButton(Long chatId, long remainingMinutes) {
+        String template = getMessage(chatId, "apk_link.cooldown");
+        String text = String.format(template, remainingMinutes);
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        rows.add(List.of(createCallbackButton(getMessage(chatId, "apk_link.button.back"), BACK_MAIN)));
+        sendMessageWithKeyboard(chatId, text, rows);
     }
 
     private void sendCooldownRedirectToChannel(Long chatId, String channelLink) {
