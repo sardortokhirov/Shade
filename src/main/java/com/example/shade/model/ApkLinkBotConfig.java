@@ -49,4 +49,13 @@ public class ApkLinkBotConfig {
 
     @Column(name = "last_auto_post_time")
     private java.time.Instant lastAutoPostTime;
+
+    @Column(name = "group_user_link_limit")
+    private Integer groupUserLinkLimit;
+
+    @Column(name = "group_user_apk_limit")
+    private Integer groupUserApkLimit;
+
+    @Column(name = "group_user_freeze_minutes")
+    private Integer groupUserFreezeMinutes;
 }

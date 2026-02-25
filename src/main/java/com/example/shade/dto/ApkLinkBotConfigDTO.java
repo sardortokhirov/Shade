@@ -21,4 +21,7 @@ public class ApkLinkBotConfigDTO {
     private Long mainApkChannelChatId;
     private Integer autoPostIntervalHours;
     private java.time.Instant lastAutoPostTime;
+    private Integer groupUserLinkLimit;
+    private Integer groupUserApkLimit;
+    private Integer groupUserFreezeMinutes;
 }

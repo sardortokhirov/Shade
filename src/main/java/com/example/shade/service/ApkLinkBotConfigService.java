@@ -21,7 +21,8 @@ public class ApkLinkBotConfigService {
     @Transactional
     public ApkLinkBotConfig saveConfig(String botToken, Integer cooldownPrivateMinutes, Integer cooldownGroupMinutes,
             String channelKeywordAllApk, String groupKeywordAllApk,
-            Long apkChannelChatId, Integer apkChannelMessageId, Integer autoPostIntervalHours) {
+            Long apkChannelChatId, Integer apkChannelMessageId, Integer autoPostIntervalHours,
+            Integer groupUserLinkLimit, Integer groupUserApkLimit, Integer groupUserFreezeMinutes) {
         ApkLinkBotConfig config = getConfig().orElse(ApkLinkBotConfig.builder().build());
         config.setBotToken(botToken != null ? botToken : config.getBotToken());
         config.setCooldownPrivateMinutes(
@@ -38,6 +39,12 @@ public class ApkLinkBotConfigService {
             config.setApkChannelMessageId(apkChannelMessageId);
         if (autoPostIntervalHours != null)
             config.setAutoPostIntervalHours(autoPostIntervalHours);
+        if (groupUserLinkLimit != null)
+            config.setGroupUserLinkLimit(groupUserLinkLimit);
+        if (groupUserApkLimit != null)
+            config.setGroupUserApkLimit(groupUserApkLimit);
+        if (groupUserFreezeMinutes != null)
+            config.setGroupUserFreezeMinutes(groupUserFreezeMinutes);
         return configRepository.save(config);
     }
 

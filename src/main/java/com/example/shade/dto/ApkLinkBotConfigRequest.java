@@ -14,4 +14,7 @@ public class ApkLinkBotConfigRequest {
     private String channelKeywordAllApk;
     private String groupKeywordAllApk;
     private Integer autoPostIntervalHours;
+    private Integer groupUserLinkLimit;
+    private Integer groupUserApkLimit;
+    private Integer groupUserFreezeMinutes;
 }

@@ -57,6 +57,9 @@ public class ApkLinkBotController {
                     .mainApkChannelChatId(null)
                     .autoPostIntervalHours(null)
                     .lastAutoPostTime(null)
+                    .groupUserLinkLimit(null)
+                    .groupUserApkLimit(null)
+                    .groupUserFreezeMinutes(null)
                     .build());
         }
         ApkLinkBotConfigDTO dto = ApkLinkBotConfigDTO.builder()
@@ -71,6 +74,9 @@ public class ApkLinkBotController {
                 .mainApkChannelChatId(config.getMainApkChannelChatId())
                 .autoPostIntervalHours(config.getAutoPostIntervalHours())
                 .lastAutoPostTime(config.getLastAutoPostTime())
+                .groupUserLinkLimit(config.getGroupUserLinkLimit())
+                .groupUserApkLimit(config.getGroupUserApkLimit())
+                .groupUserFreezeMinutes(config.getGroupUserFreezeMinutes())
                 .build();
         return ResponseEntity.ok(dto);
     }
@@ -87,8 +93,10 @@ public class ApkLinkBotController {
                 body.getChannelKeywordAllApk(),
                 body.getGroupKeywordAllApk(),
                 null,
-                null,
-                body.getAutoPostIntervalHours());
+                body.getAutoPostIntervalHours(),
+                body.getGroupUserLinkLimit(),
+                body.getGroupUserApkLimit(),
+                body.getGroupUserFreezeMinutes());
         ApkLinkBotConfigDTO dto = ApkLinkBotConfigDTO.builder()
                 .botTokenMasked(ApkLinkBotConfigService.maskToken(saved.getBotToken()))
                 .cooldownPrivateMinutes(saved.getCooldownPrivateMinutes())
@@ -101,6 +109,9 @@ public class ApkLinkBotController {
                 .mainApkChannelChatId(saved.getMainApkChannelChatId())
                 .autoPostIntervalHours(saved.getAutoPostIntervalHours())
                 .lastAutoPostTime(saved.getLastAutoPostTime())
+                .groupUserLinkLimit(saved.getGroupUserLinkLimit())
+                .groupUserApkLimit(saved.getGroupUserApkLimit())
+                .groupUserFreezeMinutes(saved.getGroupUserFreezeMinutes())
                 .build();
         return ResponseEntity.ok(dto);
     }
@@ -123,6 +134,9 @@ public class ApkLinkBotController {
                 .mainApkChannelChatId(saved.getMainApkChannelChatId())
                 .autoPostIntervalHours(saved.getAutoPostIntervalHours())
                 .lastAutoPostTime(saved.getLastAutoPostTime())
+                .groupUserLinkLimit(saved.getGroupUserLinkLimit())
+                .groupUserApkLimit(saved.getGroupUserApkLimit())
+                .groupUserFreezeMinutes(saved.getGroupUserFreezeMinutes())
                 .build();
         return ResponseEntity.ok(dto);
     }
