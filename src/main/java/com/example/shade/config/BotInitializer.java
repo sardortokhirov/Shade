@@ -1,7 +1,7 @@
 package com.example.shade.config;
 
 import com.example.shade.bot.AdminLogBot;
-import com.example.shade.bot.ApkLinkDistributionBot;
+
 import com.example.shade.bot.LottoLogBot;
 import com.example.shade.bot.ShadePaymentBot;
 import jakarta.annotation.PostConstruct;
@@ -32,9 +32,6 @@ public class BotInitializer {
     @Autowired
     private LottoLogBot lottoLogBot;
 
-    @Autowired
-    private ApkLinkDistributionBot apkLinkDistributionBot;
-
     @PostConstruct
     public void init() {
         try {
@@ -42,13 +39,6 @@ public class BotInitializer {
             botsApi.registerBot(adminLogBot);
             botsApi.registerBot(shadePaymentBot);
             botsApi.registerBot(lottoLogBot);
-            String apkLinkToken = apkLinkDistributionBot.getBotToken();
-            if (apkLinkToken != null && !apkLinkToken.isEmpty()) {
-                botsApi.registerBot(apkLinkDistributionBot);
-                logger.info("ApkLink distribution bot registered.");
-            } else {
-                logger.warn("ApkLink distribution bot token not configured; skipping registration.");
-            }
             logger.info("Bots started and registered successfully.");
         } catch (TelegramApiException e) {
             logger.error("Failed to register bots: {}", e.getMessage());
