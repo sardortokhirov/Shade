@@ -292,22 +292,7 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
             sendText(chatId, getMessage(chatId, "apk_link.platform_not_found"));
             return;
         }
-        ApkLinkPlatform p = platform.get();
-        if (p.getApkFileId() != null && !p.getApkFileId().isEmpty()) {
-            sendDocumentByFileId(chatId, p.getApkFileId(), captionFor(p));
-        } else if (p.getApkUrl() != null && !p.getApkUrl().isEmpty()) {
-            Optional<byte[]> data = apkDownloadService.downloadApk(p.getApkUrl());
-            if (data.isPresent()) {
-                Optional<Message> sent = sendDocumentFromBytes(chatId, data.get(), fileNameFor(p), captionFor(p));
-                if (sent.isPresent() && sent.get().getDocument() != null) {
-                    platformService.updateApkFileId(p.getId(), sent.get().getDocument().getFileId());
-                }
-            } else {
-                sendText(chatId, p.getApkUrl());
-            }
-        } else {
-            sendText(chatId, getMessage(chatId, "apk_link.apk_not_configured"));
-        }
+        sendPlatformApk(chatId, platform.get());
     }
 
     private void handleChannelMessage(String text, Long chatId) {
@@ -469,9 +454,8 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
                 }
                 cooldownService.applyGroupCooldown(chatId);
             }
-            configService.getApkChannelMessageLink()
-                    .ifPresentOrElse(link -> sendChannelLinkButton(chatId, link),
-                            () -> sendText(chatId, getMessage(chatId, "apk_link.link_not_configured")));
+            // Send all APK files directly in this group
+            sendAllApksToChat(chatId);
             return;
         }
         Optional<ApkLinkPlatform> platformOpt = platformService.findPlatformByKeyword(normalizedGroupInput);
@@ -494,20 +478,58 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
             }
             cooldownService.applyGroupCooldown(chatId);
         }
+        // Send the platform link + APK file
         sendText(chatId, platform.getLinkUrl());
+        sendPlatformApk(chatId, platform);
+    }
+
+    /**
+     * Downloads and sends all APK files for all platforms that have APK configured.
+     * Used by the "all APK" keyword in groups and channels.
+     */
+    private void sendAllApksToChat(Long chatId) {
+        List<ApkLinkPlatform> withApk = platformService.findAllPlatforms().stream()
+                .filter(p -> (p.getApkFileId() != null && !p.getApkFileId().isEmpty())
+                        || (p.getApkUrl() != null && !p.getApkUrl().isEmpty()))
+                .collect(Collectors.toList());
+        if (withApk.isEmpty()) {
+            sendText(chatId, getMessage(chatId, "apk_link.no_apks_configured"));
+            return;
+        }
+        logger.info("ApkLink sending {} APK files to chat {}", withApk.size(), chatId);
+        for (ApkLinkPlatform p : withApk) {
+            sendPlatformApk(chatId, p);
+        }
+    }
+
+    /**
+     * Downloads (if needed) and sends a single platform's APK as a document.
+     * If platform has apk_file_id, sends by file_id (instant).
+     * If platform has apk_url, downloads from URL, sends as document, and caches
+     * the file_id.
+     */
+    private void sendPlatformApk(Long chatId, ApkLinkPlatform platform) {
         if (platform.getApkFileId() != null && !platform.getApkFileId().isEmpty()) {
+            logger.debug("ApkLink sending APK by file_id for platform '{}'", platform.getName());
             sendDocumentByFileId(chatId, platform.getApkFileId(), captionFor(platform));
         } else if (platform.getApkUrl() != null && !platform.getApkUrl().isEmpty()) {
+            logger.info("ApkLink downloading APK from URL for platform '{}': {}", platform.getName(),
+                    platform.getApkUrl());
             Optional<byte[]> data = apkDownloadService.downloadApk(platform.getApkUrl());
             if (data.isPresent()) {
+                logger.info("ApkLink download successful ({} bytes), sending as document", data.get().length);
                 Optional<Message> sent = sendDocumentFromBytes(chatId, data.get(), fileNameFor(platform),
                         captionFor(platform));
                 if (sent.isPresent() && sent.get().getDocument() != null) {
                     platformService.updateApkFileId(platform.getId(), sent.get().getDocument().getFileId());
+                    logger.info("ApkLink cached file_id for platform '{}'", platform.getName());
                 }
             } else {
+                logger.warn("ApkLink download FAILED for platform '{}', sending URL as fallback", platform.getName());
                 sendText(chatId, platform.getApkUrl());
             }
+        } else {
+            sendText(chatId, getMessage(chatId, "apk_link.apk_not_configured"));
         }
     }
 
