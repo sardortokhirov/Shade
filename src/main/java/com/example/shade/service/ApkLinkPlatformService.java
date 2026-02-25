@@ -122,13 +122,25 @@ public class ApkLinkPlatformService {
         String norm = normalizeKeyword(text);
         if (norm.isEmpty())
             return Optional.empty();
-        return platformRepository.findByLinkKeywordIgnoreCase(norm);
+
+        return platformRepository.findAll().stream()
+                .filter(p -> p.getLinkKeyword() != null &&
+                        java.util.Arrays.stream(p.getLinkKeyword().split(","))
+                                .map(ApkLinkPlatformService::normalizeKeyword)
+                                .anyMatch(k -> k.equalsIgnoreCase(norm)))
+                .findFirst();
     }
 
     public Optional<ApkLinkPlatform> findPlatformByApkKeyword(String text) {
         String norm = normalizeKeyword(text);
         if (norm.isEmpty())
             return Optional.empty();
-        return platformRepository.findByApkKeywordIgnoreCase(norm);
+
+        return platformRepository.findAll().stream()
+                .filter(p -> p.getApkKeyword() != null &&
+                        java.util.Arrays.stream(p.getApkKeyword().split(","))
+                                .map(ApkLinkPlatformService::normalizeKeyword)
+                                .anyMatch(k -> k.equalsIgnoreCase(norm)))
+                .findFirst();
     }
 }
