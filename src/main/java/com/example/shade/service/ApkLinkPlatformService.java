@@ -27,7 +27,8 @@ public class ApkLinkPlatformService {
     }
 
     @Transactional
-    public ApkLinkPlatform createPlatform(String name, String linkUrl, String apkFileId, String apkUrl, Integer sortOrder, String apkFileName) {
+    public ApkLinkPlatform createPlatform(String name, String linkUrl, String apkFileId, String apkUrl,
+            Integer sortOrder, String apkFileName, String apkCaption) {
         ApkLinkPlatform p = ApkLinkPlatform.builder()
                 .name(name)
                 .linkUrl(linkUrl)
@@ -35,26 +36,37 @@ public class ApkLinkPlatformService {
                 .apkUrl(apkUrl)
                 .sortOrder(sortOrder != null ? sortOrder : 0)
                 .apkFileName(apkFileName)
+                .apkCaption(apkCaption)
                 .build();
         return platformRepository.save(p);
     }
 
     @Transactional
-    public Optional<ApkLinkPlatform> updatePlatform(Long id, String name, String linkUrl, String apkFileId, String apkUrl, Integer sortOrder, String apkFileName) {
+    public Optional<ApkLinkPlatform> updatePlatform(Long id, String name, String linkUrl, String apkFileId,
+            String apkUrl, Integer sortOrder, String apkFileName, String apkCaption) {
         return platformRepository.findById(id).map(p -> {
-            if (name != null) p.setName(name);
-            if (linkUrl != null) p.setLinkUrl(linkUrl);
-            if (apkFileId != null) p.setApkFileId(apkFileId);
-            if (apkUrl != null) p.setApkUrl(apkUrl);
-            if (sortOrder != null) p.setSortOrder(sortOrder);
-            if (apkFileName != null) p.setApkFileName(apkFileName);
+            if (name != null)
+                p.setName(name);
+            if (linkUrl != null)
+                p.setLinkUrl(linkUrl);
+            if (apkFileId != null)
+                p.setApkFileId(apkFileId);
+            if (apkUrl != null)
+                p.setApkUrl(apkUrl);
+            if (sortOrder != null)
+                p.setSortOrder(sortOrder);
+            if (apkFileName != null)
+                p.setApkFileName(apkFileName);
+            if (apkCaption != null)
+                p.setApkCaption(apkCaption.isEmpty() ? null : apkCaption);
             return platformRepository.save(p);
         });
     }
 
     @Transactional
     public Optional<ApkLinkPlatform> updateApkFileId(Long platformId, String apkFileId) {
-        if (platformId == null || apkFileId == null || apkFileId.isBlank()) return Optional.empty();
+        if (platformId == null || apkFileId == null || apkFileId.isBlank())
+            return Optional.empty();
         return platformRepository.findById(platformId).map(p -> {
             p.setApkFileId(apkFileId);
             return platformRepository.save(p);
@@ -78,8 +90,10 @@ public class ApkLinkPlatformService {
     @Transactional
     public Optional<ApkLinkKeyword> addKeyword(Long platformId, String keyword) {
         String norm = normalizeKeyword(keyword);
-        if (norm.isEmpty()) return Optional.empty();
-        if (!platformRepository.existsById(platformId)) return Optional.empty();
+        if (norm.isEmpty())
+            return Optional.empty();
+        if (!platformRepository.existsById(platformId))
+            return Optional.empty();
         if (keywordRepository.existsByPlatformIdAndKeywordIgnoreCase(platformId, norm))
             return keywordRepository.findByPlatformIdAndKeywordIgnoreCase(platformId, norm);
         ApkLinkKeyword k = ApkLinkKeyword.builder().platformId(platformId).keyword(norm).build();
@@ -99,7 +113,8 @@ public class ApkLinkPlatformService {
 
     public Optional<ApkLinkPlatform> findPlatformByKeyword(String text) {
         String norm = normalizeKeyword(text);
-        if (norm.isEmpty()) return Optional.empty();
+        if (norm.isEmpty())
+            return Optional.empty();
         return keywordRepository.findFirstByKeywordIgnoreCase(norm)
                 .flatMap(k -> platformRepository.findById(k.getPlatformId()));
     }

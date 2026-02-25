@@ -83,8 +83,7 @@ public class ApkLinkBotController {
                 body.getChannelKeywordAllApk(),
                 body.getGroupKeywordAllApk(),
                 null,
-                null
-        );
+                null);
         ApkLinkBotConfigDTO dto = ApkLinkBotConfigDTO.builder()
                 .botTokenMasked(ApkLinkBotConfigService.maskToken(saved.getBotToken()))
                 .cooldownPrivateMinutes(saved.getCooldownPrivateMinutes())
@@ -141,19 +140,19 @@ public class ApkLinkBotController {
                 body.getApkFileId(),
                 body.getApkUrl(),
                 body.getSortOrder(),
-                body.getApkFileName()
-        );
+                body.getApkFileName(),
+                body.getApkCaption());
         return ResponseEntity.status(HttpStatus.CREATED).body(toPlatformDTO(p));
     }
 
     @PutMapping("/platforms/{id}")
     public ResponseEntity<?> updatePlatform(@PathVariable Long id, @RequestBody ApkLinkPlatformRequest body,
-                                            HttpServletRequest request) {
+            HttpServletRequest request) {
         if (!authenticate(request)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
         }
         return platformService.updatePlatform(id, body.getName(), body.getLinkUrl(),
-                        body.getApkFileId(), body.getApkUrl(), body.getSortOrder(), body.getApkFileName())
+                body.getApkFileId(), body.getApkUrl(), body.getSortOrder(), body.getApkFileName(), body.getApkCaption())
                 .map(p -> ResponseEntity.ok(toPlatformDTO(p)))
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -186,7 +185,7 @@ public class ApkLinkBotController {
 
     @PostMapping("/platforms/{platformId}/keywords")
     public ResponseEntity<?> addKeyword(@PathVariable Long platformId, @RequestBody ApkLinkKeywordRequest body,
-                                        HttpServletRequest request) {
+            HttpServletRequest request) {
         if (!authenticate(request)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
         }
@@ -203,7 +202,7 @@ public class ApkLinkBotController {
 
     @DeleteMapping("/platforms/{platformId}/keywords/{keyword}")
     public ResponseEntity<?> removeKeyword(@PathVariable Long platformId, @PathVariable String keyword,
-                                           HttpServletRequest request) {
+            HttpServletRequest request) {
         if (!authenticate(request)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
         }
@@ -233,7 +232,7 @@ public class ApkLinkBotController {
 
     @PutMapping("/channels/{id}")
     public ResponseEntity<?> updateChannel(@PathVariable Long id, @RequestBody ApkLinkInviteRequest body,
-                                           HttpServletRequest request) {
+            HttpServletRequest request) {
         if (!authenticate(request)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
         }
@@ -276,7 +275,7 @@ public class ApkLinkBotController {
 
     @PutMapping("/groups/{id}")
     public ResponseEntity<?> updateGroup(@PathVariable Long id, @RequestBody ApkLinkInviteRequest body,
-                                         HttpServletRequest request) {
+            HttpServletRequest request) {
         if (!authenticate(request)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
         }
@@ -316,6 +315,7 @@ public class ApkLinkBotController {
                 .apkUrl(p.getApkUrl())
                 .sortOrder(p.getSortOrder())
                 .apkFileName(p.getApkFileName())
+                .apkCaption(p.getApkCaption())
                 .build();
     }
 }

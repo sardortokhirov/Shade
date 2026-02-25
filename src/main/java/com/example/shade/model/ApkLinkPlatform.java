@@ -33,4 +33,7 @@ public class ApkLinkPlatform {
 
     @Column(name = "apk_file_name", length = 512)
     private String apkFileName;
+
+    @Column(name = "apk_caption", length = 2000)
+    private String apkCaption;
 }

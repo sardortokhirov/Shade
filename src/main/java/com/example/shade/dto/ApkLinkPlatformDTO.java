@@ -17,4 +17,5 @@ public class ApkLinkPlatformDTO {
     private String apkUrl;
     private Integer sortOrder;
     private String apkFileName;
+    private String apkCaption;
 }
