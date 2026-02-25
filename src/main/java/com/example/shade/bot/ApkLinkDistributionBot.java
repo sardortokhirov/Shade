@@ -91,8 +91,10 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
                         sendMainMenu(chatId);
                     }
                 } else if ("group".equals(chatType) || "supergroup".equals(chatType)) {
-                    handleGroupMessage(update.getMessage().getText(), chatId,
-                            update.getMessage().getFrom().getId());
+                    if (update.getMessage().getFrom() != null) {
+                        handleGroupMessage(update.getMessage().getText(), chatId,
+                                update.getMessage().getFrom().getId());
+                    }
                 } else if ("channel".equals(chatType)) {
                     handleChannelMessage(update.getMessage().getText(), chatId);
                 }
@@ -169,7 +171,9 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
             } catch (NumberFormatException e) {
                 sendText(chatId, getMessage(chatId, "apk_link.invalid_selection"));
             }
+            return;
         }
+        sendText(chatId, getMessage(chatId, "apk_link.unknown_action"));
     }
 
     private void sendLanguageSelection(Long chatId) {
@@ -240,7 +244,7 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
                 .map(c -> c.getCooldownPrivateMinutes() != null ? c.getCooldownPrivateMinutes() : 0)
                 .orElse(0);
         Optional<Long> remaining = cooldownService.getRemainingMinutesUser(userId, cooldownMinutes);
-        if (remaining.isPresent()) {
+        if (remaining.isPresent() && remaining.get() > 0) {
             Optional<String> channelLink = configService.getApkChannelMessageLink();
             if (channelLink.isPresent()) {
                 sendCooldownRedirectToChannel(chatId, channelLink.get());
@@ -294,13 +298,18 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
         String keyword = configService.getConfig()
                 .map(ApkLinkBotConfig::getChannelKeywordAllApk)
                 .orElse(null);
-        if (keyword == null || keyword.isEmpty() || !text.trim().equals(keyword.trim())) {
+        if (keyword == null || keyword.isEmpty()) return;
+        String normalizedInput = text.trim().toLowerCase();
+        String normalizedKeyword = keyword.trim().toLowerCase();
+        if (normalizedInput.startsWith("/")) normalizedInput = normalizedInput.substring(1);
+        if (!normalizedInput.equals(normalizedKeyword)) {
             return;
         }
         Long mainChatId = configService.getConfig()
                 .map(ApkLinkBotConfig::getMainApkChannelChatId)
                 .orElse(null);
         if (mainChatId != null && !mainChatId.equals(chatId)) {
+            sendText(chatId, getMessage(chatId, "apk_link.wrong_channel"));
             return;
         }
         List<ApkLinkPlatform> withApk = platformService.findAllPlatforms().stream()
@@ -402,25 +411,29 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
 
     private void handleGroupMessage(String text, Long chatId, Long userId) {
         String trimmed = text != null ? text.trim() : "";
+        String normalizedGroupInput = trimmed;
+        if (normalizedGroupInput.toLowerCase().startsWith("/")) {
+            normalizedGroupInput = normalizedGroupInput.substring(1).trim();
+        }
         Optional<ApkLinkBotConfig> configOpt = configService.getConfig();
         String groupKeywordAllApk = configOpt.map(ApkLinkBotConfig::getGroupKeywordAllApk).orElse(null);
-        if (groupKeywordAllApk != null && !groupKeywordAllApk.isEmpty() && trimmed.equalsIgnoreCase(groupKeywordAllApk.trim())) {
+        if (groupKeywordAllApk != null && !groupKeywordAllApk.isEmpty() && normalizedGroupInput.equalsIgnoreCase(groupKeywordAllApk.trim())) {
             int cooldownMinutes = configOpt.map(c -> c.getCooldownGroupMinutes() != null ? c.getCooldownGroupMinutes() : 0).orElse(0);
             boolean isAdmin = isChatAdmin(chatId, userId);
             if (!isAdmin) {
                 Optional<Long> remaining = cooldownService.getRemainingMinutesGroup(chatId, cooldownMinutes);
-                if (remaining.isPresent()) {
+                if (remaining.isPresent() && remaining.get() > 0) {
                     sendCooldownMessage(chatId, remaining.get());
                     return;
                 }
                 cooldownService.applyGroupCooldown(chatId);
             }
             configService.getApkChannelMessageLink()
-                    .ifPresentOrElse(link -> sendText(chatId, link),
+                    .ifPresentOrElse(link -> sendChannelLinkButton(chatId, link),
                             () -> sendText(chatId, getMessage(chatId, "apk_link.link_not_configured")));
             return;
         }
-        Optional<ApkLinkPlatform> platformOpt = platformService.findPlatformByKeyword(text);
+        Optional<ApkLinkPlatform> platformOpt = platformService.findPlatformByKeyword(normalizedGroupInput);
         if (platformOpt.isEmpty()) {
             return;
         }
@@ -431,7 +444,7 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
         boolean isAdmin = isChatAdmin(chatId, userId);
         if (!isAdmin) {
             Optional<Long> remaining = cooldownService.getRemainingMinutesGroup(chatId, cooldownMinutes);
-            if (remaining.isPresent()) {
+            if (remaining.isPresent() && remaining.get() > 0) {
                 sendCooldownMessage(chatId, remaining.get());
                 return;
             }
@@ -488,6 +501,11 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
     }
 
     private void sendApkRedirectToChannel(Long chatId, String channelLink) {
+        sendChannelLinkButton(chatId, channelLink);
+    }
+
+    /** Sends a message with a single URL button that opens the channel APK message (private or group). */
+    private void sendChannelLinkButton(Long chatId, String channelLink) {
         String text = getMessage(chatId, "apk_link.apk_redirect_to_channel");
         String buttonText = getMessage(chatId, "apk_link.button.open_channel");
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
