@@ -20,23 +20,33 @@ public class ApkLinkBotConfigService {
 
     @Transactional
     public ApkLinkBotConfig saveConfig(String botToken, Integer cooldownPrivateMinutes, Integer cooldownGroupMinutes,
-                                       String channelKeywordAllApk, String groupKeywordAllApk,
-                                       Long apkChannelChatId, Integer apkChannelMessageId) {
+            String channelKeywordAllApk, String groupKeywordAllApk,
+            Long apkChannelChatId, Integer apkChannelMessageId, Integer autoPostIntervalHours) {
         ApkLinkBotConfig config = getConfig().orElse(ApkLinkBotConfig.builder().build());
         config.setBotToken(botToken != null ? botToken : config.getBotToken());
-        config.setCooldownPrivateMinutes(cooldownPrivateMinutes != null ? cooldownPrivateMinutes : config.getCooldownPrivateMinutes());
-        config.setCooldownGroupMinutes(cooldownGroupMinutes != null ? cooldownGroupMinutes : config.getCooldownGroupMinutes());
-        if (channelKeywordAllApk != null) config.setChannelKeywordAllApk(channelKeywordAllApk);
-        if (groupKeywordAllApk != null) config.setGroupKeywordAllApk(groupKeywordAllApk);
-        if (apkChannelChatId != null) config.setApkChannelChatId(apkChannelChatId);
-        if (apkChannelMessageId != null) config.setApkChannelMessageId(apkChannelMessageId);
+        config.setCooldownPrivateMinutes(
+                cooldownPrivateMinutes != null ? cooldownPrivateMinutes : config.getCooldownPrivateMinutes());
+        config.setCooldownGroupMinutes(
+                cooldownGroupMinutes != null ? cooldownGroupMinutes : config.getCooldownGroupMinutes());
+        if (channelKeywordAllApk != null)
+            config.setChannelKeywordAllApk(channelKeywordAllApk);
+        if (groupKeywordAllApk != null)
+            config.setGroupKeywordAllApk(groupKeywordAllApk);
+        if (apkChannelChatId != null)
+            config.setApkChannelChatId(apkChannelChatId);
+        if (apkChannelMessageId != null)
+            config.setApkChannelMessageId(apkChannelMessageId);
+        if (autoPostIntervalHours != null)
+            config.setAutoPostIntervalHours(autoPostIntervalHours);
         return configRepository.save(config);
     }
 
     /**
-     * Saves the channel message link (used by bot after posting all APKs in channel).
+     * Saves the channel message link (used by bot after posting all APKs in
+     * channel).
      * Does not change other config fields.
-     * If mainApkChannelChatId is null, sets it to this chatId so the first channel becomes main.
+     * If mainApkChannelChatId is null, sets it to this chatId so the first channel
+     * becomes main.
      */
     @Transactional
     public ApkLinkBotConfig saveApkChannelMessageLink(Long chatId, Integer messageId) {
@@ -50,7 +60,8 @@ public class ApkLinkBotConfigService {
     }
 
     /**
-     * Sets or clears the main APK channel. Only this channel may trigger send-all-APKs when the keyword is posted.
+     * Sets or clears the main APK channel. Only this channel may trigger
+     * send-all-APKs when the keyword is posted.
      */
     @Transactional
     public ApkLinkBotConfig setMainApkChannelChatId(Long mainApkChannelChatId) {
@@ -61,11 +72,13 @@ public class ApkLinkBotConfigService {
 
     /**
      * Builds the t.me link for the stored APK channel message.
-     * Format for supergroup/channel: https://t.me/c/&lt;chat_id_without_-100&gt;/&lt;message_id&gt;
+     * Format for supergroup/channel:
+     * https://t.me/c/&lt;chat_id_without_-100&gt;/&lt;message_id&gt;
      * e.g. chatId -1001234567890 -> 1234567890.
      */
     public Optional<String> buildApkChannelMessageLink(Long chatId, Integer messageId) {
-        if (chatId == null || messageId == null) return Optional.empty();
+        if (chatId == null || messageId == null)
+            return Optional.empty();
         long abs = Math.abs(chatId.longValue());
         if (abs >= 1_000_000_000_000L) {
             abs = abs % 1_000_000_000_000L;
@@ -84,7 +97,8 @@ public class ApkLinkBotConfigService {
     }
 
     public static String maskToken(String token) {
-        if (token == null || token.length() < 8) return "***";
+        if (token == null || token.length() < 8)
+            return "***";
         return token.substring(0, 4) + "***" + token.substring(token.length() - 4);
     }
 }

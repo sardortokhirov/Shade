@@ -36,4 +36,10 @@ public class ApkLinkPlatform {
 
     @Column(name = "apk_caption", length = 2000)
     private String apkCaption;
+
+    @Column(name = "link_keyword", length = 255)
+    private String linkKeyword;
+
+    @Column(name = "apk_keyword", length = 255)
+    private String apkKeyword;
 }

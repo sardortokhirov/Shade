@@ -55,6 +55,8 @@ public class ApkLinkBotController {
                     .apkChannelMessageId(null)
                     .apkChannelMessageLink(null)
                     .mainApkChannelChatId(null)
+                    .autoPostIntervalHours(null)
+                    .lastAutoPostTime(null)
                     .build());
         }
         ApkLinkBotConfigDTO dto = ApkLinkBotConfigDTO.builder()
@@ -67,6 +69,8 @@ public class ApkLinkBotController {
                 .apkChannelMessageId(config.getApkChannelMessageId())
                 .apkChannelMessageLink(configService.getApkChannelMessageLink().orElse(null))
                 .mainApkChannelChatId(config.getMainApkChannelChatId())
+                .autoPostIntervalHours(config.getAutoPostIntervalHours())
+                .lastAutoPostTime(config.getLastAutoPostTime())
                 .build();
         return ResponseEntity.ok(dto);
     }
@@ -83,7 +87,8 @@ public class ApkLinkBotController {
                 body.getChannelKeywordAllApk(),
                 body.getGroupKeywordAllApk(),
                 null,
-                null);
+                null,
+                body.getAutoPostIntervalHours());
         ApkLinkBotConfigDTO dto = ApkLinkBotConfigDTO.builder()
                 .botTokenMasked(ApkLinkBotConfigService.maskToken(saved.getBotToken()))
                 .cooldownPrivateMinutes(saved.getCooldownPrivateMinutes())
@@ -94,6 +99,8 @@ public class ApkLinkBotController {
                 .apkChannelMessageId(saved.getApkChannelMessageId())
                 .apkChannelMessageLink(configService.getApkChannelMessageLink().orElse(null))
                 .mainApkChannelChatId(saved.getMainApkChannelChatId())
+                .autoPostIntervalHours(saved.getAutoPostIntervalHours())
+                .lastAutoPostTime(saved.getLastAutoPostTime())
                 .build();
         return ResponseEntity.ok(dto);
     }
@@ -114,6 +121,8 @@ public class ApkLinkBotController {
                 .apkChannelMessageId(saved.getApkChannelMessageId())
                 .apkChannelMessageLink(configService.getApkChannelMessageLink().orElse(null))
                 .mainApkChannelChatId(saved.getMainApkChannelChatId())
+                .autoPostIntervalHours(saved.getAutoPostIntervalHours())
+                .lastAutoPostTime(saved.getLastAutoPostTime())
                 .build();
         return ResponseEntity.ok(dto);
     }
@@ -141,7 +150,9 @@ public class ApkLinkBotController {
                 body.getApkUrl(),
                 body.getSortOrder(),
                 body.getApkFileName(),
-                body.getApkCaption());
+                body.getApkCaption(),
+                body.getLinkKeyword(),
+                body.getApkKeyword());
         return ResponseEntity.status(HttpStatus.CREATED).body(toPlatformDTO(p));
     }
 
@@ -152,7 +163,8 @@ public class ApkLinkBotController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
         }
         return platformService.updatePlatform(id, body.getName(), body.getLinkUrl(),
-                body.getApkFileId(), body.getApkUrl(), body.getSortOrder(), body.getApkFileName(), body.getApkCaption())
+                body.getApkFileId(), body.getApkUrl(), body.getSortOrder(), body.getApkFileName(), body.getApkCaption(),
+                body.getLinkKeyword(), body.getApkKeyword())
                 .map(p -> ResponseEntity.ok(toPlatformDTO(p)))
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -316,6 +328,8 @@ public class ApkLinkBotController {
                 .sortOrder(p.getSortOrder())
                 .apkFileName(p.getApkFileName())
                 .apkCaption(p.getApkCaption())
+                .linkKeyword(p.getLinkKeyword())
+                .apkKeyword(p.getApkKeyword())
                 .build();
     }
 }

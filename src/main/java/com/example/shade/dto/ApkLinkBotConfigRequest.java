@@ -13,4 +13,5 @@ public class ApkLinkBotConfigRequest {
     private Integer cooldownGroupMinutes;
     private String channelKeywordAllApk;
     private String groupKeywordAllApk;
+    private Integer autoPostIntervalHours;
 }

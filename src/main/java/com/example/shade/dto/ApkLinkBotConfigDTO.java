@@ -19,4 +19,6 @@ public class ApkLinkBotConfigDTO {
     private Integer apkChannelMessageId;
     private String apkChannelMessageLink;
     private Long mainApkChannelChatId;
+    private Integer autoPostIntervalHours;
+    private java.time.Instant lastAutoPostTime;
 }
