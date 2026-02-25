@@ -93,6 +93,7 @@ public class ApkLinkBotController {
                 body.getChannelKeywordAllApk(),
                 body.getGroupKeywordAllApk(),
                 null,
+                null,
                 body.getAutoPostIntervalHours(),
                 body.getGroupUserLinkLimit(),
                 body.getGroupUserApkLimit(),
