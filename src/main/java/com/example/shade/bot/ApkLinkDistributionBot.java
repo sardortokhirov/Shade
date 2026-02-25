@@ -84,6 +84,8 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
             if (update.hasMessage() && update.getMessage().hasText()) {
                 Long chatId = update.getMessage().getChatId();
                 String chatType = update.getMessage().getChat().getType();
+                logger.debug("ApkLink received message in {} chat {}: {}", chatType, chatId,
+                        update.getMessage().getText());
                 if ("private".equals(chatType)) {
                     if (languageService.getLanguageCode(chatId).isEmpty()) {
                         sendLanguageSelection(chatId);
@@ -91,13 +93,25 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
                         sendMainMenu(chatId);
                     }
                 } else if ("group".equals(chatType) || "supergroup".equals(chatType)) {
+                    Long userId = null;
                     if (update.getMessage().getFrom() != null) {
-                        handleGroupMessage(update.getMessage().getText(), chatId,
-                                update.getMessage().getFrom().getId());
+                        userId = update.getMessage().getFrom().getId();
+                    } else if (update.getMessage().getSenderChat() != null) {
+                        userId = update.getMessage().getSenderChat().getId();
                     }
-                } else if ("channel".equals(chatType)) {
-                    handleChannelMessage(update.getMessage().getText(), chatId);
+                    if (userId != null) {
+                        handleGroupMessage(update.getMessage().getText(), chatId, userId);
+                    } else {
+                        logger.debug("ApkLink ignoring group message with no identifiable sender in chat {}", chatId);
+                    }
                 }
+            }
+            // Telegram sends channel posts via channelPost field, NOT the message field
+            if (update.hasChannelPost() && update.getChannelPost().hasText()) {
+                Long chatId = update.getChannelPost().getChatId();
+                String text = update.getChannelPost().getText();
+                logger.info("ApkLink received channel post in chat {}: {}", chatId, text);
+                handleChannelMessage(text, chatId);
             }
         } catch (Exception e) {
             logger.error("ApkLink bot error: {}", e.getMessage(), e);
@@ -190,7 +204,8 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
         String text = getMessage(chatId, "apk_link.main_menu");
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         rows.add(List.of(createCallbackButton(getMessage(chatId, "apk_link.button.link_apk"), MAIN_LINK_APK)));
-        rows.add(List.of(createCallbackButton(getMessage(chatId, "apk_link.button.group_channel"), MAIN_GROUP_CHANNEL)));
+        rows.add(
+                List.of(createCallbackButton(getMessage(chatId, "apk_link.button.group_channel"), MAIN_GROUP_CHANNEL)));
         rows.add(List.of(createCallbackButton(getMessage(chatId, "apk_link.button.contacts"), MAIN_CONTACTS)));
         sendMessageWithKeyboard(chatId, text, rows);
     }
@@ -198,7 +213,8 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
     private void sendPlatformList(Long chatId) {
         List<ApkLinkPlatform> platforms = platformService.findAllPlatforms();
         if (platforms.isEmpty()) {
-            sendText(chatId, getMessage(chatId, "apk_link.select_platform") + " " + getMessage(chatId, "apk_link.no_platforms_configured"));
+            sendText(chatId, getMessage(chatId, "apk_link.select_platform") + " "
+                    + getMessage(chatId, "apk_link.no_platforms_configured"));
             return;
         }
         String text = getMessage(chatId, "apk_link.select_platform");
@@ -262,13 +278,15 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
     }
 
     private void handleSendApk(Long chatId, Long userId, Long platformId) {
-        // APK in private: no cooldown. When main channel link is set, always redirect to that channel message.
+        // APK in private: no cooldown. When main channel link is set, always redirect
+        // to that channel message.
         Optional<String> channelLink = configService.getApkChannelMessageLink();
         if (channelLink.isPresent()) {
             sendApkRedirectToChannel(chatId, channelLink.get());
             return;
         }
-        // No channel link: send platform's APK file/URL or fallback (no cooldown for APK)
+        // No channel link: send platform's APK file/URL or fallback (no cooldown for
+        // APK)
         Optional<ApkLinkPlatform> platform = platformService.findPlatformById(platformId);
         if (platform.isEmpty()) {
             sendText(chatId, getMessage(chatId, "apk_link.platform_not_found"));
@@ -293,21 +311,32 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
     }
 
     private void handleChannelMessage(String text, Long chatId) {
-        if (text == null) return;
+        if (text == null)
+            return;
         String keyword = configService.getConfig()
                 .map(ApkLinkBotConfig::getChannelKeywordAllApk)
                 .orElse(null);
-        if (keyword == null || keyword.isEmpty()) return;
-        String normalizedInput = text.trim().toLowerCase();
-        String normalizedKeyword = keyword.trim().toLowerCase();
-        if (normalizedInput.startsWith("/")) normalizedInput = normalizedInput.substring(1);
-        if (!normalizedInput.equals(normalizedKeyword)) {
+        if (keyword == null || keyword.isEmpty()) {
+            logger.debug("ApkLink channel keyword not configured, ignoring channel post");
             return;
         }
+        String normalizedInput = text.trim().toLowerCase();
+        String normalizedKeyword = keyword.trim().toLowerCase();
+        if (normalizedInput.startsWith("/"))
+            normalizedInput = normalizedInput.substring(1);
+        if (normalizedKeyword.startsWith("/"))
+            normalizedKeyword = normalizedKeyword.substring(1);
+        if (!normalizedInput.equals(normalizedKeyword)) {
+            logger.debug("ApkLink channel keyword mismatch: input='{}' vs keyword='{}'", normalizedInput,
+                    normalizedKeyword);
+            return;
+        }
+        logger.info("ApkLink channel keyword '{}' matched in chat {}", normalizedInput, chatId);
         Long mainChatId = configService.getConfig()
                 .map(ApkLinkBotConfig::getMainApkChannelChatId)
                 .orElse(null);
         if (mainChatId != null && !mainChatId.equals(chatId)) {
+            logger.warn("ApkLink channel {} is not the main APK channel (main={}), rejecting", chatId, mainChatId);
             sendText(chatId, getMessage(chatId, "apk_link.wrong_channel"));
             return;
         }
@@ -315,6 +344,7 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
                 .filter(p -> (p.getApkFileId() != null && !p.getApkFileId().isEmpty())
                         || (p.getApkUrl() != null && !p.getApkUrl().isEmpty()))
                 .collect(Collectors.toList());
+        logger.info("ApkLink found {} platforms with APK for channel posting", withApk.size());
         if (withApk.isEmpty()) {
             sendText(chatId, getMessage(chatId, "apk_link.no_apks_configured"));
             return;
@@ -352,10 +382,12 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
                     } else if (p.getApkUrl() != null && !p.getApkUrl().isEmpty()) {
                         Optional<byte[]> data = apkDownloadService.downloadApk(p.getApkUrl());
                         if (data.isPresent()) {
-                            Optional<Message> sent = sendDocumentFromBytes(chatId, data.get(), fileNameFor(p), captionFor(p));
+                            Optional<Message> sent = sendDocumentFromBytes(chatId, data.get(), fileNameFor(p),
+                                    captionFor(p));
                             if (sent.isPresent() && sent.get().getDocument() != null) {
                                 if (!channelLinkSaved) {
-                                    configService.saveApkChannelMessageLink(sent.get().getChatId(), sent.get().getMessageId());
+                                    configService.saveApkChannelMessageLink(sent.get().getChatId(),
+                                            sent.get().getMessageId());
                                     channelLinkSaved = true;
                                 }
                                 platformService.updateApkFileId(p.getId(), sent.get().getDocument().getFileId());
@@ -388,7 +420,8 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
                         SendMediaGroup group = new SendMediaGroup(chatId.toString(), mediaList);
                         List<Message> sent = execute(group);
                         if (!sent.isEmpty() && !channelLinkSaved) {
-                            configService.saveApkChannelMessageLink(sent.get(0).getChatId(), sent.get(0).getMessageId());
+                            configService.saveApkChannelMessageLink(sent.get(0).getChatId(),
+                                    sent.get(0).getMessageId());
                             channelLinkSaved = true;
                         }
                     }
@@ -404,7 +437,8 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
     }
 
     private static String fileNameFor(ApkLinkPlatform p) {
-        if (p.getApkFileName() != null && !p.getApkFileName().isEmpty()) return p.getApkFileName();
+        if (p.getApkFileName() != null && !p.getApkFileName().isEmpty())
+            return p.getApkFileName();
         return p.getName() != null ? p.getName() : "platform";
     }
 
@@ -414,10 +448,18 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
         if (normalizedGroupInput.toLowerCase().startsWith("/")) {
             normalizedGroupInput = normalizedGroupInput.substring(1).trim();
         }
+        logger.debug("ApkLink group message in chat {} by user {}: normalized='{}'", chatId, userId,
+                normalizedGroupInput);
         Optional<ApkLinkBotConfig> configOpt = configService.getConfig();
         String groupKeywordAllApk = configOpt.map(ApkLinkBotConfig::getGroupKeywordAllApk).orElse(null);
-        if (groupKeywordAllApk != null && !groupKeywordAllApk.isEmpty() && normalizedGroupInput.equalsIgnoreCase(groupKeywordAllApk.trim())) {
-            int cooldownMinutes = configOpt.map(c -> c.getCooldownGroupMinutes() != null ? c.getCooldownGroupMinutes() : 0).orElse(0);
+        String normalizedGroupKeyword = groupKeywordAllApk != null ? groupKeywordAllApk.trim() : "";
+        if (normalizedGroupKeyword.toLowerCase().startsWith("/")) {
+            normalizedGroupKeyword = normalizedGroupKeyword.substring(1).trim();
+        }
+        if (!normalizedGroupKeyword.isEmpty() && normalizedGroupInput.equalsIgnoreCase(normalizedGroupKeyword)) {
+            logger.info("ApkLink group 'all APK' keyword matched in chat {} by user {}", chatId, userId);
+            int cooldownMinutes = configOpt
+                    .map(c -> c.getCooldownGroupMinutes() != null ? c.getCooldownGroupMinutes() : 0).orElse(0);
             boolean isAdmin = isChatAdmin(chatId, userId);
             if (!isAdmin) {
                 Optional<Long> remaining = cooldownService.getRemainingMinutesGroup(chatId, cooldownMinutes);
@@ -434,8 +476,11 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
         }
         Optional<ApkLinkPlatform> platformOpt = platformService.findPlatformByKeyword(normalizedGroupInput);
         if (platformOpt.isEmpty()) {
+            logger.debug("ApkLink no keyword match for '{}' in group {}", normalizedGroupInput, chatId);
             return;
         }
+        logger.info("ApkLink platform keyword '{}' matched '{}' in group {}", normalizedGroupInput,
+                platformOpt.get().getName(), chatId);
         ApkLinkPlatform platform = platformOpt.get();
         int cooldownMinutes = configService.getConfig()
                 .map(c -> c.getCooldownGroupMinutes() != null ? c.getCooldownGroupMinutes() : 0)
@@ -455,7 +500,8 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
         } else if (platform.getApkUrl() != null && !platform.getApkUrl().isEmpty()) {
             Optional<byte[]> data = apkDownloadService.downloadApk(platform.getApkUrl());
             if (data.isPresent()) {
-                Optional<Message> sent = sendDocumentFromBytes(chatId, data.get(), fileNameFor(platform), captionFor(platform));
+                Optional<Message> sent = sendDocumentFromBytes(chatId, data.get(), fileNameFor(platform),
+                        captionFor(platform));
                 if (sent.isPresent() && sent.get().getDocument() != null) {
                     platformService.updateApkFileId(platform.getId(), sent.get().getDocument().getFileId());
                 }
@@ -503,7 +549,10 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
         sendChannelLinkButton(chatId, channelLink);
     }
 
-    /** Sends a message with a single URL button that opens the channel APK message (private or group). */
+    /**
+     * Sends a message with a single URL button that opens the channel APK message
+     * (private or group).
+     */
     private void sendChannelLinkButton(Long chatId, String channelLink) {
         String text = getMessage(chatId, "apk_link.apk_redirect_to_channel");
         String buttonText = getMessage(chatId, "apk_link.button.open_channel");
@@ -557,14 +606,18 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
     }
 
     /**
-     * Sends a document from downloaded bytes (e.g. after fetching from redirect/tracking URL).
+     * Sends a document from downloaded bytes (e.g. after fetching from
+     * redirect/tracking URL).
      *
-     * @return the sent Message if successful (to extract file_id for persistence), or empty on failure
+     * @return the sent Message if successful (to extract file_id for persistence),
+     *         or empty on failure
      */
     private Optional<Message> sendDocumentFromBytes(Long chatId, byte[] data, String fileName, String caption) {
-        if (data == null || data.length == 0) return Optional.empty();
+        if (data == null || data.length == 0)
+            return Optional.empty();
         String safeName = sanitizeFileName(fileName != null ? fileName : "file.apk");
-        if (!safeName.toLowerCase().endsWith(".apk")) safeName = safeName + ".apk";
+        if (!safeName.toLowerCase().endsWith(".apk"))
+            safeName = safeName + ".apk";
         try {
             SendDocument doc = new SendDocument();
             doc.setChatId(chatId.toString());
@@ -580,7 +633,8 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
     }
 
     private static String sanitizeFileName(String name) {
-        if (name == null || name.isBlank()) return "file.apk";
+        if (name == null || name.isBlank())
+            return "file.apk";
         return name.replaceAll("[^a-zA-Z0-9._-]", "_");
     }
 
