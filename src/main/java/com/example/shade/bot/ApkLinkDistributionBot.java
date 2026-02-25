@@ -225,14 +225,13 @@ public class ApkLinkDistributionBot extends TelegramLongPollingBot {
         }
         String text = getMessage(chatId, "apk_link.choose_link_or_apk");
         List<InlineKeyboardButton> row = new ArrayList<>();
-        InlineKeyboardButton linkBtn = new InlineKeyboardButton();
-        linkBtn.setText(getMessage(chatId, "apk_link.button.link"));
-        linkBtn.setCallbackData(PREFIX_SEND_LINK + platformId);
-        InlineKeyboardButton apkBtn = new InlineKeyboardButton();
-        apkBtn.setText(getMessage(chatId, "apk_link.button.apk"));
-        apkBtn.setCallbackData(PREFIX_SEND_APK + platformId);
-        row.add(linkBtn);
-        row.add(apkBtn);
+        row.add(createCallbackButton(getMessage(chatId, "apk_link.button.link"), PREFIX_SEND_LINK + platformId));
+        Optional<String> channelLink = configService.getApkChannelMessageLink();
+        if (channelLink.isPresent()) {
+            row.add(createUrlButton(getMessage(chatId, "apk_link.button.apk"), channelLink.get()));
+        } else {
+            row.add(createCallbackButton(getMessage(chatId, "apk_link.button.apk"), PREFIX_SEND_APK + platformId));
+        }
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         rows.add(row);
         rows.add(List.of(createCallbackButton(getMessage(chatId, "apk_link.button.back"), BACK_MAIN)));
