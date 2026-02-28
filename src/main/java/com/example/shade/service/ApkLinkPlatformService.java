@@ -81,6 +81,16 @@ public class ApkLinkPlatformService {
     }
 
     @Transactional
+    public Optional<ApkLinkPlatform> updateChannelMessageId(Long platformId, Integer channelMessageId) {
+        if (platformId == null)
+            return Optional.empty();
+        return platformRepository.findById(platformId).map(p -> {
+            p.setChannelMessageId(channelMessageId);
+            return platformRepository.save(p);
+        });
+    }
+
+    @Transactional
     public void deletePlatform(Long id) {
         keywordRepository.findByPlatformIdOrderByKeywordAsc(id).forEach(keywordRepository::delete);
         platformRepository.deleteById(id);

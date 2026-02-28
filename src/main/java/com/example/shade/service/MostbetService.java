@@ -2,7 +2,6 @@ package com.example.shade.service;
 
 import com.example.shade.dto.BalanceLimit;
 import com.example.shade.model.*;
-import com.example.shade.repository.ExchangeRateRepository;
 import com.example.shade.repository.PlatformRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -41,8 +40,7 @@ public class MostbetService {
 //    private final String secret = "8c23c4aa-c228-448b-a86d-c04077c39603";
     private final String project = "MBC";
 
-    private final PlatformRepository  platformRepository;;
-    private final ExchangeRateRepository exchangeRateRepository;;
+    private final PlatformRepository platformRepository;
     private String now() {
         return LocalDateTime.now(ZoneId.of("UTC")).format(FMT);
     }
@@ -149,13 +147,9 @@ public class MostbetService {
         String cashpointId = platform.getWorkplaceId();
         String userId = request.getPlatformUserId();
         long amount = request.getUniqueAmount();
-
-        ExchangeRate latest = exchangeRateRepository.findLatest()
-                .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
         if (request.getCurrency().equals(Currency.RUB)) {
-            amount = BigDecimal.valueOf(request.getUniqueAmount())
-                    .multiply(latest.getUzsToRub())
-                    .longValue() / 1000;
+            // uniqueAmount is stored as UZS*1000 when RUB; Mostbet API expects UZS
+            amount = request.getUniqueAmount() / 1000;
         }
 
         TransactionResponse depositResponse = deposit(apiKey, secret, cashpointId, 1, userId, amount, platform.getCurrency().toString());

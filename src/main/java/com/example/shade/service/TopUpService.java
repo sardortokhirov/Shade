@@ -644,18 +644,24 @@ public class TopUpService {
                 request.setPayUrl((String) statusResponse.get("payUrl"));
             }
 
-            request.setStatus(RequestStatus.APPROVED);
-            requestRepository.save(request);
+            // Transfer FIRST - only approve when transfer succeeds (never transfer money on failure)
             String platformName = request.getPlatform();
             Platform platform = platformRepository.findByName(platformName)
                     .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
             BalanceLimit transferSuccessful = null;
-            if (platform.getType().equals("mostbet")) {
-                transferSuccessful = mostbetService.transferToPlatform(request);
-            } else {
-                transferSuccessful = transferToPlatform(request, adminCard);
+            try {
+                if (platform.getType().equals("mostbet")) {
+                    transferSuccessful = mostbetService.transferToPlatform(request);
+                } else {
+                    transferSuccessful = transferToPlatform(request, adminCard);
+                }
+            } catch (Exception e) {
+                logger.error("Transfer failed for request {}: {}", request.getId(), e.getMessage());
+                transferSuccessful = null;
             }
             if (transferSuccessful != null) {
+                request.setStatus(RequestStatus.APPROVED);
+                requestRepository.save(request);
                 Optional<UserBalance> balanceOpt = userBalanceRepository.findById(chatId);
                 UserBalance balance;
                 if (balanceOpt.isPresent()) {
@@ -884,15 +890,20 @@ public class TopUpService {
                 .longValue() / 1000;
 
         if (approve) {
-            // Attempt transfer FIRST, only set APPROVED status after success
+            // Attempt transfer FIRST, only set APPROVED status after success (never transfer on failure)
             String platformName = request.getPlatform();
             Platform platform = platformRepository.findByName(platformName)
                     .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
             BalanceLimit transferSuccessful = null;
-            if (platform.getType().equals("mostbet")) {
-                transferSuccessful = mostbetService.transferToPlatform(request);
-            } else {
-                transferSuccessful = transferToPlatform(request, adminCard);
+            try {
+                if (platform.getType().equals("mostbet")) {
+                    transferSuccessful = mostbetService.transferToPlatform(request);
+                } else {
+                    transferSuccessful = transferToPlatform(request, adminCard);
+                }
+            } catch (Exception e) {
+                logger.error("Transfer failed for request {}: {}", request.getId(), e.getMessage());
+                transferSuccessful = null;
             }
             if (transferSuccessful != null) {
                 // Transfer succeeded - NOW set status to APPROVED
@@ -1089,19 +1100,20 @@ public class TopUpService {
                 .longValue() / 1000;
 
         if (approve) {
-            // Attempt transfer FIRST, only set APPROVED status after success
+            // Attempt transfer FIRST, only set APPROVED status after success (never transfer on failure)
             String platformName = request.getPlatform();
             Platform platform = platformRepository.findByName(platformName)
                     .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
             BalanceLimit transferSuccessful = null;
-            if (platform.getType().equals("mostbet")) {
-                try {
+            try {
+                if (platform.getType().equals("mostbet")) {
                     transferSuccessful = mostbetService.transferToPlatform(request);
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
+                } else {
+                    transferSuccessful = transferToPlatform(request, adminCard);
                 }
-            } else {
-                transferSuccessful = transferToPlatform(request, adminCard);
+            } catch (Exception e) {
+                logger.error("Transfer failed for request {}: {}", request.getId(), e.getMessage());
+                transferSuccessful = null;
             }
             if (transferSuccessful != null) {
                 // Transfer succeeded - NOW set status to APPROVED

@@ -1622,6 +1622,10 @@ public class BonusService {
         rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.withdraw"), "WITHDRAW")));
         rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.bonus"), "BONUS")));
         rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.contact"), "CONTACT")));
+        InlineKeyboardButton instructionButton = new InlineKeyboardButton();
+        instructionButton.setText(languageSessionService.getTranslation(chatId, "button.instruction"));
+        instructionButton.setUrl("https://t.me/xonpey");
+        rows.add(List.of(instructionButton));
         markup.setKeyboard(rows);
         return markup;
     }

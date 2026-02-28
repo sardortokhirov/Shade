@@ -90,7 +90,7 @@ public class ApkLinkBotConfigService {
         if (abs >= 1_000_000_000_000L) {
             abs = abs % 1_000_000_000_000L;
         }
-        return Optional.of("https://t.me/c/" + abs + "/" + messageId);
+        return Optional.of("https://t.me/c/" + abs + "/" + messageId + "?single");
     }
 
     public Optional<String> getApkChannelMessageLink() {

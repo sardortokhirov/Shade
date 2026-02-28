@@ -42,4 +42,7 @@ public class ApkLinkPlatform {
 
     @Column(name = "apk_keyword", length = 255)
     private String apkKeyword;
+
+    @Column(name = "channel_message_id")
+    private Integer channelMessageId;
 }
