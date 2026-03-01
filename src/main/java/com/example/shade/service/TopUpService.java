@@ -512,9 +512,10 @@ public class TopUpService {
             long rubAmount = Long.parseLong(sessionService.getUserData(chatId, "amount"));
             ExchangeRate latest = exchangeRateRepository.findLatest()
                     .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
-            // Convert RUB to UZS: amount_uzs = rubAmount * rubToUzs (e.g. 500 RUB * 14000 = 7,000,000 UZS)
-            amount = BigDecimal.valueOf(rubAmount).multiply(latest.getRubToUzs())
-                    .setScale(0, RoundingMode.HALF_UP).longValue();
+            // Convert RUB to UZS using uzsToRub (1000 UZS = X RUB): amount_uzs = rubAmount * 1000 / uzsToRub
+            // e.g. 60 RUB, uzsToRub=6: 60 * 1000 / 6 = 10,000 UZS
+            amount = BigDecimal.valueOf(rubAmount).multiply(BigDecimal.valueOf(1000))
+                    .divide(latest.getUzsToRub(), 0, RoundingMode.HALF_UP).longValue();
         } else {
             amount = Long.parseLong(sessionService.getUserData(chatId, "amount"));
         }
@@ -1347,9 +1348,11 @@ public class TopUpService {
         ExchangeRate latest = exchangeRateRepository.findLatest()
                 .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
         if (request.getCurrency().equals(Currency.RUB)) {
-            // Use base amount (not uniqueAmount) to get user's requested RUB: amount_uzs / rubToUzs = amount_rub
+            // Use uzsToRub (1000 UZS = X RUB): amount_rub = amount_uzs * uzsToRub / 1000
+            // e.g. 10,000 UZS, uzsToRub=6: 10000 * 6 / 1000 = 60 RUB
             amount = BigDecimal.valueOf(request.getAmount())
-                    .divide(latest.getRubToUzs(), 0, RoundingMode.HALF_UP)
+                    .multiply(latest.getUzsToRub())
+                    .divide(BigDecimal.valueOf(1000), 0, RoundingMode.HALF_UP)
                     .longValue();
         }
         String lng = "ru";
@@ -1510,7 +1513,8 @@ public class TopUpService {
                 rubAmount = Long.parseLong(amountStr);
             } else {
                 rubAmount = BigDecimal.valueOf(request.getAmount())
-                        .divide(latest.getRubToUzs(), 0, RoundingMode.HALF_UP).longValue();
+                        .multiply(latest.getUzsToRub())
+                        .divide(BigDecimal.valueOf(1000), 0, RoundingMode.HALF_UP).longValue();
             }
 
             messageText = String.format(

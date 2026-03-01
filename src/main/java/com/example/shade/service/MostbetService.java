@@ -150,13 +150,14 @@ public class MostbetService {
         String secret = platform.getSecret();
         String cashpointId = platform.getWorkplaceId();
         String userId = request.getPlatformUserId();
-        // For RUB: use base amount (not uniqueAmount) to get user's requested RUB: amount_uzs / rubToUzs = amount_rub
+        // For RUB: use uzsToRub (1000 UZS = X RUB): amount_rub = amount_uzs * uzsToRub / 1000
         double amount;
         if (request.getCurrency() == Currency.RUB) {
             var latest = exchangeRateRepository.findLatest()
                     .orElseThrow(() -> new RuntimeException("No exchange rate found"));
             long rubAmount = BigDecimal.valueOf(request.getAmount())
-                    .divide(latest.getRubToUzs(), 0, RoundingMode.HALF_UP)
+                    .multiply(latest.getUzsToRub())
+                    .divide(BigDecimal.valueOf(1000), 0, RoundingMode.HALF_UP)
                     .longValue();
             amount = rubAmount;
         } else {
