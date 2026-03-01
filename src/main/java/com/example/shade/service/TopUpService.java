@@ -1494,10 +1494,16 @@ public class TopUpService {
         String buttonKey = attempts >= 2 ? "topup.button.send_screenshot" : "topup.button.confirm";
 
         if (request.getCurrency().equals(Currency.RUB)) {
-            long rubAmount = BigDecimal.valueOf(request.getUniqueAmount())
-                    .multiply(latest.getUzsToRub())
-                    .setScale(0, RoundingMode.HALF_UP)
-                    .longValue();
+            // Use the RUB amount the user entered (from session) - avoids UZS→RUB conversion mismatch
+            // Fallback: derive from UZS using rubToUzs (amount_uzs / rubToUzs = amount_rub)
+            String amountStr = sessionService.getUserData(chatId, "amount");
+            long rubAmount;
+            if (amountStr != null && !amountStr.isEmpty() && "RUB".equals(sessionService.getUserData(chatId, "amountCurrency"))) {
+                rubAmount = Long.parseLong(amountStr);
+            } else {
+                rubAmount = BigDecimal.valueOf(request.getAmount())
+                        .divide(latest.getRubToUzs(), 0, RoundingMode.HALF_UP).longValue();
+            }
 
             messageText = String.format(
                     languageSessionService.getTranslation(chatId, "topup.message.payment_instruction_rub"),
