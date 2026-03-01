@@ -124,7 +124,7 @@ public class TopUpService {
                             .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
                     long minUzs = configurationService.getTopUpMinAmount();
                     long minRub = BigDecimal.valueOf(minUzs).multiply(latest.getUzsToRub())
-                            .divide(BigDecimal.valueOf(1000), 0, RoundingMode.DOWN).longValue();
+                            .setScale(0, RoundingMode.DOWN).longValue();
                     if (minRub < 1) minRub = 1;
                     sessionService.setUserData(chatId, "amount", String.valueOf(minRub));
                     sessionService.setUserData(chatId, "amountCurrency", "RUB");
@@ -143,7 +143,7 @@ public class TopUpService {
                             .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
                     long maxUzs = configurationService.getTopUpMaxAmount();
                     long maxRub = BigDecimal.valueOf(maxUzs).multiply(latest.getUzsToRub())
-                            .divide(BigDecimal.valueOf(1000), 0, RoundingMode.UP).longValue();
+                            .setScale(0, RoundingMode.UP).longValue();
                     sessionService.setUserData(chatId, "amount", String.valueOf(maxRub));
                     sessionService.setUserData(chatId, "amountCurrency", "RUB");
                 } else {
@@ -496,13 +496,18 @@ public class TopUpService {
             return;
         }
 
+        // Use amountCurrency from session - matches what we showed the user (RUB or UZS prompt)
+        // request.getCurrency() can differ (e.g. platform RUB but user profile UZS) - must use what user saw
+        String amountCurrency = sessionService.getUserData(chatId, "amountCurrency");
+        boolean isRub = "RUB".equals(amountCurrency) || (amountCurrency == null && isRubTopUp(chatId));
         long amount;
-        if (request.getCurrency() == Currency.RUB) {
+        if (isRub) {
             long rubAmount = Long.parseLong(sessionService.getUserData(chatId, "amount"));
             ExchangeRate latest = exchangeRateRepository.findLatest()
                     .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
-            amount = BigDecimal.valueOf(rubAmount).multiply(BigDecimal.valueOf(1000))
-                    .divide(latest.getUzsToRub(), 0, RoundingMode.HALF_UP).longValue();
+            // Convert RUB to UZS: amount_uzs = rubAmount * rubToUzs (e.g. 500 RUB * 14000 = 7,000,000 UZS)
+            amount = BigDecimal.valueOf(rubAmount).multiply(latest.getRubToUzs())
+                    .setScale(0, RoundingMode.HALF_UP).longValue();
         } else {
             amount = Long.parseLong(sessionService.getUserData(chatId, "amount"));
         }
@@ -579,7 +584,8 @@ public class TopUpService {
                 .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
         long rubAmount = BigDecimal.valueOf(request.getUniqueAmount())
                 .multiply(latest.getUzsToRub())
-                .longValue() / 1000;
+                .setScale(0, RoundingMode.HALF_UP)
+                .longValue();
         try {
             if (adminCard.getPaymentSystem().equals(PaymentSystem.UZCARD)) {
                 statusResponse = osonService.verifyPaymentByAmountAndCard(
@@ -806,7 +812,8 @@ public class TopUpService {
                 .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
         long rubAmount = BigDecimal.valueOf(request.getUniqueAmount())
                 .multiply(latest.getUzsToRub())
-                .longValue() / 1000;
+                .setScale(0, RoundingMode.HALF_UP)
+                .longValue();
         String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
         String errorLogMessage = String.format(
                 " 🆔: %d Transfer xatosi ❌\n" +
@@ -887,7 +894,8 @@ public class TopUpService {
                 .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
         long rubAmount = BigDecimal.valueOf(request.getUniqueAmount())
                 .multiply(latest.getUzsToRub())
-                .longValue() / 1000;
+                .setScale(0, RoundingMode.HALF_UP)
+                .longValue();
 
         if (approve) {
             // Attempt transfer FIRST, only set APPROVED status after success (never transfer on failure)
@@ -1097,7 +1105,8 @@ public class TopUpService {
                 .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
         long rubAmount = BigDecimal.valueOf(request.getUniqueAmount())
                 .multiply(latest.getUzsToRub())
-                .longValue() / 1000;
+                .setScale(0, RoundingMode.HALF_UP)
+                .longValue();
 
         if (approve) {
             // Attempt transfer FIRST, only set APPROVED status after success (never transfer on failure)
@@ -1329,9 +1338,11 @@ public class TopUpService {
         ExchangeRate latest = exchangeRateRepository.findLatest()
                 .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
         if (request.getCurrency().equals(Currency.RUB)) {
+            // uniqueAmount is in UZS; convert to RUB for Servcul API
             amount = BigDecimal.valueOf(request.getUniqueAmount())
                     .multiply(latest.getUzsToRub())
-                    .longValue() / 1000;
+                    .setScale(0, RoundingMode.HALF_UP)
+                    .longValue();
         }
         String lng = "ru";
 
@@ -1483,15 +1494,16 @@ public class TopUpService {
         String buttonKey = attempts >= 2 ? "topup.button.send_screenshot" : "topup.button.confirm";
 
         if (request.getCurrency().equals(Currency.RUB)) {
-            long amount = BigDecimal.valueOf(request.getUniqueAmount())
+            long rubAmount = BigDecimal.valueOf(request.getUniqueAmount())
                     .multiply(latest.getUzsToRub())
-                    .longValue() / 1000;
+                    .setScale(0, RoundingMode.HALF_UP)
+                    .longValue();
 
             messageText = String.format(
                     languageSessionService.getTranslation(chatId, "topup.message.payment_instruction_rub"),
                     request.getUniqueAmount(),
                     request.getAmount(), request.getUniqueAmount(), escapedCardNumber,
-                    latest.getUzsToRub(), amount,
+                    latest.getUzsToRub(), rubAmount,
                     languageSessionService.getTranslation(chatId, buttonKey), chatId, request.getId());
         } else {
             messageText = String.format(

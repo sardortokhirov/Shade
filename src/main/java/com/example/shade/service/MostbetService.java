@@ -146,11 +146,8 @@ public class MostbetService {
         String secret = platform.getSecret();
         String cashpointId = platform.getWorkplaceId();
         String userId = request.getPlatformUserId();
+        // uniqueAmount is always stored in UZS (RUB is converted to UZS when creating request)
         long amount = request.getUniqueAmount();
-        if (request.getCurrency().equals(Currency.RUB)) {
-            // uniqueAmount is stored as UZS*1000 when RUB; Mostbet API expects UZS
-            amount = request.getUniqueAmount() / 1000;
-        }
 
         TransactionResponse depositResponse = deposit(apiKey, secret, cashpointId, 1, userId, amount, platform.getCurrency().toString());
         if (depositResponse == null || !"COMPLETED".equalsIgnoreCase(depositResponse.status())) {
