@@ -3,8 +3,10 @@ package com.example.shade.repository;
 import com.example.shade.model.HizmatRequest;
 import com.example.shade.model.RequestStatus;
 import com.example.shade.model.RequestType;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -60,6 +62,10 @@ public interface HizmatRequestRepository extends JpaRepository<HizmatRequest, Lo
 
     @Query("SELECT h FROM HizmatRequest h WHERE h.chatId = :chatId AND h.status = :status ORDER BY h.createdAt DESC limit 1")
     Optional<HizmatRequest> findByChatIdAndStatus(Long chatId, RequestStatus status);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT h FROM HizmatRequest h WHERE h.chatId = :chatId AND h.status = :status ORDER BY h.createdAt DESC limit 1")
+    Optional<HizmatRequest> findByChatIdAndStatusForUpdate(Long chatId, RequestStatus status);
 
     @Query("SELECT h FROM HizmatRequest h WHERE h.chatId = :chatId AND h.status = :status ")
     List<HizmatRequest> findByChatsIdAndStatus(Long chatId, RequestStatus status);

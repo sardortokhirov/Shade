@@ -9,10 +9,13 @@ import com.example.shade.repository.*;
 import java.util.Optional;
 import jakarta.xml.bind.DatatypeConverter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.DigestUtils;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
@@ -59,6 +62,10 @@ public class TopUpService {
     private final UserPlatformPermissionRepository permissionRepository;
     private final UserLimitIncreaseService userLimitIncreaseService;
     private final DailyUserStatsRepository dailyUserStatsRepository;
+
+    @Autowired
+    @Lazy
+    private TopUpService self;
 
     public void startTopUp(Long chatId) {
         logger.info("Starting top-up for chatId: {}", chatId);
@@ -156,7 +163,7 @@ public class TopUpService {
                 initiateTopUpRequest(chatId);
             }
             case "TOPUP_CONFIRM" -> initiateTopUpRequest(chatId);
-            case "TOPUP_PAYMENT_CONFIRM" -> verifyPayment(chatId);
+            case "TOPUP_PAYMENT_CONFIRM" -> self.verifyPayment(chatId);
             case "TOPUP_SEND_SCREENSHOT" -> {
                 sessionService.setUserState(chatId, "TOPUP_AWAITING_SCREENSHOT");
                 messageSender.sendMessage(chatId,
@@ -556,8 +563,10 @@ public class TopUpService {
         sendPaymentInstruction(chatId);
     }
 
-    private void verifyPayment(Long chatId) throws Exception {
-        HizmatRequest request = requestRepository.findByChatIdAndStatus(chatId, RequestStatus.PENDING_PAYMENT)
+    @Transactional
+    public void verifyPayment(Long chatId) throws Exception {
+        // Pessimistic lock prevents double processing when user double-clicks Confirm
+        HizmatRequest request = requestRepository.findByChatIdAndStatusForUpdate(chatId, RequestStatus.PENDING_PAYMENT)
                 .orElse(null);
         if (request == null) {
             logger.error("No pending payment request found for chatId {}", chatId);
@@ -584,7 +593,7 @@ public class TopUpService {
                 .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
         long rubAmount = BigDecimal.valueOf(request.getUniqueAmount())
                 .multiply(latest.getUzsToRub())
-                .setScale(0, RoundingMode.HALF_UP)
+                .divide(BigDecimal.valueOf(1000), 0, RoundingMode.HALF_UP)
                 .longValue();
         try {
             if (adminCard.getPaymentSystem().equals(PaymentSystem.UZCARD)) {
@@ -812,7 +821,7 @@ public class TopUpService {
                 .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
         long rubAmount = BigDecimal.valueOf(request.getUniqueAmount())
                 .multiply(latest.getUzsToRub())
-                .setScale(0, RoundingMode.HALF_UP)
+                .divide(BigDecimal.valueOf(1000), 0, RoundingMode.HALF_UP)
                 .longValue();
         String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
         String errorLogMessage = String.format(
@@ -894,7 +903,7 @@ public class TopUpService {
                 .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
         long rubAmount = BigDecimal.valueOf(request.getUniqueAmount())
                 .multiply(latest.getUzsToRub())
-                .setScale(0, RoundingMode.HALF_UP)
+                .divide(BigDecimal.valueOf(1000), 0, RoundingMode.HALF_UP)
                 .longValue();
 
         if (approve) {
@@ -1105,7 +1114,7 @@ public class TopUpService {
                 .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
         long rubAmount = BigDecimal.valueOf(request.getUniqueAmount())
                 .multiply(latest.getUzsToRub())
-                .setScale(0, RoundingMode.HALF_UP)
+                .divide(BigDecimal.valueOf(1000), 0, RoundingMode.HALF_UP)
                 .longValue();
 
         if (approve) {
@@ -1338,10 +1347,10 @@ public class TopUpService {
         ExchangeRate latest = exchangeRateRepository.findLatest()
                 .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
         if (request.getCurrency().equals(Currency.RUB)) {
-            // uniqueAmount is in UZS; convert to RUB for Servcul API
+            // uniqueAmount is in UZS; convert to RUB for Servcul API (uzsToRub = RUB per 1000 UZS)
             amount = BigDecimal.valueOf(request.getUniqueAmount())
                     .multiply(latest.getUzsToRub())
-                    .setScale(0, RoundingMode.HALF_UP)
+                    .divide(BigDecimal.valueOf(1000), 0, RoundingMode.HALF_UP)
                     .longValue();
         }
         String lng = "ru";

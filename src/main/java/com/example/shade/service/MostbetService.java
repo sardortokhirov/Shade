@@ -2,6 +2,7 @@ package com.example.shade.service;
 
 import com.example.shade.dto.BalanceLimit;
 import com.example.shade.model.*;
+import com.example.shade.repository.ExchangeRateRepository;
 import com.example.shade.repository.PlatformRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -12,6 +13,7 @@ import org.apache.commons.codec.binary.Hex;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -41,6 +43,8 @@ public class MostbetService {
     private final String project = "MBC";
 
     private final PlatformRepository platformRepository;
+    private final ExchangeRateRepository exchangeRateRepository;
+
     private String now() {
         return LocalDateTime.now(ZoneId.of("UTC")).format(FMT);
     }
@@ -146,8 +150,19 @@ public class MostbetService {
         String secret = platform.getSecret();
         String cashpointId = platform.getWorkplaceId();
         String userId = request.getPlatformUserId();
-        // uniqueAmount is always stored in UZS (RUB is converted to UZS when creating request)
-        long amount = request.getUniqueAmount();
+        // uniqueAmount is always stored in UZS; for RUB platforms convert to RUB before deposit (same formula as Servcul)
+        double amount;
+        if (request.getCurrency() == Currency.RUB) {
+            var latest = exchangeRateRepository.findLatest()
+                    .orElseThrow(() -> new RuntimeException("No exchange rate found"));
+            long rubAmount = BigDecimal.valueOf(request.getUniqueAmount())
+                    .multiply(latest.getUzsToRub())
+                    .divide(BigDecimal.valueOf(1000), 0, RoundingMode.HALF_UP)
+                    .longValue();
+            amount = rubAmount;
+        } else {
+            amount = request.getUniqueAmount();
+        }
 
         TransactionResponse depositResponse = deposit(apiKey, secret, cashpointId, 1, userId, amount, platform.getCurrency().toString());
         if (depositResponse == null || !"COMPLETED".equalsIgnoreCase(depositResponse.status())) {
