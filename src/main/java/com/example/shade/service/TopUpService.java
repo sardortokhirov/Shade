@@ -124,7 +124,7 @@ public class TopUpService {
                             .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
                     long minUzs = configurationService.getTopUpMinAmount();
                     long minRub = BigDecimal.valueOf(minUzs).multiply(latest.getUzsToRub())
-                            .setScale(0, RoundingMode.DOWN).longValue();
+                            .divide(BigDecimal.valueOf(1000), 0, RoundingMode.DOWN).longValue();
                     if (minRub < 1) minRub = 1;
                     sessionService.setUserData(chatId, "amount", String.valueOf(minRub));
                     sessionService.setUserData(chatId, "amountCurrency", "RUB");
@@ -143,7 +143,7 @@ public class TopUpService {
                             .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
                     long maxUzs = configurationService.getTopUpMaxAmount();
                     long maxRub = BigDecimal.valueOf(maxUzs).multiply(latest.getUzsToRub())
-                            .setScale(0, RoundingMode.UP).longValue();
+                            .divide(BigDecimal.valueOf(1000), 0, RoundingMode.UP).longValue();
                     sessionService.setUserData(chatId, "amount", String.valueOf(maxRub));
                     sessionService.setUserData(chatId, "amountCurrency", "RUB");
                 } else {
