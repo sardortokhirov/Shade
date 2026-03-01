@@ -1347,10 +1347,9 @@ public class TopUpService {
         ExchangeRate latest = exchangeRateRepository.findLatest()
                 .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
         if (request.getCurrency().equals(Currency.RUB)) {
-            // uniqueAmount is in UZS; convert to RUB for Servcul API (uzsToRub = RUB per 1000 UZS)
-            amount = BigDecimal.valueOf(request.getUniqueAmount())
-                    .multiply(latest.getUzsToRub())
-                    .divide(BigDecimal.valueOf(1000), 0, RoundingMode.HALF_UP)
+            // Use base amount (not uniqueAmount) to get user's requested RUB: amount_uzs / rubToUzs = amount_rub
+            amount = BigDecimal.valueOf(request.getAmount())
+                    .divide(latest.getRubToUzs(), 0, RoundingMode.HALF_UP)
                     .longValue();
         }
         String lng = "ru";

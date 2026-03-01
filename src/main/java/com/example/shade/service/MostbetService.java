@@ -150,14 +150,13 @@ public class MostbetService {
         String secret = platform.getSecret();
         String cashpointId = platform.getWorkplaceId();
         String userId = request.getPlatformUserId();
-        // uniqueAmount is always stored in UZS; for RUB platforms convert to RUB before deposit (same formula as Servcul)
+        // For RUB: use base amount (not uniqueAmount) to get user's requested RUB: amount_uzs / rubToUzs = amount_rub
         double amount;
         if (request.getCurrency() == Currency.RUB) {
             var latest = exchangeRateRepository.findLatest()
                     .orElseThrow(() -> new RuntimeException("No exchange rate found"));
-            long rubAmount = BigDecimal.valueOf(request.getUniqueAmount())
-                    .multiply(latest.getUzsToRub())
-                    .divide(BigDecimal.valueOf(1000), 0, RoundingMode.HALF_UP)
+            long rubAmount = BigDecimal.valueOf(request.getAmount())
+                    .divide(latest.getRubToUzs(), 0, RoundingMode.HALF_UP)
                     .longValue();
             amount = rubAmount;
         } else {
