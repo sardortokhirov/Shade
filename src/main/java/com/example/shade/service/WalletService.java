@@ -46,6 +46,7 @@ public class WalletService {
     private final ExchangeRateRepository exchangeRateRepository;
     private final LottoBotService lottoBotService;
     private final DailyStatsService dailyStatsService;
+    private final BlockedUserRepository blockedUserRepository;
 
     @Autowired
     @org.springframework.context.annotation.Lazy
@@ -916,10 +917,14 @@ public class WalletService {
         message.setReplyMarkup(markup);
         messageSender.sendMessage(message, chatId);
 
-        // Admin Notification
+        // Admin Notification (#Yechish so'rovi - Uzbek)
+        String phone = blockedUserRepository.findByChatId(chatId).map(BlockedUser::getPhoneNumber).orElse("-");
+        String dateStr = request.getCreatedAt() != null
+                ? request.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+                : LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         String adminMsg = String.format(
-                "💼 Wallet Withdrawal Request:\n🆔 ID: %d\n👤 User: %d\n💸 Amount: %,d UZS",
-                request.getId(), chatId, amount);
+                "#Yechish so'rovi\n\n🆔: %d\n👤: %d\n📞: %s\n💳 Karta: %s\n💵 Summa: %,d UZS\n📅 %s",
+                request.getId(), chatId, phone, escapeMarkdown(card), amount, dateStr);
 
         InlineKeyboardMarkup adminMarkup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> adminRows = new ArrayList<>();
@@ -985,10 +990,14 @@ public class WalletService {
         request.setStatus(RequestStatus.PROCESSING);
         requestRepository.save(request);
 
-        // Send full details to the specific admin who took it
+        // Send full details to the specific admin who took it (#Pul yechish so'rovi - format like platform withdrawal)
+        String phone = blockedUserRepository.findByChatId(request.getChatId()).map(BlockedUser::getPhoneNumber).orElse("-");
+        String dateStr = request.getCreatedAt() != null
+                ? request.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+                : LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         String adminMsg = String.format(
-                "⌛️ Wallet Withdrawal In-Progress\n🆔 ID: %d\n👤 User: %d\n💸 Amount: %,d UZS\n💳 Card: `%s`\n\nIltimos, pulni o'tkazgach 'Bajarildi' tugmasini bosing.",
-                request.getId(), request.getChatId(), request.getAmount(), escapeMarkdown(request.getCardNumber()));
+                "#Pul yechish so'rovi 💸\n\n🆔: %d\n👤: %d\n📞: %s\n💳 Karta: %s\n💵 Summa: %,d UZS\n📅 %s\n\nIltimos, pulni o'tkazgach 'Bajarildi' tugmasini bosing.",
+                request.getId(), request.getChatId(), phone, escapeMarkdown(request.getCardNumber()), request.getAmount(), dateStr);
 
         InlineKeyboardMarkup adminMarkup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> adminRows = new ArrayList<>();
