@@ -902,11 +902,14 @@ public class WalletService {
             return;
 
         // User pending message with Cancel button
+        String pendingDateStr = request.getCreatedAt() != null
+                ? request.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+                : LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         SendMessage message = new SendMessage();
         message.setChatId(chatId.toString());
         message.setText(String.format(
                 languageSessionService.getTranslation(chatId, "wallet.message.withdraw_pending"),
-                request.getId(), amount, escapeMarkdown(card)));
+                request.getId(), amount, escapeMarkdown(card), pendingDateStr));
         message.enableMarkdown(true);
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
