@@ -921,8 +921,8 @@ public class WalletService {
 
         // Admin Notification
         String adminMsg = String.format(
-                "#Yechish so'rovi\n\n🆔: %d\n👤: %d\n💳 Karta: %s\n💵 Summa: %,d UZS",
-                request.getId(), chatId, escapeMarkdown(card), amount);
+                "#Yechish so'rovi\n\n🆔: %d\n👤: %d\n💵 Summa: %,d UZS",
+                request.getId(), chatId, amount);
 
         InlineKeyboardMarkup adminMarkup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> adminRows = new ArrayList<>();
@@ -990,7 +990,7 @@ public class WalletService {
 
         // Send full details to the specific admin who took it
         String adminMsg = String.format(
-                "#Pul yechish so'rovi 💸\n\n🆔: %d\n👤: %d\n💳 Karta: %s\n💵 Summa: %,d UZS\n\nIltimos, pulni o'tkazgach 'Bajarildi' tugmasini bosing.",
+                "#Pul yechish so'rovi 💸\n\n🆔: %d\n👤: %d\n💳 Karta: %s\n💵 Summa: %,d UZS",
                 request.getId(), request.getChatId(), escapeMarkdown(request.getCardNumber()), request.getAmount());
 
         InlineKeyboardMarkup adminMarkup = new InlineKeyboardMarkup();
