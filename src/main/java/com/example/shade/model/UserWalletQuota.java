@@ -9,7 +9,8 @@ import lombok.*;
  * Earned quota = sum of (platform transfers * walletWithdrawRatio at time of
  * transfer)
  * Used quota = sum of approved wallet-to-card withdrawals
- * Remaining = earned - used
+ * Bonus quota = admin-granted extra (via user profile API)
+ * Remaining = earned + bonus - used
  *
  * Only applies to wallet→card withdrawals (WALLET_WITHDRAWAL type).
  * Quota is permanent and never resets.
@@ -37,8 +38,13 @@ public class UserWalletQuota {
     @Builder.Default
     private Long usedQuota = 0L;
 
-    /** Remaining available quota for withdrawals. */
+    /** Admin-granted extra withdrawal quota (via user profile API). */
+    @Column(name = "bonus_quota", nullable = false)
+    @Builder.Default
+    private Long bonusQuota = 0L;
+
+    /** Remaining available quota for withdrawals (earned + bonus - used). */
     public Long getRemainingQuota() {
-        return Math.max(0L, earnedQuota - usedQuota);
+        return Math.max(0L, earnedQuota + bonusQuota - usedQuota);
     }
 }

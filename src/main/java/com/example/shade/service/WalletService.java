@@ -658,10 +658,10 @@ public class WalletService {
 
             // Check withdrawal quota
             UserWalletQuota quota = walletQuotaRepository.findById(chatId)
-                    .orElse(UserWalletQuota.builder().chatId(chatId).earnedQuota(0L).usedQuota(0L).build());
+                    .orElse(UserWalletQuota.builder().chatId(chatId).earnedQuota(0L).usedQuota(0L).bonusQuota(0L).build());
 
-            if (quota.getEarnedQuota() == 0L) {
-                // Never transferred to a platform — fully blocked
+            if (quota.getRemainingQuota() == 0L) {
+                // No quota (earned or bonus) — blocked
                 SendMessage m = new SendMessage();
                 m.setChatId(chatId.toString());
                 m.setText(String.format(
@@ -1021,7 +1021,8 @@ public class WalletService {
 
         // Deduct used quota (withdrawal confirmed by admin)
         walletQuotaRepository.findByIdWithLock(request.getChatId()).ifPresent(quota -> {
-            long newUsed = Math.min(quota.getUsedQuota() + request.getAmount(), quota.getEarnedQuota());
+            long totalAvailable = quota.getEarnedQuota() + (quota.getBonusQuota() != null ? quota.getBonusQuota() : 0L);
+            long newUsed = Math.min(quota.getUsedQuota() + request.getAmount(), totalAvailable);
             quota.setUsedQuota(newUsed);
             walletQuotaRepository.save(quota);
             logger.info("Quota used for chatId {}: +{}, total used={}, remaining={}",

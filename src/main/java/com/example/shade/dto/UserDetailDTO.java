@@ -41,4 +41,10 @@ public class UserDetailDTO {
     // Detailed limit breakdown for admin
     private Long baseDailyLimit;
     private String limitBreakdown; // Human-readable breakdown
+
+    // Wallet withdrawal quota (for admin profile)
+    private Long walletQuotaEarned;
+    private Long walletQuotaBonus;
+    private Long walletQuotaUsed;
+    private Long walletQuotaRemaining;
 }

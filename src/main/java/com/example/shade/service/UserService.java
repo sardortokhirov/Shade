@@ -293,6 +293,13 @@ public class UserService {
                 dailyLimitIncreaseBD, dailyLimitIncrease, effectiveDailyLimit, dailyTopUpAmount, dailyTransferAmount,
                 availableLimit);
 
+        // Wallet withdrawal quota (earned, bonus, used, remaining)
+        Optional<UserWalletQuota> quotaOpt = userWalletQuotaRepository.findById(chatId);
+        Long walletQuotaEarned = quotaOpt.map(UserWalletQuota::getEarnedQuota).orElse(0L);
+        Long walletQuotaBonus = quotaOpt.map(q -> q.getBonusQuota() != null ? q.getBonusQuota() : 0L).orElse(0L);
+        Long walletQuotaUsed = quotaOpt.map(UserWalletQuota::getUsedQuota).orElse(0L);
+        Long walletQuotaRemaining = quotaOpt.map(UserWalletQuota::getRemainingQuota).orElse(0L);
+
         return new UserDetailDTO(
                 chatId,
                 user.getLanguage().toString(),
@@ -319,7 +326,11 @@ public class UserService {
                 lastLotteryPlayTime,
                 lastUpdated,
                 baseDailyLimit,
-                limitBreakdown);
+                limitBreakdown,
+                walletQuotaEarned,
+                walletQuotaBonus,
+                walletQuotaUsed,
+                walletQuotaRemaining);
     }
 
     /**
@@ -434,6 +445,35 @@ public class UserService {
 
         logger.info("Updated balance for chatId {}: {} -> {}", chatId, oldBalance, balance);
         return userBalance;
+    }
+
+    /**
+     * Adds extra (bonus) withdrawal quota to a user. Used by admin via user profile API.
+     * Creates UserWalletQuota if it does not exist.
+     */
+    @Transactional
+    public WithdrawQuotaUpdateResponse addWithdrawQuota(Long chatId, Long amount) {
+        if (amount == null || amount < 0) {
+            throw new IllegalArgumentException("Amount must be non-negative");
+        }
+        UserWalletQuota quota = userWalletQuotaRepository.findById(chatId)
+                .orElseGet(() -> {
+                    UserWalletQuota newQuota = UserWalletQuota.builder()
+                            .chatId(chatId)
+                            .earnedQuota(0L)
+                            .usedQuota(0L)
+                            .bonusQuota(0L)
+                            .build();
+                    return userWalletQuotaRepository.save(newQuota);
+                });
+        quota.setBonusQuota(quota.getBonusQuota() != null ? quota.getBonusQuota() + amount : amount);
+        userWalletQuotaRepository.save(quota);
+        logger.info("Added withdraw quota for chatId {}: +{} UZS, new bonus={}, remaining={}",
+                chatId, amount, quota.getBonusQuota(), quota.getRemainingQuota());
+        return WithdrawQuotaUpdateResponse.builder()
+                .bonusQuota(quota.getBonusQuota())
+                .remainingQuota(quota.getRemainingQuota())
+                .build();
     }
 
     @Transactional

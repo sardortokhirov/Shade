@@ -170,6 +170,31 @@ public class UserController {
         }
     }
 
+    @PutMapping("/{chatId}/withdraw-quota")
+    public ResponseEntity<?> addWithdrawQuota(
+            @PathVariable Long chatId,
+            @RequestBody AddWithdrawQuotaRequest request,
+            HttpServletRequest httpRequest) {
+
+        if (!authenticate(httpRequest)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
+
+        if (request == null || request.getAmount() == null || request.getAmount() < 0) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("amount is required and must be >= 0");
+        }
+
+        try {
+            WithdrawQuotaUpdateResponse response = userService.addWithdrawQuota(chatId, request.getAmount());
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error updating withdraw quota: " + e.getMessage());
+        }
+    }
+
     @PutMapping("/{chatId}/limit")
     public ResponseEntity<?> updateLimit(
             @PathVariable Long chatId,
