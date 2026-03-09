@@ -46,6 +46,7 @@ public class WalletService {
     private final ExchangeRateRepository exchangeRateRepository;
     private final LottoBotService lottoBotService;
     private final DailyStatsService dailyStatsService;
+    private final BlockedUserRepository blockedUserRepository;
 
     @Autowired
     @org.springframework.context.annotation.Lazy
@@ -988,10 +989,15 @@ public class WalletService {
         request.setStatus(RequestStatus.PROCESSING);
         requestRepository.save(request);
 
-        // Send full details to the specific admin who took it
+        // Send full details to the specific admin who took it (markdown backticks = copyable)
+        String phone = blockedUserRepository.findByChatId(request.getChatId()).map(BlockedUser::getPhoneNumber).orElse("-");
+        String dateStr = request.getCreatedAt() != null
+                ? request.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+                : LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        String cardNum = request.getCardNumber() != null ? request.getCardNumber() : "-";
         String adminMsg = String.format(
-                "#Pul yechish so'rovi 💸\n\n🆔: %d\n👤: %d\n💳 Karta: %s\n💵 Summa: %,d UZS",
-                request.getId(), request.getChatId(), escapeMarkdown(request.getCardNumber()), request.getAmount());
+                "#Pul yechish so'rovi 💸\n\n🆔: `%d`\n👤: `%d`\n📞: `%s`\n💳 Karta: `%s`\n💵 Summa: %,d UZS\n📅 %s",
+                request.getId(), request.getChatId(), phone, cardNum, request.getAmount(), dateStr);
 
         InlineKeyboardMarkup adminMarkup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> adminRows = new ArrayList<>();
