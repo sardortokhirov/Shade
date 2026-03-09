@@ -1039,9 +1039,10 @@ public class WalletService {
         });
 
         // Notify Admins (Uzbek, with emojis and wallet balance left)
+        String confirmDateStr = LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         String adminMsg = String.format(
-                "✅ *Hamyondan kartaga yechish tasdiqlandi*\n\n🆔: `%d`\n👤: `%d`\n💸 Summa: `%,d UZS`\n💳 Karta: `%s`\n🏧 Qoldi: `%,d UZS`",
-                request.getId(), request.getChatId(), request.getAmount(), escapeMarkdown(request.getCardNumber()), walletLeft);
+                "✅ *Hamyondan kartaga yechish tasdiqlandi*\n\n🆔: `%d`\n👤: `%d`\n💸 Summa: `%,d UZS`\n💳 Karta: `%s`\n🏧 Qoldi: `%,d UZS`\n📅 %s",
+                request.getId(), request.getChatId(), request.getAmount(), escapeMarkdown(request.getCardNumber()), walletLeft, confirmDateStr);
         adminLogBotService.sendToAdmins(adminMsg);
 
         // Notify User
