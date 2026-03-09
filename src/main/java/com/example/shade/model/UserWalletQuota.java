@@ -38,13 +38,13 @@ public class UserWalletQuota {
     @Builder.Default
     private Long usedQuota = 0L;
 
-    /** Admin-granted extra withdrawal quota (via user profile API). */
-    @Column(name = "bonus_quota", nullable = false)
+    /** Admin-granted extra withdrawal quota (via user profile API). Nullable so Hibernate/flyway add column without breaking existing rows. */
+    @Column(name = "bonus_quota")
     @Builder.Default
     private Long bonusQuota = 0L;
 
     /** Remaining available quota for withdrawals (earned + bonus - used). */
     public Long getRemainingQuota() {
-        return Math.max(0L, earnedQuota + bonusQuota - usedQuota);
+        return Math.max(0L, earnedQuota + (bonusQuota != null ? bonusQuota : 0L) - usedQuota);
     }
 }
