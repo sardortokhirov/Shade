@@ -142,7 +142,7 @@ public class LotteryController {
 
             String logMessage = String.format(
                     "Biletlar o'chirildi ✅\n" +
-                            "👤 User ID [%d]\n" +
+                            "👤 User ID: `%d`\n" +
                             "📅 [%s] ",
                     chatId,
                     LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
@@ -166,7 +166,7 @@ public class LotteryController {
 
             String logMessage = String.format(
                     "Balans o'chirildi ✅\n" +
-                            "👤 User ID [%d]\n" +
+                            "👤 User ID: `%d`\n" +
                             "📅 [%s] ",
                     chatId,
                     LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
@@ -191,7 +191,7 @@ public class LotteryController {
                     languageSessionService.getTranslation(chatId, "message.tickets_added_success"));
             String logMessage = String.format(
                     "Biletlar qo'shildi ✅\n" +
-                            "👤 User ID [%d]\n" +
+                            "👤 User ID: `%d`\n" +
                             "💸 Qo'shilgan miqdor: %d bilet\n" +
                             "🎟️ Jami biletlar: %d\n" +
                             "💰 Balans: %s\n" +

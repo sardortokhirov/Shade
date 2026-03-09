@@ -19,6 +19,7 @@ public class UserDetailDTO {
     private Boolean isBlocked;
     private BigDecimal balance;
     private Long tickets;
+    private Long walletBalance;
     private LocalDateTime registeredAt;
     private Long permanentLimitIncrease; // Rounded value
     private BigDecimal permanentLimitIncreasePrecise; // Precise decimal value with 8 decimal places
@@ -36,7 +37,7 @@ public class UserDetailDTO {
     private LocalDateTime dailyStatsLastUpdated; // Last update time from daily_user_stats table
     private LocalDateTime lastLotteryPlayTime;
     private LocalDateTime lastUpdated; // General last updated (from daily stats)
-    
+
     // Detailed limit breakdown for admin
     private Long baseDailyLimit;
     private String limitBreakdown; // Human-readable breakdown

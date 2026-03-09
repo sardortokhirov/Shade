@@ -41,8 +41,8 @@ public class LottoBotService {
                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         String amountStr = formatWholeNumber(amount);
         String logMessage = String.format(
-                languageSessionService.getTranslation(userId, "lotto.message.win_log"),
-                numberOfTickets, amountStr, maskedUserId, date, getRandomCongratulations(userId)
+                languageSessionService.getTranslationUz("lotto.message.win_log"),
+                numberOfTickets, amountStr, maskedUserId, date, getRandomCongratulationsUz()
         );
 
         List<AdminChat> adminChats = adminChatRepository.findByReceiveNotificationsTrue();
@@ -63,7 +63,7 @@ public class LottoBotService {
                 ? chatId.toString().substring(0, 3).concat("***").concat(chatId.toString().substring(6))
                 : chatId.toString();
         String logMessage = String.format(
-                languageSessionService.getTranslation(chatId, "lotto.message.bonus_topup_win"),
+                languageSessionService.getTranslationUz("lotto.message.bonus_topup_win"),
                 amount, amount, platform, date, maskedChatId
         );
 
@@ -79,10 +79,33 @@ public class LottoBotService {
         }
     }
 
-    private String getRandomCongratulations(Long chatId) {
-        int index = RANDOM.nextInt(4) + 1; // Random index from 1 to 4
-        String translationKey = "lotto.congratulations." + index;
-        return languageSessionService.getTranslation(chatId, translationKey);
+    /**
+     * Sends a tip/donation log to all admin chats (lotto log bot).
+     * User ID is masked (e.g. 175***3324). Tip/request ID is not shown.
+     */
+    public void logTip(Long tipId, Long chatId, Long amount, long bonusTickets) {
+        String date = LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        String maskedUserId = maskUserId(chatId);
+        String logMessage = String.format(
+                "🎁 Akkaunt rivoji uchun\n💸 Summa: %,d UZS\n👤 User Id: %s\n🎟️ Bonus chiptalar: %d\n📅 Sana: %s",
+                amount, maskedUserId, bonusTickets, date);
+
+        List<AdminChat> adminChats = adminChatRepository.findByReceiveNotificationsTrue();
+        if (adminChats.isEmpty()) {
+            logger.warn("No admin channels with notifications enabled for tip log: chatId {}, amount {}", chatId, amount);
+            return;
+        }
+
+        for (AdminChat adminChat : adminChats) {
+            messageSender.sendMessage(adminChat.getChatId(), logMessage);
+            logger.info("Sent tip log to lotto channel {}: {}", adminChat.getChatId(), logMessage);
+        }
+    }
+
+    /** Random congratulations text always in Uzbek (for lotto log bot). */
+    private String getRandomCongratulationsUz() {
+        int index = RANDOM.nextInt(4) + 1;
+        return languageSessionService.getTranslationUz("lotto.congratulations." + index);
     }
 
     /**
@@ -91,5 +114,15 @@ public class LottoBotService {
     private String formatWholeNumber(BigDecimal amount) {
         if (amount == null) return "0";
         return amount.setScale(0, java.math.RoundingMode.DOWN).toPlainString();
+    }
+
+    /** Masks user/chat ID for display (e.g. 1755953324 → 175***3324). */
+    private String maskUserId(Long id) {
+        if (id == null) return "***";
+        String s = id.toString();
+        if (s.length() >= 7) {
+            return s.substring(0, 3) + "***" + s.substring(s.length() - 4);
+        }
+        return "***";
     }
 }

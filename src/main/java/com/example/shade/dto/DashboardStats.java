@@ -23,15 +23,16 @@ public class DashboardStats {
     private final List<Map<String, Object>> recentRequests;
     private final double totalApprovedTopUpAmount;
     private final double totalApprovedBonusAmount;
+    private final double totalApprovedTipAmount;
     private final Map<String, Map<String, Double>> platformGraphData;
 
     public DashboardStats(long totalRequests, long approvedRequests, long pendingRequests, long pendingAdminRequests,
-                          long canceledRequests, long failedRequests, double totalApprovedWithdrawalAmount,
-                          Map<RequestStatus, Long> statusDistribution, Map<String, Long> requestsByPlatform,
-                          Map<String, Long> requestsByDate, Map<String, Double> amountByPlatform,
-                          double averageApprovedAmount, Map<Long, Long> topUsers, List<Map<String, Object>> recentRequests,
-                          double totalApprovedTopUpAmount, double totalApprovedBonusAmount,
-                          Map<String, Map<String, Double>> platformGraphData) {
+            long canceledRequests, long failedRequests, double totalApprovedWithdrawalAmount,
+            Map<RequestStatus, Long> statusDistribution, Map<String, Long> requestsByPlatform,
+            Map<String, Long> requestsByDate, Map<String, Double> amountByPlatform,
+            double averageApprovedAmount, Map<Long, Long> topUsers, List<Map<String, Object>> recentRequests,
+            double totalApprovedTopUpAmount, double totalApprovedBonusAmount, double totalApprovedTipAmount,
+            Map<String, Map<String, Double>> platformGraphData) {
         this.totalRequests = totalRequests;
         this.approvedRequests = approvedRequests;
         this.pendingRequests = pendingRequests;
@@ -48,6 +49,7 @@ public class DashboardStats {
         this.recentRequests = recentRequests;
         this.totalApprovedTopUpAmount = totalApprovedTopUpAmount;
         this.totalApprovedBonusAmount = totalApprovedBonusAmount;
+        this.totalApprovedTipAmount = totalApprovedTipAmount;
         this.platformGraphData = platformGraphData;
     }
 
@@ -113,6 +115,10 @@ public class DashboardStats {
 
     public double getTotalApprovedBonusAmount() {
         return totalApprovedBonusAmount;
+    }
+
+    public double getTotalApprovedTipAmount() {
+        return totalApprovedTipAmount;
     }
 
     public Map<String, Map<String, Double>> getPlatformGraphData() {

@@ -464,7 +464,7 @@ public class BonusService {
             LocalDateTime timestamp = LocalDateTime.now(ZoneId.of("GMT+5"));
             String logMessage = String.format(
                     "🎫 Chipta sotib olingan 🎫\n\n" +
-                    "👤 User ID: %d\n" +
+                    "👤 User ID: `%d`\n" +
                     "📱 Telefon: %s\n" +
                     "🎟 Sotib olingan chiptalar: %d ta\n" +
                     "💰 Sarflangan summa: %,d so'm\n" +
@@ -979,7 +979,7 @@ public class BonusService {
                     }
                     
                     String message = String.format(
-                            "🆔: %d  Bonus To'lov yakunlandi ✅\n" +
+                            "🆔: `%d` Bonus To'lov yakunlandi ✅\n" +
                                     "👤: [%d] %s\n" +
                                     "🌐 #%s: %s\n" +
                                     "💸 Miqdor: %,d UZS\n" +
@@ -1014,7 +1014,7 @@ public class BonusService {
                     Long permanentLimitIncrease = permanentIncrease.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
                     
                     String message = String.format(
-                            "🆔: %d  Bonus To'lov yakunlandi ✅\n" +
+                            "🆔: `%d` Bonus To'lov yakunlandi ✅\n" +
                                     "👤: [%d] %s\n" +
                                     "🌐 #%s: %s\n" +
                                     "💸 Miqdor: %,d UZS\n" +
@@ -1119,7 +1119,7 @@ public class BonusService {
                         Long permanentLimitIncrease = permanentIncrease.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
                         
                         String message = String.format(
-                                "🆔: %d  Bonus To'lov yakunlandi ✅\n" +
+                                "🆔: `%d` Bonus To'lov yakunlandi ✅\n" +
                                         "👤: [%d] %s\n" +
                                         "🌐 #%s: %s\n" +
                                         "💸 Miqdor: %,d UZS\n" +
@@ -1149,7 +1149,7 @@ public class BonusService {
                         Long permanentLimitIncrease = permanentIncrease.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
                         
                         String message = String.format(
-                                "🆔: %d  Bonus To'lov yakunlandi ✅\n" +
+                                "🆔: `%d` Bonus To'lov yakunlandi ✅\n" +
                                         "👤: [%d] %s\n" +
                                         "🌐 #%s: %s\n" +
                                         "💸 Miqdor: %,d UZS\n" +
@@ -1205,7 +1205,7 @@ public class BonusService {
                 .longValue() / 1000;
         String cardDisplay = request.getCardNumber() != null ? request.getCardNumber() : "—";
         String errorLogMessage = String.format(
-                "🆔: %d Transfer ❌\n" +
+                "🆔: `%d` Transfer ❌\n" +
                         "👤: [%d] %s\n" +
                         "🌐 #%s %s🇺🇿:%s\n" +
                         "💸 Miqdor: %,d UZS\n" +
@@ -1268,9 +1268,9 @@ public class BonusService {
 
         String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
         String errorLogMessage = String.format(
-                "🆔: %d \n Bonus rad etildi ❌\n" +
-                        "👤 User ID [%s] %s\n" +
-                        "🌐 %s: " + "%s\n" +
+                "🆔: `%d`\nBonus rad etildi ❌\n" +
+                        "👤 User ID: `%s` %s\n" +
+                        "🌐 %s: " + "`%s`\n" +
                         "💸 Bonus: %s \n" +
                         "💰 Balans: %s so‘m\n" +
                         "📅 [%s] ",
@@ -1509,7 +1509,7 @@ public class BonusService {
             if (limitIncreaseJustAdded > 0) {
                 adminLog = String.format(
                         "Lotereya o'ynaldi 🎟\n" +
-                                "👤 User ID [%s] %s\n" +
+                                "👤 User ID: `%s` %s\n" +
                                 "🎫 O'ynalgan chiptalar: %s ta\n" +
                                 "💰 Jami yutuq: %s UZS\n" +
                                 "📈 Limit oshdi (bu o'yin): %,d so'm\n" +
@@ -1524,7 +1524,7 @@ public class BonusService {
             } else {
                 adminLog = String.format(
                         "Lotereya o'ynaldi 🎟\n" +
-                                "👤 User ID [%s] %s\n" +
+                                "👤 User ID: `%s` %s\n" +
                                 "🎫 O'ynalgan chiptalar: %s ta\n" +
                                 "💰 Jami yutuq: %s UZS\n" +
                                 "📊 Limit: %,d / %,d so'm\n" +
@@ -1718,7 +1718,7 @@ public class BonusService {
                     .map(HizmatRequest::getPlatformUserId)
                     .distinct()
                     .limit(2)
-                    .map(id -> createButton("ID: " + id, "BONUS_TOPUP_PAST_ID:" + id))
+                    .map(id -> createButton("🆔 " + id, "BONUS_TOPUP_PAST_ID:" + id))
                     .collect(Collectors.toList());
             if (!pastIdButtons.isEmpty()) {
                 rows.add(pastIdButtons);

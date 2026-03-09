@@ -14,5 +14,7 @@ public enum RequestStatus {
     CANCELED,
     PENDING_PAYMENT,
     FAILED,
-    PENDING_SCREENSHOT
+    USER_CANCELED,
+    PENDING_SCREENSHOT,
+    PROCESSING
 }

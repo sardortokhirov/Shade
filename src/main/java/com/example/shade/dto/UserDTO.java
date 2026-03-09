@@ -18,6 +18,7 @@ public class UserDTO {
     private Boolean isBlocked;
     private BigDecimal balance;
     private Long tickets;
+    private Long walletBalance;
     private LocalDateTime registeredAt;
     private Long permanentLimitIncrease;
     private Long effectiveDailyLimit;

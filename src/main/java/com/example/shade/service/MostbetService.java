@@ -142,6 +142,31 @@ public class MostbetService {
         return resp.getBody();
     }
 
+    /**
+     * Validates that the player ID exists on the platform by calling deposit with amount 0.
+     * Used at ID entry in wallet transfer-to-platform flow so invalid IDs are rejected immediately.
+     * Returns false if credentials are missing, API throws, or response is not COMPLETED.
+     */
+    public boolean isPlayerValid(Platform platform, String playerId) {
+        if (platform == null || playerId == null || playerId.isBlank()) {
+            return false;
+        }
+        String apiKey = platform.getApiKey();
+        String secret = platform.getSecret();
+        String cashpointId = platform.getWorkplaceId();
+        if (apiKey == null || secret == null || cashpointId == null
+                || apiKey.isBlank() || secret.isBlank() || cashpointId.isBlank()) {
+            return false;
+        }
+        String currency = platform.getCurrency() != null ? platform.getCurrency().toString() : "UZS";
+        try {
+            TransactionResponse response = deposit(apiKey, secret, cashpointId, 1, playerId.trim(), 0, currency);
+            return response != null && "COMPLETED".equalsIgnoreCase(response.status());
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     public BalanceLimit transferToPlatform(HizmatRequest request) throws Exception {
         String platformName = request.getPlatform();
         Platform platform = platformRepository.findByName(platformName)

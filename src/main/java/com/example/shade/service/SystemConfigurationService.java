@@ -36,6 +36,8 @@ public class SystemConfigurationService {
     private static final BigDecimal DEFAULT_DEPOSIT_DAILY_LIMIT_INCREASE_PERCENTAGE = BigDecimal.ZERO;
     private static final Boolean DEFAULT_HUMO_ENABLED = true;
     private static final Long DEFAULT_LOTTERY_COOLDOWN_SECONDS = 300L;
+    private static final Long DEFAULT_WALLET_MIN_WITHDRAW_AMOUNT = 10_000L;
+    private static final Long DEFAULT_WALLET_WITHDRAW_RATIO = 10L;
 
     @Transactional
     public SystemConfiguration getConfiguration() {
@@ -56,6 +58,7 @@ public class SystemConfigurationService {
                     config.setDepositDailyLimitIncreasePercentage(DEFAULT_DEPOSIT_DAILY_LIMIT_INCREASE_PERCENTAGE);
                     config.setHumoEnabled(DEFAULT_HUMO_ENABLED);
                     config.setLotteryCooldownSeconds(DEFAULT_LOTTERY_COOLDOWN_SECONDS);
+                    config.setWalletMinWithdrawAmount(DEFAULT_WALLET_MIN_WITHDRAW_AMOUNT);
                     config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
                     return configurationRepository.save(config);
                 });
@@ -101,43 +104,43 @@ public class SystemConfigurationService {
 
     public BigDecimal getWithdrawalCommissionPercentage() {
         SystemConfiguration config = getConfiguration();
-        return config.getWithdrawalCommissionPercentage() != null 
-                ? config.getWithdrawalCommissionPercentage() 
+        return config.getWithdrawalCommissionPercentage() != null
+                ? config.getWithdrawalCommissionPercentage()
                 : DEFAULT_WITHDRAWAL_COMMISSION;
     }
 
     public BigDecimal getReferralCommissionPercentage() {
         SystemConfiguration config = getConfiguration();
-        return config.getReferralCommissionPercentage() != null 
-                ? config.getReferralCommissionPercentage() 
+        return config.getReferralCommissionPercentage() != null
+                ? config.getReferralCommissionPercentage()
                 : DEFAULT_REFERRAL_COMMISSION;
     }
 
     public Long getTicketCalculationAmount() {
         SystemConfiguration config = getConfiguration();
-        return config.getTicketCalculationAmount() != null 
-                ? config.getTicketCalculationAmount() 
+        return config.getTicketCalculationAmount() != null
+                ? config.getTicketCalculationAmount()
                 : DEFAULT_TICKET_CALCULATION;
     }
 
     public Long getDailyBonusTransferLimit() {
         SystemConfiguration config = getConfiguration();
-        return config.getDailyBonusTransferLimit() != null 
-                ? config.getDailyBonusTransferLimit() 
+        return config.getDailyBonusTransferLimit() != null
+                ? config.getDailyBonusTransferLimit()
                 : DEFAULT_DAILY_BONUS_TRANSFER_LIMIT;
     }
 
     public BigDecimal getTopUpDailyLimitIncreasePercentage() {
         SystemConfiguration config = getConfiguration();
-        return config.getTopUpDailyLimitIncreasePercentage() != null 
-                ? config.getTopUpDailyLimitIncreasePercentage() 
+        return config.getTopUpDailyLimitIncreasePercentage() != null
+                ? config.getTopUpDailyLimitIncreasePercentage()
                 : DEFAULT_TOP_UP_DAILY_LIMIT_INCREASE_PERCENTAGE;
     }
 
     public BigDecimal getDepositDailyLimitIncreasePercentage() {
         SystemConfiguration config = getConfiguration();
-        return config.getDepositDailyLimitIncreasePercentage() != null 
-                ? config.getDepositDailyLimitIncreasePercentage() 
+        return config.getDepositDailyLimitIncreasePercentage() != null
+                ? config.getDepositDailyLimitIncreasePercentage()
                 : DEFAULT_DEPOSIT_DAILY_LIMIT_INCREASE_PERCENTAGE;
     }
 
@@ -148,14 +151,66 @@ public class SystemConfigurationService {
 
     public Long getLotteryCooldownSeconds() {
         SystemConfiguration config = getConfiguration();
-        return config.getLotteryCooldownSeconds() != null 
-                ? config.getLotteryCooldownSeconds() 
+        return config.getLotteryCooldownSeconds() != null
+                ? config.getLotteryCooldownSeconds()
                 : DEFAULT_LOTTERY_COOLDOWN_SECONDS;
+    }
+
+    public Long getWalletMinWithdrawAmount() {
+        SystemConfiguration config = getConfiguration();
+        return config.getWalletMinWithdrawAmount() != null
+                ? config.getWalletMinWithdrawAmount()
+                : DEFAULT_WALLET_MIN_WITHDRAW_AMOUNT;
+    }
+
+    public Long getWalletWithdrawRatio() {
+        SystemConfiguration config = getConfiguration();
+        return config.getWalletWithdrawRatio() != null
+                ? config.getWalletWithdrawRatio()
+                : DEFAULT_WALLET_WITHDRAW_RATIO;
     }
 
     @Transactional
     public void setHumoEnabled(boolean enabled) {
         SystemConfiguration current = getConfiguration();
+        SystemConfiguration config = copyConfig(current);
+        config.setHumoEnabled(enabled);
+        config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
+        configurationRepository.save(config);
+        logger.info("HUMO enabled set to {}", enabled);
+    }
+
+    /**
+     * Updates only the wallet withdraw ratio by creating a new config row (history preserved).
+     * Does not modify the managed entity, so no Hibernate "identifier altered" error.
+     */
+    @Transactional
+    public SystemConfiguration setWalletWithdrawRatio(Long ratio) {
+        SystemConfiguration current = getConfiguration();
+        SystemConfiguration config = copyConfig(current);
+        config.setWalletWithdrawRatio(ratio);
+        config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
+        SystemConfiguration saved = configurationRepository.save(config);
+        logger.info("Wallet withdraw ratio updated to {}", ratio);
+        return saved;
+    }
+
+    /**
+     * Updates only the wallet minimum withdraw amount by creating a new config row (history preserved).
+     * Does not modify the managed entity, so no Hibernate "identifier altered" error.
+     */
+    @Transactional
+    public SystemConfiguration setWalletMinWithdrawAmount(Long amount) {
+        SystemConfiguration current = getConfiguration();
+        SystemConfiguration config = copyConfig(current);
+        config.setWalletMinWithdrawAmount(amount);
+        config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
+        SystemConfiguration saved = configurationRepository.save(config);
+        logger.info("Wallet min withdraw amount updated to {}", amount);
+        return saved;
+    }
+
+    private SystemConfiguration copyConfig(SystemConfiguration current) {
         SystemConfiguration config = new SystemConfiguration();
         config.setTopUpMinAmount(current.getTopUpMinAmount());
         config.setTopUpMaxAmount(current.getTopUpMaxAmount());
@@ -169,10 +224,10 @@ public class SystemConfigurationService {
         config.setDailyBonusTransferLimit(current.getDailyBonusTransferLimit());
         config.setTopUpDailyLimitIncreasePercentage(current.getTopUpDailyLimitIncreasePercentage());
         config.setDepositDailyLimitIncreasePercentage(current.getDepositDailyLimitIncreasePercentage());
-        config.setHumoEnabled(enabled);
+        config.setHumoEnabled(current.getHumoEnabled());
         config.setLotteryCooldownSeconds(current.getLotteryCooldownSeconds());
-        config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
-        configurationRepository.save(config);
-        logger.info("HUMO enabled set to {}", enabled);
+        config.setWalletMinWithdrawAmount(current.getWalletMinWithdrawAmount());
+        config.setWalletWithdrawRatio(current.getWalletWithdrawRatio());
+        return config;
     }
 }

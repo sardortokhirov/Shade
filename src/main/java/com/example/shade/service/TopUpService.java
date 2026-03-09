@@ -2,6 +2,7 @@ package com.example.shade.service;
 
 import com.example.shade.bot.MessageSender;
 import com.example.shade.dto.BalanceLimit;
+import com.example.shade.dto.WalletUserIdValidationResult;
 import com.example.shade.model.*;
 import com.example.shade.model.Currency;
 import com.example.shade.model.PaymentSystem;
@@ -62,6 +63,7 @@ public class TopUpService {
     private final UserPlatformPermissionRepository permissionRepository;
     private final UserLimitIncreaseService userLimitIncreaseService;
     private final DailyUserStatsRepository dailyUserStatsRepository;
+    private final UserWalletQuotaRepository userWalletQuotaRepository;
 
     @Autowired
     @Lazy
@@ -73,6 +75,36 @@ public class TopUpService {
         sessionService.addNavigationState(chatId, "MAIN_MENU");
         sessionService.setUserData(chatId, PAYMENT_ATTEMPTS_KEY, "0");
         sendPlatformSelection(chatId);
+    }
+
+    @Transactional
+    public void startWalletTopUp(Long chatId) {
+        logger.info("Starting wallet top-up for chatId: {}", chatId);
+
+        // Create request for Wallet platform
+        HizmatRequest request = HizmatRequest.builder()
+                .chatId(chatId)
+                .platform("Wallet")
+                .platformUserId(String.valueOf(chatId))
+                .fullName("WALLET")
+                .status(RequestStatus.PENDING)
+                .createdAt(LocalDateTime.now(ZoneId.of("GMT+5")))
+                .currency(Currency.UZS)
+                .amount(0L)
+                .type(RequestType.TOP_UP)
+                .build();
+        requestRepository.save(request);
+
+        // Set session data as if user went through regular top-up
+        sessionService.setUserData(chatId, "platform", "Wallet");
+        sessionService.setUserData(chatId, "platformUserId", String.valueOf(chatId));
+        sessionService.setUserData(chatId, "fullName", "WALLET");
+        sessionService.setUserData(chatId, PAYMENT_ATTEMPTS_KEY, "0");
+
+        // Card is not asked for transfer from card to wallet - go directly to amount input
+        sessionService.setUserState(chatId, "TOPUP_AMOUNT_INPUT");
+        sessionService.addNavigationState(chatId, "WALLET_MENU");
+        sendAmountInput(chatId);
     }
 
     public void handleTextInput(Long chatId, String text) {
@@ -132,7 +164,8 @@ public class TopUpService {
                     long minUzs = configurationService.getTopUpMinAmount();
                     long minRub = BigDecimal.valueOf(minUzs).multiply(latest.getUzsToRub())
                             .divide(BigDecimal.valueOf(1000), 0, RoundingMode.DOWN).longValue();
-                    if (minRub < 1) minRub = 1;
+                    if (minRub < 1)
+                        minRub = 1;
                     sessionService.setUserData(chatId, "amount", String.valueOf(minRub));
                     sessionService.setUserData(chatId, "amountCurrency", "RUB");
                 } else {
@@ -257,6 +290,75 @@ public class TopUpService {
         validateUserId(chatId, userId);
     }
 
+    /**
+     * Validates platform user ID for wallet transfer. Does not send messages; caller (WalletService) handles errors.
+     */
+    public WalletUserIdValidationResult validatePlatformUserIdForWallet(Long chatId, String platformName, String platformUserId) {
+        String trimmed = platformUserId != null ? platformUserId.trim() : "";
+        if (trimmed.isEmpty()) {
+            return WalletUserIdValidationResult.invalid("wallet.message.invalid_id");
+        }
+        String name = platformName != null ? platformName.replace("_", "") : "";
+        Platform platform = platformRepository.findByName(name).orElse(null);
+        if (platform == null) {
+            return WalletUserIdValidationResult.invalid("topup.message.api_error");
+        }
+        if ("mostbet".equals(platform.getType())) {
+            if (!mostbetService.isPlayerValid(platform, trimmed)) {
+                return WalletUserIdValidationResult.invalid("topup.message.no_user_found");
+            }
+            String fullName = requestRepository
+                    .findTopByChatIdAndPlatformAndPlatformUserIdOrderByCreatedAtDesc(chatId, name, trimmed)
+                    .map(HizmatRequest::getFullName)
+                    .orElse("MOSTBET");
+            return WalletUserIdValidationResult.valid(fullName);
+        }
+        // Servcul-style API validation
+        String hash = platform.getApiKey();
+        String cashierPass = platform.getPassword();
+        String cashdeskId = platform.getWorkplaceId();
+        if (hash == null || cashierPass == null || cashdeskId == null || hash.isEmpty() || cashierPass.isEmpty() || cashdeskId.isEmpty()) {
+            return WalletUserIdValidationResult.invalid("topup.message.platform_credentials_error");
+        }
+        String confirmInput = trimmed + ":" + hash;
+        String confirm = DigestUtils.md5DigestAsHex(confirmInput.getBytes(StandardCharsets.UTF_8));
+        String sha256Input1 = "hash=" + hash + "&userid=" + trimmed + "&cashdeskid=" + cashdeskId;
+        String sha256Result1 = sha256Hex(sha256Input1);
+        String md5Input = "userid=" + trimmed + "&cashierpass=" + cashierPass + "&hash=" + hash;
+        String md5Result = DigestUtils.md5DigestAsHex(md5Input.getBytes(StandardCharsets.UTF_8));
+        String finalSignature = sha256Hex(sha256Result1 + md5Result);
+        String apiUrl = String.format(
+                "https://partners.servcul.com/CashdeskBotAPI/Users/%s?confirm=%s&cashdeskId=%s",
+                trimmed, confirm, cashdeskId);
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("sign", finalSignature);
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+            ResponseEntity<UserProfile> response = restTemplate.exchange(apiUrl, HttpMethod.GET, entity, UserProfile.class);
+            UserProfile profile = response.getBody();
+            if (response.getStatusCode().is2xxSuccessful() && profile != null && profile.getUserId() != null && profile.getName() != null) {
+                // Servcul: currencyId 1 = RUB, else UZS (match existing top-up flow)
+                Currency profileCurrency = (profile.getCurrencyId() != null && profile.getCurrencyId().intValue() == 1)
+                        ? Currency.RUB : Currency.UZS;
+                if (!platform.getCurrency().equals(profileCurrency)) {
+                    return WalletUserIdValidationResult.invalid("wallet.message.platform_user_currency_mismatch");
+                }
+                return WalletUserIdValidationResult.valid(profile.getName());
+            }
+            return WalletUserIdValidationResult.invalid("topup.message.no_user_found");
+        } catch (HttpClientErrorException.NotFound e) {
+            return WalletUserIdValidationResult.invalid("topup.message.no_user_found");
+        } catch (HttpClientErrorException e) {
+            String key = e.getStatusCode().value() == 401 ? "topup.message.auth_failed"
+                    : e.getStatusCode().value() == 403 ? "topup.message.invalid_confirm"
+                    : "topup.message.generic_api_error";
+            return WalletUserIdValidationResult.invalid(key);
+        } catch (Exception e) {
+            logger.error("Error validating user ID {} for platform {}: {}", trimmed, name, e.getMessage());
+            return WalletUserIdValidationResult.invalid("topup.message.api_error");
+        }
+    }
+
     private void validateUserId(Long chatId, String userId) {
         // --- Granular Permission Check ---
         String trimmedUserId = userId != null ? userId.trim() : "";
@@ -272,12 +374,20 @@ public class TopUpService {
         Platform platform = platformRepository.findByName(platformName)
                 .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
         if (platform.getType().equals("mostbet")) {
+            if (!mostbetService.isPlayerValid(platform, trimmedUserId)) {
+                sendNoUserFound(chatId);
+                return;
+            }
             Currency currency = platform.getCurrency();
+            String fullName = requestRepository
+                    .findTopByChatIdAndPlatformAndPlatformUserIdOrderByCreatedAtDesc(chatId, platformName, trimmedUserId)
+                    .map(HizmatRequest::getFullName)
+                    .orElse("MOSTBET");
             HizmatRequest request = HizmatRequest.builder()
                     .chatId(chatId)
                     .platform(platformName)
-                    .platformUserId(userId)
-                    .fullName("MOSTBET")
+                    .platformUserId(trimmedUserId)
+                    .fullName(fullName)
                     .status(RequestStatus.PENDING)
                     .createdAt(LocalDateTime.now(ZoneId.of("GMT+5")))
                     .currency(currency)
@@ -285,8 +395,8 @@ public class TopUpService {
                     .type(RequestType.TOP_UP)
                     .build();
             requestRepository.save(request);
-            sessionService.setUserData(chatId, "platformUserId", userId);
-            sessionService.setUserData(chatId, "fullName", "mostbet");
+            sessionService.setUserData(chatId, "platformUserId", trimmedUserId);
+            sessionService.setUserData(chatId, "fullName", fullName);
             sessionService.setUserState(chatId, "TOPUP_APPROVE_USER");
 
             handleApproveUser(chatId);
@@ -308,22 +418,22 @@ public class TopUpService {
                 return;
             }
 
-            String confirmInput = userId + ":" + hash;
+            String confirmInput = trimmedUserId + ":" + hash;
             String confirm = DigestUtils.md5DigestAsHex(confirmInput.getBytes(StandardCharsets.UTF_8));
-            String sha256Input1 = "hash=" + hash + "&userid=" + userId + "&cashdeskid=" + cashdeskId;
+            String sha256Input1 = "hash=" + hash + "&userid=" + trimmedUserId + "&cashdeskid=" + cashdeskId;
             String sha256Result1 = sha256Hex(sha256Input1);
-            String md5Input = "userid=" + userId + "&cashierpass=" + cashierPass + "&hash=" + hash;
+            String md5Input = "userid=" + trimmedUserId + "&cashierpass=" + cashierPass + "&hash=" + hash;
             String md5Result = DigestUtils.md5DigestAsHex(md5Input.getBytes(StandardCharsets.UTF_8));
             String finalSignature = sha256Hex(sha256Result1 + md5Result);
 
             logger.debug(
                     "Validating user ID {}: confirmInput={}, confirm={}, sha256Input1={}, sha256Result1={}, md5Input={}, md5Result={}, finalSignature={}",
-                    userId, confirmInput, confirm, sha256Input1, sha256Result1, md5Input, md5Result, finalSignature);
+                    trimmedUserId, confirmInput, confirm, sha256Input1, sha256Result1, md5Input, md5Result, finalSignature);
 
             String apiUrl = String.format(
                     "https://partners.servcul.com/CashdeskBotAPI/Users/%s?confirm=%s&cashdeskId=%s",
-                    userId, confirm, cashdeskId);
-            logger.info("Validating user ID {} for platform {} (chatId: {}), URL: {}", userId, platformName, chatId,
+                    trimmedUserId, confirm, cashdeskId);
+            logger.info("Validating user ID {} for platform {} (chatId: {}), URL: {}", trimmedUserId, platformName, chatId,
                     apiUrl);
 
             try {
@@ -338,16 +448,21 @@ public class TopUpService {
                 if (response.getStatusCode().is2xxSuccessful() && profile != null && profile.getUserId() != null
                         && profile.getName() != null) {
                     String fullName = profile.getName();
-                    sessionService.setUserData(chatId, "platformUserId", userId);
-                    sessionService.setUserData(chatId, "fullName", fullName);
-                    Currency currency = Currency.UZS;
-                    if (profile.getCurrencyId() == 1L) {
-                        currency = Currency.RUB;
+                    Currency profileCurrency = (profile.getCurrencyId() != null && profile.getCurrencyId().intValue() == 1)
+                            ? Currency.RUB : Currency.UZS;
+                    if (!platform.getCurrency().equals(profileCurrency)) {
+                        logger.warn("User {} currency {} does not match platform {} currency {}", userId,
+                                profileCurrency, platformName, platform.getCurrency());
+                        sendNoUserFound(chatId);
+                        return;
                     }
+                    Currency currency = profileCurrency;
+                    sessionService.setUserData(chatId, "platformUserId", trimmedUserId);
+                    sessionService.setUserData(chatId, "fullName", fullName);
                     HizmatRequest request = HizmatRequest.builder()
                             .chatId(chatId)
                             .platform(platformName)
-                            .platformUserId(userId)
+                            .platformUserId(trimmedUserId)
                             .fullName(fullName)
                             .status(RequestStatus.PENDING)
                             .createdAt(LocalDateTime.now(ZoneId.of("GMT+5")))
@@ -386,7 +501,8 @@ public class TopUpService {
     }
 
     private void handleApproveUser(Long chatId) {
-        sessionService.setUserState(chatId, "TOPUP_CARD_INPUT");
+        // Card is not asked for card-to-platform top-up - go directly to amount input
+        sessionService.setUserState(chatId, "TOPUP_AMOUNT_INPUT");
         sessionService.addNavigationState(chatId, "TOPUP_APPROVE_USER");
         String fullName = sessionService.getUserData(chatId, "fullName");
         if (fullName == null) {
@@ -396,7 +512,7 @@ public class TopUpService {
             sessionService.setUserState(chatId, "TOPUP_USER_ID_INPUT");
             sendUserIdInput(chatId, sessionService.getUserData(chatId, "platform"));
         } else {
-            sendCardInput(chatId, fullName);
+            sendAmountInput(chatId);
         }
     }
 
@@ -422,7 +538,6 @@ public class TopUpService {
             request.setCardNumber(cardNumber);
             requestRepository.save(request);
         }
-
         sessionService.setUserState(chatId, "TOPUP_AMOUNT_INPUT");
         sessionService.addNavigationState(chatId, "TOPUP_CARD_INPUT");
         sendAmountInput(chatId);
@@ -442,7 +557,8 @@ public class TopUpService {
                         .divide(BigDecimal.valueOf(1000), 0, RoundingMode.DOWN).longValue();
                 long maxRub = BigDecimal.valueOf(maxUzs).multiply(latest.getUzsToRub())
                         .divide(BigDecimal.valueOf(1000), 0, RoundingMode.UP).longValue();
-                if (minRub < 1) minRub = 1;
+                if (minRub < 1)
+                    minRub = 1;
                 if (amount < minRub || amount > maxRub) {
                     String message = String.format(
                             languageSessionService.getTranslation(chatId, "topup.message.invalid_amount_range_rub"),
@@ -503,8 +619,10 @@ public class TopUpService {
             return;
         }
 
-        // Use amountCurrency from session - matches what we showed the user (RUB or UZS prompt)
-        // request.getCurrency() can differ (e.g. platform RUB but user profile UZS) - must use what user saw
+        // Use amountCurrency from session - matches what we showed the user (RUB or UZS
+        // prompt)
+        // request.getCurrency() can differ (e.g. platform RUB but user profile UZS) -
+        // must use what user saw
         String amountCurrency = sessionService.getUserData(chatId, "amountCurrency");
         boolean isRub = "RUB".equals(amountCurrency) || (amountCurrency == null && isRubTopUp(chatId));
         long amount;
@@ -512,7 +630,8 @@ public class TopUpService {
             long rubAmount = Long.parseLong(sessionService.getUserData(chatId, "amount"));
             ExchangeRate latest = exchangeRateRepository.findLatest()
                     .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
-            // Convert RUB to UZS using uzsToRub (1000 UZS = X RUB): amount_uzs = rubAmount * 1000 / uzsToRub
+            // Convert RUB to UZS using uzsToRub (1000 UZS = X RUB): amount_uzs = rubAmount
+            // * 1000 / uzsToRub
             // e.g. 60 RUB, uzsToRub=6: 60 * 1000 / 6 = 10,000 UZS
             amount = BigDecimal.valueOf(rubAmount).multiply(BigDecimal.valueOf(1000))
                     .divide(latest.getUzsToRub(), 0, RoundingMode.HALF_UP).longValue();
@@ -530,7 +649,8 @@ public class TopUpService {
             // Check HUMO toggle setting
             if (!configurationService.getHumoEnabled()) {
                 // Try to get UZCARD card first
-                Optional<AdminCard> uzcardCard = adminCardRepository.findLeastRecentlyUsedByPaymentSystem(PaymentSystem.UZCARD);
+                Optional<AdminCard> uzcardCard = adminCardRepository
+                        .findLeastRecentlyUsedByPaymentSystem(PaymentSystem.UZCARD);
                 if (uzcardCard.isPresent()) {
                     adminCard = uzcardCard.get();
                 } else {
@@ -598,9 +718,10 @@ public class TopUpService {
                 .longValue();
         try {
             if (adminCard.getPaymentSystem().equals(PaymentSystem.UZCARD)) {
+                String userCard = request.getCardNumber() != null ? request.getCardNumber() : "";
                 statusResponse = osonService.verifyPaymentByAmountAndCard(
                         chatId, request.getPlatform(), request.getPlatformUserId(),
-                        request.getAmount(), request.getCardNumber(), adminCard.getCardNumber(),
+                        request.getAmount(), userCard, adminCard.getCardNumber(),
                         request.getUniqueAmount());
             } else {
                 try {
@@ -628,14 +749,14 @@ public class TopUpService {
             sessionService.setUserState(chatId, "TOPUP_AWAITING_SCREENSHOT");
 
             String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
+            String cardBlock = optionalCardLineBackticks(request.getCardNumber()) + optionalAdminCardLine(adminCard.getCardNumber());
             String logMessage = String.format(
-                    "🆔: %d  \n" +
-                            "👤: [%s] %s\n" +
-                            "🌐 #%s: " + "%s\n" +
+                    "🆔: `%d`\n" +
+                            "👤: `%s` %s\n" +
+                            "🌐 #%s: " + "`%s`\n" +
                             "💸 Miqdor: %,d UZS\n" +
                             "💸 Miqdor: %,d RUB\n" +
-                            "💳 Karta: `%s`\n" +
-                            "🔐 Admin kartasi: `%s`\n" +
+                            "%s" +
                             "📅 [%s]",
                     request.getId(),
                     chatId,
@@ -644,8 +765,7 @@ public class TopUpService {
                     request.getPlatformUserId(),
                     request.getUniqueAmount(),
                     rubAmount,
-                    request.getCardNumber(),
-                    adminCard.getCardNumber(),
+                    cardBlock,
                     LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
             adminLogBotService.sendLog("Osonda Xatolik Yuz berdi ⚠\uFE0F \n\n" + logMessage);
         }
@@ -660,16 +780,21 @@ public class TopUpService {
                 request.setPayUrl((String) statusResponse.get("payUrl"));
             }
 
-            // Transfer FIRST - only approve when transfer succeeds (never transfer money on failure)
+            // Transfer FIRST - only approve when transfer succeeds (never transfer money on
+            // failure)
             String platformName = request.getPlatform();
-            Platform platform = platformRepository.findByName(platformName)
-                    .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
             BalanceLimit transferSuccessful = null;
             try {
-                if (platform.getType().equals("mostbet")) {
-                    transferSuccessful = mostbetService.transferToPlatform(request);
+                if ("Wallet".equals(platformName)) {
+                    transferSuccessful = self.creditWalletBalance(request);
                 } else {
-                    transferSuccessful = transferToPlatform(request, adminCard);
+                    Platform platform = platformRepository.findByName(platformName)
+                            .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
+                    if (platform.getType().equals("mostbet")) {
+                        transferSuccessful = mostbetService.transferToPlatform(request);
+                    } else {
+                        transferSuccessful = transferToPlatform(request, adminCard);
+                    }
                 }
             } catch (Exception e) {
                 logger.error("Transfer failed for request {}: {}", request.getId(), e.getMessage());
@@ -677,6 +802,12 @@ public class TopUpService {
             }
             if (transferSuccessful != null) {
                 request.setStatus(RequestStatus.APPROVED);
+                if ("Wallet".equals(platformName)) {
+                    Long w = userBalanceRepository.findById(chatId)
+                            .map(ub -> ub.getWalletBalance() != null ? ub.getWalletBalance() : 0L)
+                            .orElse(0L);
+                    request.setWalletBalanceAtTime(w);
+                }
                 requestRepository.save(request);
                 Optional<UserBalance> balanceOpt = userBalanceRepository.findById(chatId);
                 UserBalance balance;
@@ -687,36 +818,52 @@ public class TopUpService {
                     if (userBalanceRepository.existsById(chatId)) {
                         // Entity exists but findById returned empty - fetch again
                         balance = userBalanceRepository.findById(chatId)
-                            .orElseThrow(() -> new IllegalStateException("UserBalance exists but not accessible for chatId: " + chatId));
+                                .orElseThrow(() -> new IllegalStateException(
+                                        "UserBalance exists but not accessible for chatId: " + chatId));
                     } else {
                         // Truly doesn't exist - safe to create
                         balance = UserBalance.builder()
-                            .chatId(request.getChatId())
-                            .tickets(0L)
-                            .balance(BigDecimal.ZERO)
-                            .build();
+                                .chatId(request.getChatId())
+                                .tickets(0L)
+                                .balance(BigDecimal.ZERO)
+                                .build();
                         balance = userBalanceRepository.save(balance);
                         logger.info("Created new UserBalance for chatId {}", chatId);
                     }
                 }
-                long ticketCalculationAmount = configurationService.getTicketCalculationAmount();
-                long tickets = request.getAmount() / ticketCalculationAmount;
-                if (tickets > 0) {
-                    lotteryService.awardTickets(chatId, tickets);
+                long tickets = 0;
+                if (!"Wallet".equals(platformName)) {
+                    long ticketCalculationAmount = configurationService.getTicketCalculationAmount();
+                    tickets = request.getAmount() / ticketCalculationAmount;
+                    if (tickets > 0) {
+                        lotteryService.awardTickets(chatId, tickets);
+                    }
+
+                    bonusService.creditReferral(request.getChatId(), request.getAmount());
+
+                    dailyStatsService.addTopUpAmount(request.getChatId(), request.getAmount());
                 }
 
-                bonusService.creditReferral(request.getChatId(), request.getAmount());
-
-                dailyStatsService.addTopUpAmount(request.getChatId(), request.getAmount());
+                long quotaEarned = 0L;
+                if (!"Wallet".equals(platformName)) {
+                    Long ratio = configurationService.getWalletWithdrawRatio();
+                    long amountForQuota = request.getAmount() != null ? request.getAmount() : (request.getUniqueAmount() != null ? request.getUniqueAmount() : 0L);
+                    quotaEarned = amountForQuota * ratio;
+                    UserWalletQuota quota = userWalletQuotaRepository.findByIdWithLock(chatId)
+                            .orElse(UserWalletQuota.builder().chatId(chatId).earnedQuota(0L).usedQuota(0L).build());
+                    quota.setEarnedQuota(quota.getEarnedQuota() + quotaEarned);
+                    userWalletQuotaRepository.save(quota);
+                    logger.info("Quota earned for chatId {} (card-to-platform): +{} UZS (ratio={})", chatId, quotaEarned, ratio);
+                }
 
                 String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
+                String cardBlock = optionalCardLineBackticks(request.getCardNumber()) + optionalAdminCardLine(adminCard.getCardNumber());
                 String logMessage = String.format(
-                        "🆔: %d To'lov yakunlandi ✅\n" +
-                                "🌐 #%s: " + "%s\n" +
+                        "🆔: `%d` To'lov yakunlandi ✅\n" +
+                                "🌐 #%s: " + "`%s`\n" +
                                 "💸 Miqdor: %,d UZS\n" +
                                 "💸 Miqdor: %,d RUB\n" +
-                                "💳 Karta: `%s`\n" +
-                                "🔐 Admin kartasi: `%s`\n" +
+                                "%s" +
                                 "🎟️ Chiptalar: %d (+ %d )\n\n" +
                                 "📅 [%s]",
                         request.getId(),
@@ -724,8 +871,7 @@ public class TopUpService {
                         request.getPlatformUserId(),
                         request.getUniqueAmount(),
                         rubAmount,
-                        request.getCardNumber(),
-                        adminCard.getCardNumber(),
+                        cardBlock,
                         balance.getTickets(),
                         tickets,
                         LocalDateTime.now(ZoneId.of("GMT+5"))
@@ -734,36 +880,72 @@ public class TopUpService {
                 Long totalLimit = dailyStatsService.getEffectiveDailyLimit(request.getChatId());
                 Long availableLimit = dailyStatsService.getAvailableLimit(request.getChatId());
                 LocalDate today = LocalDate.now(ZoneId.of("GMT+5"));
-                Optional<DailyUserStats> dailyStatsOpt = dailyUserStatsRepository.findByChatIdAndDate(request.getChatId(), today);
+                Optional<DailyUserStats> dailyStatsOpt = dailyUserStatsRepository
+                        .findByChatIdAndDate(request.getChatId(), today);
                 Long dailyTopUpAmount = dailyStatsOpt.map(DailyUserStats::getDailyTopUpAmount).orElse(0L);
-                String logMessageAdmin = String.format(
-                        "🆔: %d To'lov yakunlandi ✅\n" +
-                                "👤: [%d] %s\n" +
-                                "🌐 #%s: %s\n" +
-                                "💸 Miqdor: %,d UZS\n" +
-                                "💸 Miqdor: %,d RUB\n" +
-                                "💳 Karta: %s\n" +
-                                "💳 Bizniki: %s\n" +
-                                "🎟️ Chiptalar: %d (+ %d )\n" +
-                                "\n🏦: %,d %s\n" +
-                                "\n📊 Limit: %,d / %,d so'm\n" +
-                                "📅 [%s]",
-                        request.getId(),
-                        chatId,
-                        number,
-                        request.getPlatform(),
-                        request.getPlatformUserId(),
-                        request.getUniqueAmount(),
-                        rubAmount,
-                        request.getCardNumber(),
-                        adminCard.getCardNumber(),
-                        balance.getTickets(),
-                        tickets,
-                        transferSuccessful.getLimit().longValue(),
-                        request.getCurrency().toString(),
-                        totalLimit, availableLimit,
-                        LocalDateTime.now(ZoneId.of("GMT+5"))
-                                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                String cardBlockAdmin = optionalCardLinePlain(request.getCardNumber()) + optionalBiznikiLine(adminCard.getCardNumber());
+                long walletLeft = balance.getWalletBalance() != null ? balance.getWalletBalance() : 0L;
+                String logMessageAdmin;
+                if ("Wallet".equals(platformName)) {
+                    logMessageAdmin = String.format(
+                            "🆔: `%d` To'lov yakunlandi ✅\n" +
+                                    "👤: `%d` %s\n" +
+                                    "🌐 #%s: `%s`\n" +
+                                    "💸 Miqdor: %,d UZS\n" +
+                                    "💸 Miqdor: %,d RUB\n" +
+                                    "%s" +
+                                    "🎟️ Chiptalar: %d (+ %d )\n" +
+                                    "🔰 Yechib olish kvotasi: +%,d UZS\n" +
+                                    "\n📊 Limit: %,d / %,d so'm\n" +
+                                    "🏧 Qoldi: %,d UZS\n" +
+                                    "📅 [%s]",
+                            request.getId(),
+                            chatId,
+                            number,
+                            request.getPlatform(),
+                            request.getPlatformUserId(),
+                            request.getUniqueAmount(),
+                            rubAmount,
+                            cardBlockAdmin,
+                            balance.getTickets(),
+                            tickets,
+                            quotaEarned,
+                            totalLimit, availableLimit,
+                            walletLeft,
+                            LocalDateTime.now(ZoneId.of("GMT+5"))
+                                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                } else {
+                    logMessageAdmin = String.format(
+                            "🆔: `%d` To'lov yakunlandi ✅\n" +
+                                    "👤: `%d` %s\n" +
+                                    "🌐 #%s: `%s`\n" +
+                                    "💸 Miqdor: %,d UZS\n" +
+                                    "💸 Miqdor: %,d RUB\n" +
+                                    "%s" +
+                                    "🎟️ Chiptalar: %d (+ %d )\n" +
+                                    "🔰 Yechib olish kvotasi: +%,d UZS\n" +
+                                    "\n🏦: %,d %s\n" +
+                                    "\n📊 Limit: %,d / %,d so'm\n" +
+                                    "🏧 Qoldi: %,d UZS\n" +
+                                    "📅 [%s]",
+                            request.getId(),
+                            chatId,
+                            number,
+                            request.getPlatform(),
+                            request.getPlatformUserId(),
+                            request.getUniqueAmount(),
+                            rubAmount,
+                            cardBlockAdmin,
+                            balance.getTickets(),
+                            tickets,
+                            quotaEarned,
+                            transferSuccessful.getLimit().longValue(),
+                            request.getCurrency().toString(),
+                            totalLimit, availableLimit,
+                            walletLeft,
+                            LocalDateTime.now(ZoneId.of("GMT+5"))
+                                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                }
                 adminLogBotService.sendLog(logMessageAdmin);
 
                 // messageSender.animateAndDeleteMessages(chatId,
@@ -817,7 +999,7 @@ public class TopUpService {
             requestRepository.save(request);
             logger.info("Reverted request {} status to PENDING_SCREENSHOT after transfer failure", request.getId());
         }
-        
+
         ExchangeRate latest = exchangeRateRepository.findLatest()
                 .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
         long rubAmount = BigDecimal.valueOf(request.getUniqueAmount())
@@ -825,14 +1007,14 @@ public class TopUpService {
                 .divide(BigDecimal.valueOf(1000), 0, RoundingMode.HALF_UP)
                 .longValue();
         String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
+        String cardBlockErr = optionalCardLineBackticks(request.getCardNumber()) + optionalAdminCardLine(adminCard.getCardNumber());
         String errorLogMessage = String.format(
-                " 🆔: %d Transfer xatosi ❌\n" +
-                        "👤 User ID [%s] %s\n" +
+                " 🆔: `%d` Transfer xatosi ❌\n" +
+                        "👤 User ID: `%s` %s\n" +
                         "🌐 #%s: " + "%s\n" +
                         "💸 Miqdor: %,d UZS\n" +
                         "💸 Miqdor: %,d RUB\n" +
-                        "💳 Karta: `%s`\n" +
-                        "🔐 Admin kartasi: `%s`\n" +
+                        "%s" +
                         "📅 [%s] ",
                 request.getId(),
                 request.getChatId(), number,
@@ -840,8 +1022,7 @@ public class TopUpService {
                 request.getPlatformUserId(),
                 request.getUniqueAmount(),
                 rubAmount,
-                request.getCardNumber(),
-                adminCard.getCardNumber(),
+                cardBlockErr,
                 LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
@@ -883,17 +1064,19 @@ public class TopUpService {
     public void handleScreenshotApproval(Long chatId, Long requestId, boolean approve) throws Exception {
         HizmatRequest request = requestRepository.findById(requestId)
                 .orElse(null);
-        
+
         // Verify the request is still in PENDING_SCREENSHOT status before processing
         if (request != null && request.getStatus() != RequestStatus.PENDING_SCREENSHOT) {
-            logger.warn("Request {} is not in PENDING_SCREENSHOT status, current status: {}", requestId, request.getStatus());
-            adminLogBotService.sendLog("So'rov allaqachon ko'rib chiqilgan. ID: " + requestId + ", Status: " + request.getStatus());
+            logger.warn("Request {} is not in PENDING_SCREENSHOT status, current status: {}", requestId,
+                    request.getStatus());
+            adminLogBotService.sendLog(
+                    String.format("So'rov allaqachon ko'rib chiqilgan. 🆔 `%d`, Status: %s", requestId, request.getStatus()));
             return;
         }
-        
+
         if (request == null) {
             logger.error("No request found for ID {}", requestId);
-            adminLogBotService.sendLog("❌ Xatolik: So‘rov topilmadi. ID: " + requestId);
+            adminLogBotService.sendLog(String.format("❌ Xatolik: So‘rov topilmadi. 🆔 `%d`", requestId));
             return;
         }
 
@@ -908,16 +1091,21 @@ public class TopUpService {
                 .longValue();
 
         if (approve) {
-            // Attempt transfer FIRST, only set APPROVED status after success (never transfer on failure)
+            // Attempt transfer FIRST, only set APPROVED status after success (never
+            // transfer on failure)
             String platformName = request.getPlatform();
-            Platform platform = platformRepository.findByName(platformName)
-                    .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
             BalanceLimit transferSuccessful = null;
             try {
-                if (platform.getType().equals("mostbet")) {
-                    transferSuccessful = mostbetService.transferToPlatform(request);
+                if ("Wallet".equals(platformName)) {
+                    transferSuccessful = self.creditWalletBalance(request);
                 } else {
-                    transferSuccessful = transferToPlatform(request, adminCard);
+                    Platform platform = platformRepository.findByName(platformName)
+                            .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
+                    if (platform.getType().equals("mostbet")) {
+                        transferSuccessful = mostbetService.transferToPlatform(request);
+                    } else {
+                        transferSuccessful = transferToPlatform(request, adminCard);
+                    }
                 }
             } catch (Exception e) {
                 logger.error("Transfer failed for request {}: {}", request.getId(), e.getMessage());
@@ -926,8 +1114,14 @@ public class TopUpService {
             if (transferSuccessful != null) {
                 // Transfer succeeded - NOW set status to APPROVED
                 request.setStatus(RequestStatus.APPROVED);
+                if ("Wallet".equals(platformName)) {
+                    Long w = userBalanceRepository.findById(request.getChatId())
+                            .map(ub -> ub.getWalletBalance() != null ? ub.getWalletBalance() : 0L)
+                            .orElse(0L);
+                    request.setWalletBalanceAtTime(w);
+                }
                 requestRepository.save(request);
-                
+
                 Optional<UserBalance> balanceOpt = userBalanceRepository.findById(request.getChatId());
                 UserBalance balance;
                 if (balanceOpt.isPresent()) {
@@ -937,51 +1131,68 @@ public class TopUpService {
                     if (userBalanceRepository.existsById(request.getChatId())) {
                         // Entity exists but findById returned empty - fetch again
                         balance = userBalanceRepository.findById(request.getChatId())
-                            .orElseThrow(() -> new IllegalStateException("UserBalance exists but not accessible for chatId: " + request.getChatId()));
+                                .orElseThrow(() -> new IllegalStateException(
+                                        "UserBalance exists but not accessible for chatId: " + request.getChatId()));
                     } else {
                         // Truly doesn't exist - safe to create
                         balance = UserBalance.builder()
-                            .chatId(request.getChatId())
-                            .tickets(0L)
-                            .balance(BigDecimal.ZERO)
-                            .build();
+                                .chatId(request.getChatId())
+                                .tickets(0L)
+                                .balance(BigDecimal.ZERO)
+                                .build();
                         balance = userBalanceRepository.save(balance);
                         logger.info("Created new UserBalance for chatId {}", request.getChatId());
                     }
                 }
-                long ticketCalculationAmount = configurationService.getTicketCalculationAmount();
-                long tickets = request.getAmount() / ticketCalculationAmount;
-                if (tickets > 0) {
-                    lotteryService.awardTickets(request.getChatId(), tickets);
-                }
-
-                bonusService.creditReferral(request.getChatId(), request.getAmount());
-
-                // Calculate limit increase directly from percentage (optimize: avoid multiple DB calls)
-                java.math.BigDecimal topUpPercentage = configurationService.getTopUpDailyLimitIncreasePercentage();
+                long tickets = 0;
                 long limitIncrease = 0L;
-                if (topUpPercentage.compareTo(java.math.BigDecimal.ZERO) > 0) {
-                    java.math.BigDecimal increaseAmountBD = java.math.BigDecimal.valueOf(request.getAmount())
-                            .multiply(topUpPercentage)
-                            .divide(java.math.BigDecimal.valueOf(100), 8, java.math.RoundingMode.HALF_UP);
-                    limitIncrease = increaseAmountBD.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
+                if (!"Wallet".equals(platformName)) {
+                    long ticketCalculationAmount = configurationService.getTicketCalculationAmount();
+                    tickets = request.getAmount() / ticketCalculationAmount;
+                    if (tickets > 0) {
+                        lotteryService.awardTickets(request.getChatId(), tickets);
+                    }
+
+                    bonusService.creditReferral(request.getChatId(), request.getAmount());
+
+                    // Calculate limit increase directly from percentage (optimize: avoid multiple
+                    // DB calls)
+                    java.math.BigDecimal topUpPercentage = configurationService.getTopUpDailyLimitIncreasePercentage();
+                    if (topUpPercentage.compareTo(java.math.BigDecimal.ZERO) > 0) {
+                        java.math.BigDecimal increaseAmountBD = java.math.BigDecimal.valueOf(request.getAmount())
+                                .multiply(topUpPercentage)
+                                .divide(java.math.BigDecimal.valueOf(100), 8, java.math.RoundingMode.HALF_UP);
+                        limitIncrease = increaseAmountBD.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
+                    }
+
+                    // Process top-up (this will add the limit increase internally)
+                    dailyStatsService.addTopUpAmount(request.getChatId(), request.getAmount());
                 }
-                
-                // Process top-up (this will add the limit increase internally)
-                dailyStatsService.addTopUpAmount(request.getChatId(), request.getAmount());
+
+                long quotaEarned = 0L;
+                if (!"Wallet".equals(platformName)) {
+                    Long ratio = configurationService.getWalletWithdrawRatio();
+                    long amountForQuota = request.getAmount() != null ? request.getAmount() : (request.getUniqueAmount() != null ? request.getUniqueAmount() : 0L);
+                    quotaEarned = amountForQuota * ratio;
+                    UserWalletQuota quota = userWalletQuotaRepository.findByIdWithLock(request.getChatId())
+                            .orElse(UserWalletQuota.builder().chatId(request.getChatId()).earnedQuota(0L).usedQuota(0L).build());
+                    quota.setEarnedQuota(quota.getEarnedQuota() + quotaEarned);
+                    userWalletQuotaRepository.save(quota);
+                    logger.info("Quota earned for chatId {} (card-to-platform screenshot): +{} UZS (ratio={})", request.getChatId(), quotaEarned, ratio);
+                }
 
                 // Get limit information (cache to avoid multiple calls)
                 String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
                 Long totalLimit = dailyStatsService.getEffectiveDailyLimit(request.getChatId());
                 Long availableLimit = dailyStatsService.getAvailableLimit(request.getChatId());
+                String cardBlockUser = optionalCardLineBackticks(request.getCardNumber()) + optionalAdminCardLine(adminCard.getCardNumber());
                 String logMessage = String.format(
-                        " 🆔: %d To'lov skrinshoti tasdiqlandi ✅\n" +
-                                "👤ID [%s] %s\n" +
-                                "🌐 #%s: " + "%s\n" +
+                        " 🆔: `%d` To'lov skrinshoti tasdiqlandi ✅\n" +
+                                "👤 ID: `%s` %s\n" +
+                                "🌐 #%s: " + "`%s`\n" +
                                 "💸 Miqdor: %,d UZS\n" +
                                 "💸 Miqdor: %,d RUB\n" +
-                                "💳 Karta: `%s`\n" +
-                                "🔐 Admin kartasi: `%s`\n" +
+                                "%s" +
                                 "🎟️ Chiptalar: %d (+ %d )\n\n" +
                                 "📈 Limit oshdi: %,d so'm\n" +
                                 "📊 Limit: %,d / %,d so'm\n" +
@@ -992,8 +1203,7 @@ public class TopUpService {
                         request.getPlatformUserId(),
                         request.getUniqueAmount(),
                         rubAmount,
-                        request.getCardNumber(),
-                        adminCard.getCardNumber(),
+                        cardBlockUser,
                         balance.getTickets(),
                         tickets,
                         limitIncrease,
@@ -1001,35 +1211,69 @@ public class TopUpService {
                         LocalDateTime.now(ZoneId.of("GMT+5"))
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                 LocalDate todayForTopUp = LocalDate.now(ZoneId.of("GMT+5"));
-                Optional<DailyUserStats> dailyStatsOptForTopUp = dailyUserStatsRepository.findByChatIdAndDate(request.getChatId(), todayForTopUp);
+                Optional<DailyUserStats> dailyStatsOptForTopUp = dailyUserStatsRepository
+                        .findByChatIdAndDate(request.getChatId(), todayForTopUp);
                 Long dailyTopUpAmountForLog = dailyStatsOptForTopUp.map(DailyUserStats::getDailyTopUpAmount).orElse(0L);
-                String adminLogMessage = String.format(
-                        "🆔: %d To'lov skrinshoti tasdiqlandi ✅\n" +
-                                "👤: [%d] %s\n" +
-                                "🌐 #%s: %s\n" +
-                                "💸 Miqdor: %,d UZS\n" +
-                                "💸 Miqdor: %,d RUB\n" +
-                                "💳 Karta: %s\n" +
-                                "💳 Bizniki: %s\n" +
-                                "🎟️ Chiptalar: %d (+ %d )\n" +
-                                "\n🏦: %,d %s\n" +
-                                "📊 Limit: %,d / %,d so'm\n" +
-                                "📅 [%s]",
-                        request.getId(),
-                        request.getChatId(), number,
-                        request.getPlatform(),
-                        request.getPlatformUserId(),
-                        request.getUniqueAmount(),
-                        rubAmount,
-                        request.getCardNumber(),
-                        adminCard.getCardNumber(),
-                        balance.getTickets(),
-                        tickets,
-                        transferSuccessful.getLimit().longValue(),
-                        request.getCurrency().toString(),
-                        totalLimit, availableLimit,
-                        LocalDateTime.now(ZoneId.of("GMT+5"))
-                                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                String cardBlockAdmin2 = optionalCardLinePlain(request.getCardNumber()) + optionalBiznikiLine(adminCard.getCardNumber());
+                String adminLogMessage;
+                if ("Wallet".equals(platformName)) {
+                    adminLogMessage = String.format(
+                            "🆔: `%d` To'lov skrinshoti tasdiqlandi ✅\n" +
+                                    "👤: `%d` %s\n" +
+                                    "🌐 #%s: `%s`\n" +
+                                    "💸 Miqdor: %,d UZS\n" +
+                                    "💸 Miqdor: %,d RUB\n" +
+                                    "%s" +
+                                    "🎟️ Chiptalar: %d (+ %d )\n" +
+                                    "🔰 Yechib olish kvotasi: +%,d UZS\n" +
+                                    "\n📊 Limit: %,d / %,d so'm\n" +
+                                    "🏧 Qoldi: %,d UZS\n" +
+                                    "📅 [%s]",
+                            request.getId(),
+                            request.getChatId(), number,
+                            request.getPlatform(),
+                            request.getPlatformUserId(),
+                            request.getUniqueAmount(),
+                            rubAmount,
+                            cardBlockAdmin2,
+                            balance.getTickets(),
+                            tickets,
+                            quotaEarned,
+                            totalLimit, availableLimit,
+                            balance.getWalletBalance() != null ? balance.getWalletBalance() : 0L,
+                            LocalDateTime.now(ZoneId.of("GMT+5"))
+                                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                } else {
+                    adminLogMessage = String.format(
+                            "🆔: `%d` To'lov skrinshoti tasdiqlandi ✅\n" +
+                                    "👤: `%d` %s\n" +
+                                    "🌐 #%s: `%s`\n" +
+                                    "💸 Miqdor: %,d UZS\n" +
+                                    "💸 Miqdor: %,d RUB\n" +
+                                    "%s" +
+                                    "🎟️ Chiptalar: %d (+ %d )\n" +
+                                    "🔰 Yechib olish kvotasi: +%,d UZS\n" +
+                                    "\n🏦: %,d %s\n" +
+                                    "📊 Limit: %,d / %,d so'm\n" +
+                                    "🏧 Qoldi: %,d UZS\n" +
+                                    "📅 [%s]",
+                            request.getId(),
+                            request.getChatId(), number,
+                            request.getPlatform(),
+                            request.getPlatformUserId(),
+                            request.getUniqueAmount(),
+                            rubAmount,
+                            cardBlockAdmin2,
+                            balance.getTickets(),
+                            tickets,
+                            quotaEarned,
+                            transferSuccessful.getLimit().longValue(),
+                            request.getCurrency().toString(),
+                            totalLimit, availableLimit,
+                            balance.getWalletBalance() != null ? balance.getWalletBalance() : 0L,
+                            LocalDateTime.now(ZoneId.of("GMT+5"))
+                                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                }
 
                 adminLogBotService.sendLog(adminLogMessage);
                 Long userChatId = request.getChatId();
@@ -1051,6 +1295,8 @@ public class TopUpService {
 
             Long userChatId = request.getChatId();
             String number = blockedUserRepository.findByChatId(userChatId).get().getPhoneNumber();
+            String cardForRejectMsg = (request.getCardNumber() != null && !request.getCardNumber().trim().isEmpty()) ? request.getCardNumber() : "";
+            String adminCardForRejectMsg = (adminCard != null && adminCard.getCardNumber() != null && !adminCard.getCardNumber().trim().isEmpty()) ? adminCard.getCardNumber() : "";
             String logMessage = String.format(
                     languageSessionService.getTranslation(userChatId, "topup.message.screenshot_rejected"),
                     request.getId(),
@@ -1058,17 +1304,16 @@ public class TopUpService {
                     request.getPlatformUserId(),
                     request.getUniqueAmount(),
                     rubAmount,
-                    request.getCardNumber(),
-                    adminCard.getCardNumber(),
+                    cardForRejectMsg,
+                    adminCardForRejectMsg,
                     LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
             String adminMessage = String.format(
-                    "🆔: %d To‘lov skrinshoti rad etildi ❌\n" +
-                            "👤ID [%s] %s\n" +
-                            "🌐 #%s: " + "%s\n" +
+                    "🆔: `%d` To‘lov skrinshoti rad etildi ❌\n" +
+                            "👤 ID: `%s` %s\n" +
+                            "🌐 #%s: " + "`%s`\n" +
                             "💸 Miqdor: %,d UZS\n" +
                             "💸 Miqdor: %,d RUB\n" +
-                            "💳 Karta: `%s`\n" +
-                            "💳 Bizniki: `%s`\n" +
+                            "%s" +
                             "📅 [%s] ",
                     request.getId(),
                     userChatId, number,
@@ -1076,8 +1321,7 @@ public class TopUpService {
                     request.getPlatformUserId(),
                     request.getUniqueAmount(),
                     rubAmount,
-                    request.getCardNumber(),
-                    adminCard.getCardNumber(),
+                    optionalCardLineBackticks(request.getCardNumber()) + optionalBiznikiLineBackticks(adminCard != null ? adminCard.getCardNumber() : null),
                     LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
             adminLogBotService.sendLog(adminMessage);
@@ -1091,20 +1335,24 @@ public class TopUpService {
     }
 
     public void handleScreenshotApprovalChat(Long adminChatId, Long requestId, boolean approve) {
-        // Use findById with the actual request ID to ensure we approve the correct request
-        // This fixes the bug where approving one screenshot could approve a different request
+        // Use findById with the actual request ID to ensure we approve the correct
+        // request
+        // This fixes the bug where approving one screenshot could approve a different
+        // request
         HizmatRequest request = requestRepository.findById(requestId).orElse(null);
-        
+
         // Verify the request is still in PENDING_SCREENSHOT status before processing
         if (request != null && request.getStatus() != RequestStatus.PENDING_SCREENSHOT) {
-            logger.warn("Request {} is not in PENDING_SCREENSHOT status, current status: {}", requestId, request.getStatus());
-            adminLogBotService.sendLog("So'rov allaqachon ko'rib chiqilgan. ID: " + requestId + ", Status: " + request.getStatus());
+            logger.warn("Request {} is not in PENDING_SCREENSHOT status, current status: {}", requestId,
+                    request.getStatus());
+            adminLogBotService.sendLog(
+                    String.format("So'rov allaqachon ko'rib chiqilgan. 🆔 `%d`, Status: %s", requestId, request.getStatus()));
             return;
         }
-        
+
         if (request == null) {
             logger.error("No request found for ID {}", requestId);
-            adminLogBotService.sendLog("❌ Xatolik: So‘rov topilmadi. ID: " + requestId);
+            adminLogBotService.sendLog(String.format("❌ Xatolik: So‘rov topilmadi. 🆔 `%d`", requestId));
             return;
         }
 
@@ -1119,16 +1367,21 @@ public class TopUpService {
                 .longValue();
 
         if (approve) {
-            // Attempt transfer FIRST, only set APPROVED status after success (never transfer on failure)
+            // Attempt transfer FIRST, only set APPROVED status after success (never
+            // transfer on failure)
             String platformName = request.getPlatform();
-            Platform platform = platformRepository.findByName(platformName)
-                    .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
             BalanceLimit transferSuccessful = null;
             try {
-                if (platform.getType().equals("mostbet")) {
-                    transferSuccessful = mostbetService.transferToPlatform(request);
+                if ("Wallet".equals(platformName)) {
+                    transferSuccessful = self.creditWalletBalance(request);
                 } else {
-                    transferSuccessful = transferToPlatform(request, adminCard);
+                    Platform platform = platformRepository.findByName(platformName)
+                            .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
+                    if (platform.getType().equals("mostbet")) {
+                        transferSuccessful = mostbetService.transferToPlatform(request);
+                    } else {
+                        transferSuccessful = transferToPlatform(request, adminCard);
+                    }
                 }
             } catch (Exception e) {
                 logger.error("Transfer failed for request {}: {}", request.getId(), e.getMessage());
@@ -1137,8 +1390,14 @@ public class TopUpService {
             if (transferSuccessful != null) {
                 // Transfer succeeded - NOW set status to APPROVED
                 request.setStatus(RequestStatus.APPROVED);
+                if ("Wallet".equals(platformName)) {
+                    Long w = userBalanceRepository.findById(request.getChatId())
+                            .map(ub -> ub.getWalletBalance() != null ? ub.getWalletBalance() : 0L)
+                            .orElse(0L);
+                    request.setWalletBalanceAtTime(w);
+                }
                 requestRepository.save(request);
-                
+
                 Optional<UserBalance> balanceOpt = userBalanceRepository.findById(requestId);
                 UserBalance balance;
                 if (balanceOpt.isPresent()) {
@@ -1148,51 +1407,68 @@ public class TopUpService {
                     if (userBalanceRepository.existsById(requestId)) {
                         // Entity exists but findById returned empty - fetch again
                         balance = userBalanceRepository.findById(requestId)
-                            .orElseThrow(() -> new IllegalStateException("UserBalance exists but not accessible for chatId: " + requestId));
+                                .orElseThrow(() -> new IllegalStateException(
+                                        "UserBalance exists but not accessible for chatId: " + requestId));
                     } else {
                         // Truly doesn't exist - safe to create
                         balance = UserBalance.builder()
-                            .chatId(request.getChatId())
-                            .tickets(0L)
-                            .balance(BigDecimal.ZERO)
-                            .build();
+                                .chatId(request.getChatId())
+                                .tickets(0L)
+                                .balance(BigDecimal.ZERO)
+                                .build();
                         balance = userBalanceRepository.save(balance);
                         logger.info("Created new UserBalance for chatId {}", requestId);
                     }
                 }
-                long ticketCalculationAmount = configurationService.getTicketCalculationAmount();
-                long tickets = request.getAmount() / ticketCalculationAmount;
-                if (tickets > 0) {
-                    lotteryService.awardTickets(requestId, tickets);
-                }
-
-                bonusService.creditReferral(request.getChatId(), request.getAmount());
-
-                // Calculate limit increase directly from percentage (optimize: avoid multiple DB calls)
-                java.math.BigDecimal topUpPercentage = configurationService.getTopUpDailyLimitIncreasePercentage();
+                long tickets = 0;
                 long limitIncrease = 0L;
-                if (topUpPercentage.compareTo(java.math.BigDecimal.ZERO) > 0) {
-                    java.math.BigDecimal increaseAmountBD = java.math.BigDecimal.valueOf(request.getAmount())
-                            .multiply(topUpPercentage)
-                            .divide(java.math.BigDecimal.valueOf(100), 8, java.math.RoundingMode.HALF_UP);
-                    limitIncrease = increaseAmountBD.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
+                if (!"Wallet".equals(platformName)) {
+                    long ticketCalculationAmount = configurationService.getTicketCalculationAmount();
+                    tickets = request.getAmount() / ticketCalculationAmount;
+                    if (tickets > 0) {
+                        lotteryService.awardTickets(requestId, tickets);
+                    }
+
+                    bonusService.creditReferral(request.getChatId(), request.getAmount());
+
+                    // Calculate limit increase directly from percentage (optimize: avoid multiple
+                    // DB calls)
+                    java.math.BigDecimal topUpPercentage = configurationService.getTopUpDailyLimitIncreasePercentage();
+                    if (topUpPercentage.compareTo(java.math.BigDecimal.ZERO) > 0) {
+                        java.math.BigDecimal increaseAmountBD = java.math.BigDecimal.valueOf(request.getAmount())
+                                .multiply(topUpPercentage)
+                                .divide(java.math.BigDecimal.valueOf(100), 8, java.math.RoundingMode.HALF_UP);
+                        limitIncrease = increaseAmountBD.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
+                    }
+
+                    // Process top-up (this will add the limit increase internally)
+                    dailyStatsService.addTopUpAmount(request.getChatId(), request.getAmount());
                 }
-                
-                // Process top-up (this will add the limit increase internally)
-                dailyStatsService.addTopUpAmount(request.getChatId(), request.getAmount());
+
+                long quotaEarned = 0L;
+                if (!"Wallet".equals(platformName)) {
+                    Long ratio = configurationService.getWalletWithdrawRatio();
+                    long amountForQuota = request.getAmount() != null ? request.getAmount() : (request.getUniqueAmount() != null ? request.getUniqueAmount() : 0L);
+                    quotaEarned = amountForQuota * ratio;
+                    UserWalletQuota quota = userWalletQuotaRepository.findByIdWithLock(request.getChatId())
+                            .orElse(UserWalletQuota.builder().chatId(request.getChatId()).earnedQuota(0L).usedQuota(0L).build());
+                    quota.setEarnedQuota(quota.getEarnedQuota() + quotaEarned);
+                    userWalletQuotaRepository.save(quota);
+                    logger.info("Quota earned for chatId {} (card-to-platform screenshot): +{} UZS (ratio={})", request.getChatId(), quotaEarned, ratio);
+                }
 
                 // Get limit information (cache to avoid multiple calls)
                 String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
                 Long totalLimit = dailyStatsService.getEffectiveDailyLimit(request.getChatId());
                 Long availableLimit = dailyStatsService.getAvailableLimit(request.getChatId());
+                String cardBlockUser = optionalCardLineBackticks(request.getCardNumber()) + optionalAdminCardLine(adminCard.getCardNumber());
                 String logMessage = String.format(
-                        " 🆔: %d To'lov skrinshoti tasdiqlandi ✅\n" +
-                                "👤ID [%s] %s\n" +
-                                "🌐 #%s: " + "%s\n" +
+                        " 🆔: `%d` To'lov skrinshoti tasdiqlandi ✅\n" +
+                                "👤 ID: `%s` %s\n" +
+                                "🌐 #%s: " + "`%s`\n" +
                                 "💸 Miqdor: %,d UZS\n" +
                                 "💸 Miqdor: %,d RUB\n" +
-                                "💳 Karta: `%s`\n" +
-                                "🔐 Admin kartasi: `%s`\n" +
+                                "%s" +
                                 "🎟️ Chiptalar: %d (+ %d )\n\n" +
                                 "📈 Limit oshdi: %,d so'm\n" +
                                 "📊 Limit: %,d / %,d so'm\n" +
@@ -1203,8 +1479,7 @@ public class TopUpService {
                         request.getPlatformUserId(),
                         request.getUniqueAmount(),
                         rubAmount,
-                        request.getCardNumber(),
-                        adminCard.getCardNumber(),
+                        cardBlockUser,
                         balance.getTickets(),
                         tickets,
                         limitIncrease,
@@ -1212,35 +1487,69 @@ public class TopUpService {
                         LocalDateTime.now(ZoneId.of("GMT+5"))
                                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                 LocalDate todayForTopUp = LocalDate.now(ZoneId.of("GMT+5"));
-                Optional<DailyUserStats> dailyStatsOptForTopUp = dailyUserStatsRepository.findByChatIdAndDate(request.getChatId(), todayForTopUp);
+                Optional<DailyUserStats> dailyStatsOptForTopUp = dailyUserStatsRepository
+                        .findByChatIdAndDate(request.getChatId(), todayForTopUp);
                 Long dailyTopUpAmountForLog = dailyStatsOptForTopUp.map(DailyUserStats::getDailyTopUpAmount).orElse(0L);
-                String adminLogMessage = String.format(
-                        "🆔: %d To'lov skrinshoti tasdiqlandi ✅\n" +
-                                "👤: [%d] %s\n" +
-                                "🌐 #%s: %s\n" +
-                                "💸 Miqdor: %,d UZS\n" +
-                                "💸 Miqdor: %,d RUB\n" +
-                                "💳 Karta: %s\n" +
-                                "💳 Bizniki: %s\n" +
-                                "🎟️ Chiptalar: %d (+ %d )\n" +
-                                "\n🏦: %,d %s\n" +
-                                "📊 Limit: %,d / %,d so'm\n" +
-                                "📅 [%s]",
-                        request.getId(),
-                        request.getChatId(), number,
-                        request.getPlatform(),
-                        request.getPlatformUserId(),
-                        request.getUniqueAmount(),
-                        rubAmount,
-                        request.getCardNumber(),
-                        adminCard.getCardNumber(),
-                        balance.getTickets(),
-                        tickets,
-                        transferSuccessful.getLimit().longValue(),
-                        request.getCurrency().toString(),
-                        totalLimit, availableLimit,
-                        LocalDateTime.now(ZoneId.of("GMT+5"))
-                                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                String cardBlockAdmin2 = optionalCardLinePlain(request.getCardNumber()) + optionalBiznikiLine(adminCard.getCardNumber());
+                String adminLogMessage;
+                if ("Wallet".equals(platformName)) {
+                    adminLogMessage = String.format(
+                            "🆔: `%d` To'lov skrinshoti tasdiqlandi ✅\n" +
+                                    "👤: `%d` %s\n" +
+                                    "🌐 #%s: `%s`\n" +
+                                    "💸 Miqdor: %,d UZS\n" +
+                                    "💸 Miqdor: %,d RUB\n" +
+                                    "%s" +
+                                    "🎟️ Chiptalar: %d (+ %d )\n" +
+                                    "🔰 Yechib olish kvotasi: +%,d UZS\n" +
+                                    "\n📊 Limit: %,d / %,d so'm\n" +
+                                    "🏧 Qoldi: %,d UZS\n" +
+                                    "📅 [%s]",
+                            request.getId(),
+                            request.getChatId(), number,
+                            request.getPlatform(),
+                            request.getPlatformUserId(),
+                            request.getUniqueAmount(),
+                            rubAmount,
+                            cardBlockAdmin2,
+                            balance.getTickets(),
+                            tickets,
+                            quotaEarned,
+                            totalLimit, availableLimit,
+                            balance.getWalletBalance() != null ? balance.getWalletBalance() : 0L,
+                            LocalDateTime.now(ZoneId.of("GMT+5"))
+                                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                } else {
+                    adminLogMessage = String.format(
+                            "🆔: `%d` To'lov skrinshoti tasdiqlandi ✅\n" +
+                                    "👤: `%d` %s\n" +
+                                    "🌐 #%s: `%s`\n" +
+                                    "💸 Miqdor: %,d UZS\n" +
+                                    "💸 Miqdor: %,d RUB\n" +
+                                    "%s" +
+                                    "🎟️ Chiptalar: %d (+ %d )\n" +
+                                    "🔰 Yechib olish kvotasi: +%,d UZS\n" +
+                                    "\n🏦: %,d %s\n" +
+                                    "📊 Limit: %,d / %,d so'm\n" +
+                                    "🏧 Qoldi: %,d UZS\n" +
+                                    "📅 [%s]",
+                            request.getId(),
+                            request.getChatId(), number,
+                            request.getPlatform(),
+                            request.getPlatformUserId(),
+                            request.getUniqueAmount(),
+                            rubAmount,
+                            cardBlockAdmin2,
+                            balance.getTickets(),
+                            tickets,
+                            quotaEarned,
+                            transferSuccessful.getLimit().longValue(),
+                            request.getCurrency().toString(),
+                            totalLimit, availableLimit,
+                            balance.getWalletBalance() != null ? balance.getWalletBalance() : 0L,
+                            LocalDateTime.now(ZoneId.of("GMT+5"))
+                                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                }
 
                 adminLogBotService.sendLog(adminLogMessage);
                 Long userChatId = request.getChatId();
@@ -1262,6 +1571,8 @@ public class TopUpService {
 
             Long userChatId = request.getChatId();
             String number = blockedUserRepository.findByChatId(userChatId).get().getPhoneNumber();
+            String cardForRejectMsg = (request.getCardNumber() != null && !request.getCardNumber().trim().isEmpty()) ? request.getCardNumber() : "";
+            String adminCardForRejectMsg = (adminCard != null && adminCard.getCardNumber() != null && !adminCard.getCardNumber().trim().isEmpty()) ? adminCard.getCardNumber() : "";
             String logMessage = String.format(
                     languageSessionService.getTranslation(userChatId, "topup.message.screenshot_rejected"),
                     request.getId(),
@@ -1269,17 +1580,16 @@ public class TopUpService {
                     request.getPlatformUserId(),
                     request.getUniqueAmount(),
                     rubAmount,
-                    request.getCardNumber(),
-                    adminCard.getCardNumber(),
+                    cardForRejectMsg,
+                    adminCardForRejectMsg,
                     LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
             String adminMessage = String.format(
-                    "🆔: %d To‘lov skrinshoti rad etildi ❌\n" +
-                            "👤ID [%s] %s\n" +
-                            "🌐 #%s: " + "%s\n" +
+                    "🆔: `%d` To‘lov skrinshoti rad etildi ❌\n" +
+                            "👤 ID: `%s` %s\n" +
+                            "🌐 #%s: " + "`%s`\n" +
                             "💸 Miqdor: %,d UZS\n" +
                             "💸 Miqdor: %,d RUB\n" +
-                            "💳 Karta: `%s`\n" +
-                            "💳 Bizniki: `%s`\n" +
+                            "%s" +
                             "📅 [%s] ",
                     request.getId(),
                     userChatId, number,
@@ -1287,8 +1597,7 @@ public class TopUpService {
                     request.getPlatformUserId(),
                     request.getUniqueAmount(),
                     rubAmount,
-                    request.getCardNumber(),
-                    adminCard.getCardNumber(),
+                    optionalCardLineBackticks(request.getCardNumber()) + optionalBiznikiLineBackticks(adminCard != null ? adminCard.getCardNumber() : null),
                     LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
             adminLogBotService.sendLog(adminMessage);
@@ -1335,7 +1644,39 @@ public class TopUpService {
                 : null;
     }
 
-    private BalanceLimit transferToPlatform(HizmatRequest request, AdminCard adminCard) {
+    /**
+     * Credits the wallet balance for a "Wallet" platform top-up (card-to-wallet only).
+     * Returns a non-null BalanceLimit to indicate success (compatible with transfer
+     * flow).
+     * Must NOT award withdraw quota; quota is earned only on wallet-to-platform transfers.
+     */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public BalanceLimit creditWalletBalance(HizmatRequest request) {
+        UserBalance balance = userBalanceRepository.findByIdWithLock(request.getChatId())
+                .orElseGet(() -> {
+                    UserBalance newBalance = UserBalance.builder()
+                            .chatId(request.getChatId())
+                            .tickets(0L)
+                            .balance(BigDecimal.ZERO)
+                            .build();
+                    return userBalanceRepository.save(newBalance);
+                });
+        balance.setWalletBalance(balance.getWalletBalance() + request.getUniqueAmount());
+        userBalanceRepository.save(balance);
+        logger.info("✅ Wallet balance credited for chatId {}: +{} UZS, new balance: {}",
+                request.getChatId(), request.getUniqueAmount(), balance.getWalletBalance());
+        return new BalanceLimit(BigDecimal.ZERO, BigDecimal.ZERO);
+    }
+
+    public BalanceLimit transferToPlatform(HizmatRequest request, String cardNumber) {
+        return transferToPlatformInternal(request, cardNumber);
+    }
+
+    public BalanceLimit transferToPlatform(HizmatRequest request, AdminCard adminCard) {
+        return transferToPlatformInternal(request, adminCard.getCardNumber());
+    }
+
+    private BalanceLimit transferToPlatformInternal(HizmatRequest request, String cardNumber) {
         String platformName = request.getPlatform();
         Platform platform = platformRepository.findByName(platformName)
                 .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
@@ -1384,7 +1725,7 @@ public class TopUpService {
         body.put("lng", lng);
         body.put("summa", amount);
         body.put("confirm", confirm);
-        body.put("cardNumber", adminCard.getCardNumber());
+        body.put("cardNumber", cardNumber);
 
         try {
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
@@ -1403,61 +1744,88 @@ public class TopUpService {
                 if (messageObj != null) {
                     String message = messageObj.toString().toLowerCase();
                     String originalMessage = messageObj.toString();
-                    
+
                     // Check if operation is queued (valid success response)
                     if (message.contains("очередь") || message.contains("принята") || message.contains("поставлена")
                             || message.contains("queue") || message.contains("queued") || message.contains("accepted")
                             || message.contains("pending")) {
                         isQueuedOperation = true;
-                        logger.info("⏳ Transfer queued (will be processed) for chatId {}, userId: {}, message: {}", 
+                        logger.info("⏳ Transfer queued (will be processed) for chatId {}, userId: {}, message: {}",
                                 request.getChatId(), userId, originalMessage);
                     }
-                    
-                    // If message indicates failure (e.g., contains error keywords), treat as failure
-                    if (!isQueuedOperation && (message.contains("error") || message.contains("fail") || message.contains("insufficient") 
+
+                    // If message indicates failure (e.g., contains error keywords), treat as
+                    // failure
+                    if (!isQueuedOperation && (message.contains("error") || message.contains("fail")
+                            || message.contains("insufficient")
                             || message.contains("out of money") || message.contains("not enough"))) {
                         String errorMsg = originalMessage;
-                        logger.error("❌ Transfer failed despite success=true for chatId {}, userId: {}, message: {}", 
+                        logger.error("❌ Transfer failed despite success=true for chatId {}, userId: {}, message: {}",
                                 request.getChatId(), userId, errorMsg);
-                        adminLogBotService.sendToAdmins("❌ Transfer xatosi (success=true but error message): " + errorMsg);
+                        adminLogBotService
+                                .sendToAdmins("❌ Transfer xatosi (success=true but error message): " + errorMsg);
+                        if ("WALLET".equals(cardNumber)) {
+                            SendMessage m = new SendMessage();
+                            m.setChatId(request.getChatId().toString());
+                            m.setText(String.format(
+                                    languageSessionService.getTranslation(request.getChatId(), "wallet.message.transfer_failed_reason"),
+                                    escapeMarkdown(errorMsg)));
+                            m.enableMarkdown(true);
+                            messageSender.sendMessage(m, request.getChatId());
+                        }
                         return null;
                     }
                 }
-                
+
                 if (isQueuedOperation) {
-                    logger.info("✅ Transfer queued successfully for chatId {}, userId: {}, amount: {}, platform: {}. Operation will be processed.",
+                    logger.info(
+                            "✅ Transfer queued successfully for chatId {}, userId: {}, amount: {}, platform: {}. Operation will be processed.",
                             request.getChatId(), userId, amount, platformName);
-                    
-                    // For queued operations, try to get balance but don't fail if it's not available yet
+
+                    // For queued operations, try to get balance but don't fail if it's not
+                    // available yet
                     BalanceLimit balanceLimit = null;
                     try {
                         balanceLimit = getCashdeskBalance(hash, cashierPass, cashdeskId);
                     } catch (Exception e) {
-                        logger.warn("⚠️ Balance retrieval failed for queued operation (chatId: {}, userId: {}), but operation is queued and will be processed: {}", 
+                        logger.warn(
+                                "⚠️ Balance retrieval failed for queued operation (chatId: {}, userId: {}), but operation is queued and will be processed: {}",
                                 request.getChatId(), userId, e.getMessage());
                     }
-                    
-                    // Return a valid BalanceLimit even if balance retrieval failed (queued operations will process)
+
+                    // Return a valid BalanceLimit even if balance retrieval failed (queued
+                    // operations will process)
                     if (balanceLimit == null) {
                         // Return a placeholder balance limit for queued operations
                         balanceLimit = new BalanceLimit(BigDecimal.ZERO, BigDecimal.ZERO);
                     }
-                    
+
                     return balanceLimit;
                 }
-                
+
                 logger.info("✅ Transfer successful for chatId {}, userId: {}, amount: {}, platform: {}",
                         request.getChatId(), userId, amount, platformName);
 
                 BalanceLimit balanceLimit = getCashdeskBalance(hash, cashierPass, cashdeskId);
                 if (balanceLimit == null) {
                     // Balance retrieval failed - treat transfer as failed
-                    logger.error("❌ Failed to retrieve balance after transfer for chatId {}, userId: {}, platform: {}", 
+                    logger.error("❌ Failed to retrieve balance after transfer for chatId {}, userId: {}, platform: {}",
                             request.getChatId(), userId, platformName);
-                    adminLogBotService.sendToAdmins("❌ Transfer xatosi: Balance retrieval failed for chatId " + request.getChatId());
+                    adminLogBotService.sendToAdmins(
+                            "❌ Transfer xatosi: Balance retrieval failed for chatId " + request.getChatId());
+                    if ("WALLET".equals(cardNumber)) {
+                        String err = languageSessionService.getTranslation(request.getChatId(), "topup.message.transfer_error_default");
+                        SendMessage m = new SendMessage();
+                        m.setChatId(request.getChatId().toString());
+                        m.setText(String.format(
+                                languageSessionService.getTranslation(request.getChatId(), "wallet.message.transfer_failed_reason"),
+                                escapeMarkdown(err)));
+                        m.enableMarkdown(true);
+                        messageSender.sendMessage(m, request.getChatId());
+                    }
                     return null;
                 }
-                
+
                 return balanceLimit;
             }
 
@@ -1468,9 +1836,15 @@ public class TopUpService {
             logger.error("❌ Transfer failed for chatId {}, userId: {}, response: {}", request.getChatId(), userId,
                     responseBody);
             adminLogBotService.sendToAdmins("❌ Transfer xatosi: " + errorMsg);
-            // messageSender.sendMessage(request.getChatId(),
-            // String.format(languageSessionService.getTranslation(request.getChatId(),
-            // "topup.message.transfer_error"), errorMsg));
+            if ("WALLET".equals(cardNumber)) {
+                SendMessage m = new SendMessage();
+                m.setChatId(request.getChatId().toString());
+                m.setText(String.format(
+                        languageSessionService.getTranslation(request.getChatId(), "wallet.message.transfer_failed_reason"),
+                        escapeMarkdown(errorMsg)));
+                m.enableMarkdown(true);
+                messageSender.sendMessage(m, request.getChatId());
+            }
             return null;
 
         } catch (HttpClientErrorException e) {
@@ -1505,11 +1879,13 @@ public class TopUpService {
         String buttonKey = attempts >= 2 ? "topup.button.send_screenshot" : "topup.button.confirm";
 
         if (request.getCurrency().equals(Currency.RUB)) {
-            // Use the RUB amount the user entered (from session) - avoids UZS→RUB conversion mismatch
+            // Use the RUB amount the user entered (from session) - avoids UZS→RUB
+            // conversion mismatch
             // Fallback: derive from UZS using rubToUzs (amount_uzs / rubToUzs = amount_rub)
             String amountStr = sessionService.getUserData(chatId, "amount");
             long rubAmount;
-            if (amountStr != null && !amountStr.isEmpty() && "RUB".equals(sessionService.getUserData(chatId, "amountCurrency"))) {
+            if (amountStr != null && !amountStr.isEmpty()
+                    && "RUB".equals(sessionService.getUserData(chatId, "amountCurrency"))) {
                 rubAmount = Long.parseLong(amountStr);
             } else {
                 rubAmount = BigDecimal.valueOf(request.getAmount())
@@ -1517,11 +1893,12 @@ public class TopUpService {
                         .divide(BigDecimal.valueOf(1000), 0, RoundingMode.HALF_UP).longValue();
             }
 
+            String rateDisplay = formatRateOrAmount(latest.getUzsToRub());
             messageText = String.format(
                     languageSessionService.getTranslation(chatId, "topup.message.payment_instruction_rub"),
                     request.getUniqueAmount(),
                     request.getAmount(), request.getUniqueAmount(), escapedCardNumber,
-                    latest.getUzsToRub(), rubAmount,
+                    rateDisplay, rubAmount,
                     languageSessionService.getTranslation(chatId, buttonKey), chatId, request.getId());
         } else {
             messageText = String.format(
@@ -1553,6 +1930,37 @@ public class TopUpService {
         Random random = new Random();
         int randomDigits = random.nextInt(100);
         return baseAmount + randomDigits;
+    }
+
+    /** Formats exchange rate or amount for display: whole number without trailing zeros (e.g. 7.0000 -> "7"). */
+    private String formatRateOrAmount(BigDecimal value) {
+        if (value == null) return "0";
+        return value.stripTrailingZeros().toPlainString();
+    }
+
+    private static String optionalCardLineBackticks(String card) {
+        if (card == null || card.trim().isEmpty()) return "";
+        return "💳 Karta: `" + card + "`\n";
+    }
+
+    private static String optionalAdminCardLine(String card) {
+        if (card == null || card.trim().isEmpty()) return "";
+        return "🔐 Admin kartasi: `" + card + "`\n";
+    }
+
+    private static String optionalCardLinePlain(String card) {
+        if (card == null || card.trim().isEmpty()) return "";
+        return "💳 Karta: " + card + "\n";
+    }
+
+    private static String optionalBiznikiLine(String bizniki) {
+        if (bizniki == null || bizniki.trim().isEmpty()) return "";
+        return "💳 Bizniki: " + bizniki + "\n";
+    }
+
+    private static String optionalBiznikiLineBackticks(String bizniki) {
+        if (bizniki == null || bizniki.trim().isEmpty()) return "";
+        return "💳 Bizniki: `" + bizniki + "`\n";
     }
 
     private void sendPlatformSelection(Long chatId) {
@@ -1610,19 +2018,25 @@ public class TopUpService {
 
     private boolean isRubTopUp(Long chatId) {
         String platformName = sessionService.getUserData(chatId, "platform");
-        if (platformName == null) return false;
+        if (platformName == null)
+            return false;
         platformName = platformName.replace("_", "");
         Optional<Platform> platformOpt = platformRepository.findByName(platformName);
         if (platformOpt.isPresent()) {
             return platformOpt.get().getCurrency() == Currency.RUB;
         }
         String userId = sessionService.getUserData(chatId, "platformUserId");
-        if (userId == null) return false;
-        Optional<HizmatRequest> req = requestRepository.findTopByChatIdAndPlatformAndPlatformUserIdOrderByCreatedAtDesc(chatId, platformName, userId);
+        if (userId == null)
+            return false;
+        Optional<HizmatRequest> req = requestRepository
+                .findTopByChatIdAndPlatformAndPlatformUserIdOrderByCreatedAtDesc(chatId, platformName, userId);
         return req.map(r -> r.getCurrency() == Currency.RUB).orElse(false);
     }
 
     private void sendAmountInput(Long chatId) {
+        String platformUserId = sessionService.getUserData(chatId, "platformUserId");
+        String userIdDisplay = platformUserId != null && !platformUserId.isEmpty() ? platformUserId : "—";
+
         SendMessage message = new SendMessage();
         message.setChatId(chatId);
         boolean rub = isRubTopUp(chatId);
@@ -1635,10 +2049,11 @@ public class TopUpService {
                     .divide(BigDecimal.valueOf(1000), 0, RoundingMode.DOWN).longValue();
             long maxRub = BigDecimal.valueOf(maxUzs).multiply(latest.getUzsToRub())
                     .divide(BigDecimal.valueOf(1000), 0, RoundingMode.UP).longValue();
-            if (minRub < 1) minRub = 1;
+            if (minRub < 1)
+                minRub = 1;
             String messageText = String.format(
                     languageSessionService.getTranslation(chatId, "topup.message.enter_amount_rub"),
-                    minRub, maxRub);
+                    userIdDisplay);
             message.setText(messageText);
             message.setReplyMarkup(createAmountKeyboard(chatId));
         } else {
@@ -1646,7 +2061,7 @@ public class TopUpService {
             long maxAmount = configurationService.getTopUpMaxAmount();
             String messageText = String.format(
                     languageSessionService.getTranslation(chatId, "topup.message.enter_amount"),
-                    minAmount, maxAmount);
+                    userIdDisplay);
             message.setText(messageText);
             message.setReplyMarkup(createAmountKeyboard(chatId));
         }
@@ -1678,6 +2093,11 @@ public class TopUpService {
         List<Platform> uzsPlatforms = platformRepository.findByCurrency(Currency.UZS);
         List<Platform> rubPlatforms = platformRepository.findByCurrency(Currency.RUB);
 
+        // Add Wallet button as the first option
+        rows.add(List.of(createButton(
+                languageSessionService.getTranslation(chatId, "topup.button.wallet"),
+                "TOPUP_PLATFORM:Wallet")));
+
         int maxRows = Math.max(uzsPlatforms.size(), rubPlatforms.size());
         for (int i = 0; i < maxRows; i++) {
             List<InlineKeyboardButton> row = new ArrayList<>();
@@ -1708,6 +2128,7 @@ public class TopUpService {
                 rows.add(row);
             }
         }
+
         rows.add(createNavigationButtons(chatId));
         markup.setKeyboard(rows);
         return markup;
@@ -1771,9 +2192,12 @@ public class TopUpService {
                     .divide(BigDecimal.valueOf(1000), 0, RoundingMode.DOWN).longValue();
             long maxRub = BigDecimal.valueOf(maxUzs).multiply(latest.getUzsToRub())
                     .divide(BigDecimal.valueOf(1000), 0, RoundingMode.UP).longValue();
-            if (minRub < 1) minRub = 1;
-            String minButtonText = String.format(languageSessionService.getTranslation(chatId, "topup.button.min_rub"), minRub);
-            String maxButtonText = String.format(languageSessionService.getTranslation(chatId, "topup.button.max_rub"), maxRub);
+            if (minRub < 1)
+                minRub = 1;
+            String minButtonText = String.format(languageSessionService.getTranslation(chatId, "topup.button.min_rub"),
+                    minRub);
+            String maxButtonText = String.format(languageSessionService.getTranslation(chatId, "topup.button.max_rub"),
+                    maxRub);
             rows.add(List.of(
                     createButton(minButtonText, "TOPUP_AMOUNT_MIN"),
                     createButton(maxButtonText, "TOPUP_AMOUNT_MAX")));

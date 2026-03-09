@@ -37,7 +37,8 @@ public class AdminLogBotService {
         }
         var adminChats = adminChatRepository.findByReceiveNotificationsTrue();
         if (adminChats.isEmpty()) {
-            logger.warn("No admin chat IDs with notifications enabled to send screenshot for userChatId {}", userChatId);
+            logger.warn("No admin chat IDs with notifications enabled to send screenshot for userChatId {}",
+                    userChatId);
             return;
         }
 
@@ -53,26 +54,29 @@ public class AdminLogBotService {
         // Calculate RUB amount if needed
         ExchangeRate latest = exchangeRateRepository.findLatest()
                 .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
-        long rubAmount =
-                BigDecimal.valueOf(request.getUniqueAmount())
-                        .multiply(latest.getUzsToRub())
-                        .longValue() / 1000;
+        long rubAmount = BigDecimal.valueOf(request.getUniqueAmount())
+                .multiply(latest.getUzsToRub())
+                .longValue() / 1000;
         // Format log message as photo caption
         String number = blockedUserRepository.findByChatId(userChatId).get().getPhoneNumber();
-        String adminCardNum = request.getAdminCardId() != null ? adminCardRepository.findById(request.getAdminCardId()).map(AdminCard::getCardNumber).orElse("N/A") : "N/A";
+        String adminCardNum = request.getAdminCardId() != null
+                ? adminCardRepository.findById(request.getAdminCardId()).map(AdminCard::getCardNumber).orElse("N/A")
+                : "N/A";
 
         String logMessage = String.format(
-                "\uD83C\uDD94: %d To‘lov skrinshoti keldi 📷\n" +
-                        "👤 User ID [%s] %s\n" +
-                        "🌐 %s: " + "%s\n"+
+                "🆔: `%d` To‘lov skrinshoti keldi 📷\n" +
+                        "👤 User ID: `%s` %s\n" +
+                        "🌐 Platform: %s\n" +
+                        "📋 Platform ID: `%s`\n" +
                         "💸 Miqdor: %,d UZS\n" +
                         "💸 Miqdor: %,d RUB\n" +
-                        "💳 Karta: `%s`\n" +
-                        "\uD83D\uDCB3 Bizniki: `%s`\n" +
+                        "%s" +
                         "📅 [%s]",
                 request.getId(),
                 userChatId, number, request.getPlatform(), request.getPlatformUserId(),
-                request.getUniqueAmount(), rubAmount, request.getCardNumber(), adminCardNum,
+                request.getUniqueAmount(), rubAmount,
+                ((request.getCardNumber() != null && !request.getCardNumber().trim().isEmpty()) ? "💳 Karta: `" + request.getCardNumber() + "`\n" : "")
+                        + ((adminCardNum != null && !adminCardNum.isEmpty() && !"N/A".equals(adminCardNum)) ? "\uD83D\uDCB3 Bizniki: `" + adminCardNum + "`\n" : ""),
                 LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
         // Set log message as photo caption
@@ -87,7 +91,8 @@ public class AdminLogBotService {
             try {
                 sendPhoto.setChatId(adminChat.getChatId().toString());
                 adminTelegramMessageSender.sendScreenshotRequest(sendPhoto, adminChat.getChatId());
-                logger.info("Sent screenshot with log caption to admin chatId {} for userChatId {}", adminChat.getChatId(), userChatId);
+                logger.info("Sent screenshot with log caption to admin chatId {} for userChatId {}",
+                        adminChat.getChatId(), userChatId);
             } catch (Exception e) {
                 logger.error("Failed to send screenshot with log caption to admin chatId {} for userChatId {}: {}",
                         adminChat.getChatId(), userChatId, e.getMessage());
@@ -145,8 +150,8 @@ public class AdminLogBotService {
         }
         adminChat.setReceiveNotifications(enable);
         adminChatRepository.save(adminChat);
-        String message = enable ? "✅ Bildirishnomalar yoqildi for chatId: " + chatId :
-                "🔔 Bildirishnomalar o‘chirildi for chatId: " + chatId;
+        String message = enable ? "✅ Bildirishnomalar yoqildi for chatId: " + chatId
+                : "🔔 Bildirishnomalar o‘chirildi for chatId: " + chatId;
         logger.info("{} notifications for admin chatId: {}", enable ? "Enabled" : "Disabled", chatId);
         sendToAdmins(message);
     }
@@ -185,7 +190,11 @@ public class AdminLogBotService {
             return;
         }
         for (AdminChat adminChat : adminChats) {
-            adminTelegramMessageSender.sendMessage(adminChat.getChatId(), message);
+            SendMessage sendMessage = new SendMessage();
+            sendMessage.setChatId(adminChat.getChatId().toString());
+            sendMessage.setText(message);
+            sendMessage.enableMarkdown(true);
+            adminTelegramMessageSender.sendMessage(sendMessage, adminChat.getChatId());
             logger.info("Sent log to admin chatId: {}", adminChat.getChatId());
         }
     }
@@ -194,7 +203,8 @@ public class AdminLogBotService {
         sendWithdrawRequestToAdmins(userChatId, message, requestId, createApprovalKeyboard(requestId));
     }
 
-    public void sendWithdrawRequestToAdmins(Long userChatId, String message, Long requestId, InlineKeyboardMarkup keyboard) {
+    public void sendWithdrawRequestToAdmins(Long userChatId, String message, Long requestId,
+            InlineKeyboardMarkup keyboard) {
         var adminChats = adminChatRepository.findByReceiveNotificationsTrue();
         if (adminChats.isEmpty()) {
             logger.warn("No admin chat IDs with notifications enabled to send withdraw request: {}", message);
@@ -219,7 +229,11 @@ public class AdminLogBotService {
             return;
         }
         for (AdminChat adminChat : adminChats) {
-            adminTelegramMessageSender.sendMessage(adminChat.getChatId(), message);
+            SendMessage sendMessage = new SendMessage();
+            sendMessage.setChatId(adminChat.getChatId().toString());
+            sendMessage.setText(message);
+            sendMessage.enableMarkdown(true);
+            adminTelegramMessageSender.sendMessage(sendMessage, adminChat.getChatId());
             logger.info("Sent message to admin chatId: {}", adminChat.getChatId());
         }
     }
@@ -234,10 +248,30 @@ public class AdminLogBotService {
             SendMessage sendMessage = new SendMessage();
             sendMessage.setChatId(adminChat.getChatId().toString());
             sendMessage.setText(message);
+            sendMessage.enableMarkdown(true);
             sendMessage.setReplyMarkup(keyboard);
             adminTelegramMessageSender.sendMessage(sendMessage, adminChat.getChatId());
             logger.info("Sent message with keyboard to admin chatId: {}", adminChat.getChatId());
         }
+    }
+
+    public void sendToSingleAdmin(Long adminChatId, String message) {
+        SendMessage sendMessage = new SendMessage();
+        sendMessage.setChatId(adminChatId.toString());
+        sendMessage.setText(message);
+        sendMessage.enableMarkdown(true);
+        adminTelegramMessageSender.sendMessage(sendMessage, adminChatId);
+        logger.info("Sent single message to admin chatId: {}", adminChatId);
+    }
+
+    public void sendToSingleAdmin(Long adminChatId, String message, InlineKeyboardMarkup keyboard) {
+        SendMessage sendMessage = new SendMessage();
+        sendMessage.setChatId(adminChatId.toString());
+        sendMessage.setText(message);
+        sendMessage.enableMarkdown(true);
+        sendMessage.setReplyMarkup(keyboard);
+        adminTelegramMessageSender.sendMessage(sendMessage, adminChatId);
+        logger.info("Sent single message with keyboard to admin chatId: {}", adminChatId);
     }
 
     private InlineKeyboardMarkup createApprovalKeyboard(Long requestId) {
@@ -245,8 +279,7 @@ public class AdminLogBotService {
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         rows.add(List.of(
                 createButton("✅ Tasdiqlash", "APPROVE_WITHDRAW:" + requestId),
-                createButton("❌ Rad etish", "REJECT_WITHDRAW:" + requestId)
-        ));
+                createButton("❌ Rad etish", "REJECT_WITHDRAW:" + requestId)));
         markup.setKeyboard(rows);
         return markup;
     }
@@ -261,8 +294,7 @@ public class AdminLogBotService {
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         rows.add(List.of(
                 createButton("✅ Approve", "SCREENSHOT_APPROVE:" + requestId),
-                createButton("❌ Reject", "SCREENSHOT_REJECT:" + requestId)
-        ));
+                createButton("❌ Reject", "SCREENSHOT_REJECT:" + requestId)));
         markup.setKeyboard(rows);
         return markup;
     }

@@ -190,7 +190,8 @@ public class OsonService {
                 Map<String, Object> responseBody = apiResponse.getBody();
                 if (apiResponse.getStatusCode().is2xxSuccessful() && responseBody != null && "0".equals(String.valueOf(responseBody.get("errno")))) {
                     List<Map<String, Object>> transactions = (List<Map<String, Object>>) responseBody.get("array");
-                    String userCardLastDigits = userCardNumber.substring(userCardNumber.length() - 4);
+                    String userCardLastDigits = (userCardNumber != null && userCardNumber.length() >= 4)
+                            ? userCardNumber.substring(userCardNumber.length() - 4) : "";
                     OffsetDateTime now = OffsetDateTime.now(ZoneId.of("GMT+5"));
 
                     for (Map<String, Object> transaction : transactions) {

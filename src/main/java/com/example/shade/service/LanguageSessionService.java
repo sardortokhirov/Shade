@@ -40,6 +40,15 @@ public class LanguageSessionService {
         }
     }
 
+    /** Returns translation always in Uzbek (e.g. for lotto log bot messages). */
+    public String getTranslationUz(String textCode) {
+        try {
+            return messageSource.getMessage(textCode, null, new Locale("uz"));
+        } catch (Exception e) {
+            return "Translation not found for code: " + textCode;
+        }
+    }
+
     public void addUserLanguageSession(Long chatId, Language language) {
         sessionStore.put(chatId, language);
     }

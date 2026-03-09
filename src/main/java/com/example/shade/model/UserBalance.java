@@ -24,6 +24,10 @@ public class UserBalance {
     @Column(name = "balance", nullable = false, precision = 30, scale = 2)
     private BigDecimal balance;
 
+    @Column(name = "wallet_balance", nullable = false, columnDefinition = "bigint default 0")
+    @Builder.Default
+    private Long walletBalance = 0L;
+
     @Column(name = "last_lottery_play_time", nullable = true)
     private LocalDateTime lastLotteryPlayTime;
 }

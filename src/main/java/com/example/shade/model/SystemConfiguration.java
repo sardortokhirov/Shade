@@ -64,6 +64,19 @@ public class SystemConfiguration {
     @Column(name = "lottery_cooldown_seconds", nullable = false)
     private Long lotteryCooldownSeconds = 300L;
 
+    @Column(name = "wallet_min_withdraw_amount", nullable = false, columnDefinition = "bigint default 10000")
+    private Long walletMinWithdrawAmount = 10_000L;
+
+    /**
+     * Multiplier: how many UZS of withdrawal quota a user earns per 1 UZS
+     * transferred to a platform.
+     * E.g., ratio=10 means sending 10,000 to platform earns 100,000 withdrawal
+     * quota.
+     * Applies only to new platform transfers after each ratio change.
+     */
+    @Column(name = "wallet_withdraw_ratio", nullable = false, columnDefinition = "bigint default 10")
+    private Long walletWithdrawRatio = 10L;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 }

@@ -2,6 +2,7 @@ package com.example.shade.controller;
 
 import com.example.shade.dto.DashboardStats;
 import com.example.shade.dto.RequestFilter;
+import com.example.shade.dto.UserWalletBalancesResponse;
 import com.example.shade.model.RequestStatus;
 import com.example.shade.model.RequestType;
 import com.example.shade.service.DashboardService;
@@ -220,5 +221,18 @@ public class DashboardController {
         RequestFilter filter = new RequestFilter(null, null, RequestStatus.APPROVED, null, startDate, endDate);
         Map<String, Map<String, Double>> platformGraphData = dashboardService.getPlatformGraphData(filter);
         return ResponseEntity.ok(platformGraphData);
+    }
+
+    /**
+     * Returns all users' wallet balances and total (for dashboard).
+     * Requires same Basic auth as other dashboard endpoints.
+     */
+    @GetMapping("/wallet-balances")
+    public ResponseEntity<UserWalletBalancesResponse> getAllUsersWalletMoney(HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        UserWalletBalancesResponse response = dashboardService.getAllUsersWalletMoney();
+        return ResponseEntity.ok(response);
     }
 }

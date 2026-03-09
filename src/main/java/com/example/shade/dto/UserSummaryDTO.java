@@ -12,11 +12,13 @@ import java.time.LocalDateTime;
 public class UserSummaryDTO {
     private Long totalTopUps;
     private Long totalTransfers;
+    private Long totalTips;
     private Long totalRequests;
     private Long approvedRequests;
     private Long canceledRequests;
     private Long pendingRequests;
     private Long failedRequests;
+    private Long walletBalance;
     private LocalDateTime firstRequestDate;
     private LocalDateTime lastRequestDate;
 }

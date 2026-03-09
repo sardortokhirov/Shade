@@ -1,0 +1,185 @@
+﻿message.phone_number_request=Iltimos, telefon raqamingizni yuboring yoki menyuga oâ€˜tish uchun quyidagi tugmani bosing:
+button.phone_number_submit=ðŸ“ž Telefon raqamni yuborish
+message.phone_number_recieved=Telefon raqami qabul qilindi.
+message.please_confirm_payment_transaction=Iltimos, avval toâ€˜lov soâ€˜rovini yakunlang.
+message.invalid_photo_file=Xatolik: Yuklangan rasm fayli notoâ€˜gâ€˜ri. Iltimos, qayta urinib koâ€˜ring.
+message.photo_processing_error=Xatolik: Rasmni yuborishda xato yuz berdi. Iltimos, qayta urinib koâ€˜ring.
+message.photo_sent_confirmation=Rasm yuborildi. Admin tasdiqlashini kuting.
+message.feature_unavailable=Iltimos, 5 daqiqadan soâ€˜ng urinib kuring
+message.awaiting_phone_number=Iltimos, avval telefon raqamingizni yuboring.
+message.phone_number_prompt=Iltimos, telefon raqamingizni yuborish uchun tugmani bosing yoki menyuga oâ€˜tish uchun 'Asosiy menyu' ni tanlang.
+message.invalid_command=Iltimos, menyudan operatsiyani tanlang.
+message.unknown_callback=Notoâ€˜gâ€˜ri buyruq. Iltimos, qayta urinib koâ€˜ring.
+message.callback_error=Xatolik yuz berdi. Iltimos, qayta urinib koâ€˜ring.
+message.main_menu_welcome=Xush kelibsiz! Operatsiyani tanlang:
+button.topup=ðŸ¦ Hisob To'ldirish
+button.withdraw=ðŸ’¸ Pul Chiqarish
+button.bonus=ðŸŽ Bonus
+button.contact=â„¹ï¸ Aloqa
+button.back=ðŸ”™ Orqaga
+button.home=ðŸ  Bosh sahifa
+message.language_selection=Tilni tanlang:
+button.language_ru=Ð ÑƒÑÑÐºÐ¸Ð¹
+button.language_uz=Oâ€˜zbek
+message.invalid_command=ÐÐµÐ²ÐµÑ€Ð½Ð°Ñ ÐºÐ¾Ð¼Ð°Ð½Ð´Ð°. ÐŸÐ¾Ð¶Ð°Ð»ÑƒÐ¹ÑÑ‚Ð°, Ð¿Ð¾Ð¿Ñ€Ð¾Ð±ÑƒÐ¹Ñ‚Ðµ ÑÐ½Ð¾Ð²Ð°.
+message.select_from_menu=ÐŸÐ¾Ð¶Ð°Ð»ÑƒÐ¹ÑÑ‚Ð°, Ð²Ñ‹Ð±ÐµÑ€Ð¸Ñ‚Ðµ Ð¾Ð¿ÐµÑ€Ð°Ñ†Ð¸ÑŽ Ð¸Ð· Ð¼ÐµÐ½ÑŽ.
+message.bonus_menu=ðŸŽ Ð Ð°Ð·Ð´ÐµÐ» Ð±Ð¾Ð½ÑƒÑÐ¾Ð²:\nÐ‘Ð¸Ð»ÐµÑ‚Ñ‹: %d ÑˆÑ‚.\nÐ‘Ð°Ð»Ð°Ð½Ñ: %,d ÑÑƒÐ¼\nÐŸÐ¾Ð¶Ð°Ð»ÑƒÐ¹ÑÑ‚Ð°, Ð²Ñ‹Ð±ÐµÑ€Ð¸Ñ‚Ðµ:
+message.lottery_menu=ðŸŽŸ Ð Ð°Ð·Ð´ÐµÐ» Ð»Ð¾Ñ‚ÐµÑ€ÐµÐ¸:\nÐ’Ð°ÑˆÐ¸ Ð±Ð¸Ð»ÐµÑ‚Ñ‹: %d ÑˆÑ‚.\nÐ”Ð»Ñ Ð¸Ð³Ñ€Ñ‹ Ð½ÑƒÐ¶Ð½Ð¾ Ð¼Ð¸Ð½Ð¸Ð¼ÑƒÐ¼ %d Ð±Ð¸Ð»ÐµÑ‚Ð¾Ð², Ð¼Ð°ÐºÑÐ¸Ð¼ÑƒÐ¼ %d.\nÐ¥Ð¾Ñ‚Ð¸Ñ‚Ðµ ÑÑ‹Ð³Ñ€Ð°Ñ‚ÑŒ?
+message.referral_menu=ðŸ¤ Ð Ð°Ð·Ð´ÐµÐ» Ñ€ÐµÑ„ÐµÑ€Ð°Ð»Ð¾Ð²:\nÐ ÐµÑ„ÐµÑ€Ð°Ð»ÑŒÐ½Ñ‹Ðµ Ð¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ñ‚ÐµÐ»Ð¸: %d ÑˆÑ‚.\nÐ‘Ð°Ð»Ð°Ð½Ñ: %,d ÑÑƒÐ¼\nÐ’Ñ‹Ð±ÐµÑ€Ð¸Ñ‚Ðµ:
+message.referral_link=*Ð’Ð°ÑˆÐ° Ñ€ÐµÑ„ÐµÑ€Ð°Ð»ÑŒÐ½Ð°Ñ ÑÑÑ‹Ð»ÐºÐ°:*\n\n`%s`\n\nðŸ“‹ ÐÐ°Ð¶Ð¼Ð¸Ñ‚Ðµ Ð¸ ÑƒÐ´ÐµÑ€Ð¶Ð¸Ð²Ð°Ð¹Ñ‚Ðµ ÑÑÑ‹Ð»ÐºÑƒ, Ñ‡Ñ‚Ð¾Ð±Ñ‹ ÑÐºÐ¾Ð¿Ð¸Ñ€Ð¾Ð²Ð°Ñ‚ÑŒ!
+message.topup_menu=ðŸ’° ÐŸÐ¾Ð¿Ð¾Ð»Ð½ÐµÐ½Ð¸Ðµ:\nÐ‘Ð°Ð»Ð°Ð½Ñ: %,d ÑÑƒÐ¼\nÐœÐ¸Ð½Ð¸Ð¼Ð°Ð»ÑŒÐ½Ð°Ñ ÑÑƒÐ¼Ð¼Ð° Ð¿Ð¾Ð¿Ð¾Ð»Ð½ÐµÐ½Ð¸Ñ: 10,000 ÑÑƒÐ¼\nÐ’Ñ‹Ð±ÐµÑ€Ð¸Ñ‚Ðµ Ð¿Ð»Ð°Ñ‚Ñ„Ð¾Ñ€Ð¼Ñƒ:
+message.user_id_with_recent=Ð’Ñ‹ Ð¼Ð¾Ð¶ÐµÑ‚Ðµ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ñ‚ÑŒ Ð¾Ð´Ð¸Ð½ Ð¸Ð· Ð¿Ñ€ÐµÐ´Ñ‹Ð´ÑƒÑ‰Ð¸Ñ… ID Ð¸Ð»Ð¸ Ð²Ð²ÐµÑÑ‚Ð¸ Ð½Ð¾Ð²Ñ‹Ð¹:
+message.user_id_input=ÐŸÐ¾Ð¶Ð°Ð»ÑƒÐ¹ÑÑ‚Ð°, Ð²Ð²ÐµÐ´Ð¸Ñ‚Ðµ ID Ð´Ð»Ñ %s (Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ñ†Ð¸Ñ„Ñ€Ñ‹):
+message.user_approval=Ð”Ð°Ð½Ð½Ñ‹Ðµ Ð¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ñ‚ÐµÐ»Ñ:\n\nðŸ‘¤ Ð¤.Ð˜.Ðž: %s\nðŸ†” ID: %s\n\nÐ”Ð°Ð½Ð½Ñ‹Ðµ Ð²ÐµÑ€Ð½Ñ‹?
+message.no_user_found=ÐŸÐ¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ñ‚ÐµÐ»ÑŒ Ñ ÑÑ‚Ð¸Ð¼ ID Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½. ÐŸÐ¾Ð¶Ð°Ð»ÑƒÐ¹ÑÑ‚Ð°, Ð²Ð²ÐµÐ´Ð¸Ñ‚Ðµ Ð´Ñ€ÑƒÐ³Ð¾Ð¹ ID:
+message.topup_input=Ð’Ð²ÐµÐ´Ð¸Ñ‚Ðµ ÑÑƒÐ¼Ð¼Ñƒ Ð´Ð»Ñ Ð¿Ð¾Ð¿Ð¾Ð»Ð½ÐµÐ½Ð¸Ñ Ð½Ð° %s (3,600 - 100,000 ÑÑƒÐ¼):
+message.topup_confirmation=ÐŸÑ€Ð¾Ð²ÐµÑ€ÑŒÑ‚Ðµ Ð´Ð°Ð½Ð½Ñ‹Ðµ:\n\nðŸ‘¤ ID: `%s`\nÐ¤.Ð˜.Ðž: %s\nÐŸÐ»Ð°Ñ‚Ñ„Ð¾Ñ€Ð¼Ð°: %s\nðŸ†” ID: %s\nðŸ’° Ð¡ÑƒÐ¼Ð¼Ð°: %,d ÑÑƒÐ¼\n\nÐŸÐ¾Ð´Ñ‚Ð²ÐµÑ€Ð¶Ð´Ð°ÐµÑ‚Ðµ Ð¿Ð¾Ð¿Ð¾Ð»Ð½ÐµÐ½Ð¸Ðµ?
+message.invalid_user_id=ÐÐµÐ²ÐµÑ€Ð½Ñ‹Ð¹ Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚ ID. ÐŸÐ¾Ð¶Ð°Ð»ÑƒÐ¹ÑÑ‚Ð°, Ð²Ð²ÐµÐ´Ð¸Ñ‚Ðµ ID, ÑÐ¾ÑÑ‚Ð¾ÑÑ‰Ð¸Ð¹ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð¸Ð· Ñ†Ð¸Ñ„Ñ€:
+message.api_error_invalid_signature=ÐÐµÐ²ÐµÑ€Ð½Ð°Ñ Ð¿Ð¾Ð´Ð¿Ð¸ÑÑŒ. ÐŸÐ¾Ð¶Ð°Ð»ÑƒÐ¹ÑÑ‚Ð°, Ð¿Ð¾Ð¿Ñ€Ð¾Ð±ÑƒÐ¹Ñ‚Ðµ ÑÐ½Ð¾Ð²Ð°.
+message.api_error_invalid_confirm=ÐÐµÐ²ÐµÑ€Ð½Ñ‹Ð¹ Ð¿Ð°Ñ€Ð°Ð¼ÐµÑ‚Ñ€ Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð¶Ð´ÐµÐ½Ð¸Ñ. ÐŸÑ€Ð¾Ð²ÐµÑ€ÑŒÑ‚Ðµ ID Ð¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ñ‚ÐµÐ»Ñ Ð¸ Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð¿Ð»Ð°Ñ‚Ñ„Ð¾Ñ€Ð¼Ñ‹.
+message.api_error=ÐŸÑ€Ð¾Ð¸Ð·Ð¾ÑˆÐ»Ð° Ð¾ÑˆÐ¸Ð±ÐºÐ° API. ÐŸÐ¾Ð¶Ð°Ð»ÑƒÐ¹ÑÑ‚Ð°, Ð¿Ð¾Ð¿Ñ€Ð¾Ð±ÑƒÐ¹Ñ‚Ðµ ÑÐ½Ð¾Ð²Ð°.
+message.invalid_amount_range=â—ï¸Ð¡ÑƒÐ¼Ð¼Ð° Ð´Ð¾Ð»Ð¶Ð½Ð° Ð±Ñ‹Ñ‚ÑŒ Ð¾Ñ‚ 10,000 Ð´Ð¾ 10,000,000 ÑÑƒÐ¼!
+message.insufficient_minimum_balance=â—ï¸ÐÐ° Ð²Ð°ÑˆÐµÐ¼ ÑÑ‡ÐµÑ‚Ñƒ Ð´Ð¾Ð»Ð¶Ð½Ð¾ Ð±Ñ‹Ñ‚ÑŒ Ð¼Ð¸Ð½Ð¸Ð¼ÑƒÐ¼ 10,000 ÑÑƒÐ¼. Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ Ð±Ð°Ð»Ð°Ð½Ñ: %,d ÑÑƒÐ¼
+message.insufficient_balance=â—ï¸ÐÐµÐ´Ð¾ÑÑ‚Ð°Ñ‚Ð¾Ñ‡Ð½Ð¾ ÑÑ€ÐµÐ´ÑÑ‚Ð² Ð½Ð° Ð±Ð°Ð»Ð°Ð½ÑÐµ. Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ Ð±Ð°Ð»Ð°Ð½Ñ: %,d ÑÑƒÐ¼
+message.invalid_amount_format=â—ï¸ÐÐµÐ²ÐµÑ€Ð½Ñ‹Ð¹ Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚ ÑÑƒÐ¼Ð¼Ñ‹. ÐŸÐ¾Ð¶Ð°Ð»ÑƒÐ¹ÑÑ‚Ð°, Ð²Ð²ÐµÐ´Ð¸Ñ‚Ðµ ÐºÐ¾Ñ€Ñ€ÐµÐºÑ‚Ð½Ð¾Ðµ Ñ‡Ð¸ÑÐ»Ð¾:
+message.topup_insufficient_balance=ÐÐµÐ´Ð¾ÑÑ‚Ð°Ñ‚Ð¾Ñ‡Ð½Ð¾ ÑÑ€ÐµÐ´ÑÑ‚Ð² Ð½Ð° Ð±Ð°Ð»Ð°Ð½ÑÐµ! Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ Ð±Ð°Ð»Ð°Ð½Ñ: %,d ÑÑƒÐ¼
+message.request_not_found=ÐžÑˆÐ¸Ð±ÐºÐ°: Ð—Ð°Ð¿Ñ€Ð¾Ñ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½. ÐŸÐ¾Ð¿Ñ€Ð¾Ð±ÑƒÐ¹Ñ‚Ðµ ÑÐ½Ð¾Ð²Ð°.
+message.topup_request_sent=â³Ð—Ð°Ð¿Ñ€Ð¾Ñ Ð½Ð° Ð²Ñ‹Ð²Ð¾Ð´ Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ñ… ÑÑ€ÐµÐ´ÑÑ‚Ð² Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½:\n\nðŸ†”: %d\nðŸŒ %s: %s\nðŸ’° Ð¡ÑƒÐ¼Ð¼Ð°: %,d ÑÑƒÐ¼\n
+message.platform_credentials_error=ÐžÑˆÐ¸Ð±ÐºÐ° Ð² Ð½Ð°ÑÑ‚Ñ€Ð¾Ð¹ÐºÐ°Ñ… Ð¿Ð»Ð°Ñ‚Ñ„Ð¾Ñ€Ð¼Ñ‹. Ð¡Ð²ÑÐ¶Ð¸Ñ‚ÐµÑÑŒ Ñ Ð°Ð´Ð¼Ð¸Ð½Ð¸ÑÑ‚Ñ€Ð°Ñ‚Ð¾Ñ€Ð¾Ð¼.
+message.transfer_failed=âŒ ÐžÑˆÐ¸Ð±ÐºÐ° Ð¿Ñ€Ð¸ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐµ Ð¿Ð»Ð°Ñ‚ÐµÐ¶Ð°. ÐŸÐ¾Ð¿Ñ€Ð¾Ð±ÑƒÐ¹Ñ‚Ðµ ÑÐ½Ð¾Ð²Ð°.
+message.bonus_approved=ðŸ†”: %d #Ð‘Ð¾Ð½ÑƒÑ Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð¶Ð´ÐµÐ½ âœ…\nðŸŒ %s: %s\nðŸ’° Ð‘Ð¾Ð½ÑƒÑ: %,d ÑÑƒÐ¼\n\nðŸ“… [%s]
+message.transfer_failure=âŒ ÐžÑˆÐ¸Ð±ÐºÐ° Ð¿ÐµÑ€ÐµÐ²Ð¾Ð´Ð°: ÐŸÑ€Ð¾Ð¸Ð·Ð¾ÑˆÐ»Ð° Ð¾ÑˆÐ¸Ð±ÐºÐ° Ð¿Ñ€Ð¸ Ð¿ÐµÑ€ÐµÐ²Ð¾Ð´Ðµ ÑÑ€ÐµÐ´ÑÑ‚Ð². ÐÐ´Ð¼Ð¸Ð½ Ð¿Ñ€Ð¾Ð²ÐµÑ€Ð¸Ñ‚ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ð¾.
+message.bonus_declined=ðŸ†”: %d\nÐ‘Ð¾Ð½ÑƒÑ Ð¾Ñ‚ÐºÐ»Ð¾Ð½ÐµÐ½ âŒ\nðŸŒ %s: %s\nðŸ’¸ Ð‘Ð¾Ð½ÑƒÑ: %s\nðŸ’° Ð‘Ð°Ð»Ð°Ð½Ñ: %s ÑÑƒÐ¼\nðŸ“… [%s]
+message.no_admin_permission=Ð£ Ð²Ð°Ñ Ð½ÐµÑ‚ Ð¿Ñ€Ð°Ð² Ð´Ð»Ñ Ð²Ñ‹Ð¿Ð¾Ð»Ð½ÐµÐ½Ð¸Ñ ÑÑ‚Ð¾Ð³Ð¾ Ð´ÐµÐ¹ÑÑ‚Ð²Ð¸Ñ.
+message.tickets_removed=Ð’Ð°ÑˆÐ¸ Ð±Ð¸Ð»ÐµÑ‚Ñ‹ ÑƒÐ´Ð°Ð»ÐµÐ½Ñ‹.
+message.bonus_removed=Ð’Ð°Ñˆ Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ð¹ Ð±Ð°Ð»Ð°Ð½Ñ ÑƒÐ´Ð°Ð»ÐµÐ½.
+message.user_blocked=Ð’Ð°Ñˆ Ð°ÐºÐºÐ°ÑƒÐ½Ñ‚ Ð·Ð°Ð±Ð»Ð¾ÐºÐ¸Ñ€Ð¾Ð²Ð°Ð½.
+message.insufficient_tickets=Ð”Ð»Ñ Ð¸Ð³Ñ€Ñ‹ Ð½ÑƒÐ¶Ð½Ð¾ Ð¼Ð¸Ð½Ð¸Ð¼ÑƒÐ¼ %s Ð±Ð¸Ð»ÐµÑ‚Ð¾Ð²! Ð£ Ð²Ð°Ñ %s Ð±Ð¸Ð»ÐµÑ‚Ð¾Ð².
+message.lottery_results=ðŸŽ‰ Ð ÐµÐ·ÑƒÐ»ÑŒÑ‚Ð°Ñ‚Ñ‹ Ð»Ð¾Ñ‚ÐµÑ€ÐµÐ¸:\n%sÐžÐ±Ñ‰Ð¸Ð¹ Ð²Ñ‹Ð¸Ð³Ñ€Ñ‹Ñˆ: %s UZS\nÐÐ¾Ð²Ñ‹Ð¹ Ð±Ð°Ð»Ð°Ð½Ñ: %s UZS
+message.lottery_error=ÐžÑˆÐ¸Ð±ÐºÐ°: %s
+button.yes=Yes
+button.no=No
+
+button.approve_transfer=ÐžÐ´Ð¾Ð±Ñ€Ð¸Ñ‚ÑŒ Ð¿ÐµÑ€ÐµÐ²Ð¾Ð´
+button.decline_transfer=ÐžÑ‚ÐºÐ»Ð¾Ð½Ð¸Ñ‚ÑŒ Ð¿ÐµÑ€ÐµÐ²Ð¾Ð´
+button.remove_tickets=Ð£Ð´Ð°Ð»Ð¸Ñ‚ÑŒ Ð±Ð¸Ð»ÐµÑ‚Ñ‹
+button.remove_bonus=Ð£Ð´Ð°Ð»Ð¸Ñ‚ÑŒ Ð±Ð¾Ð½ÑƒÑ
+
+button.block_user=Ð—Ð°Ð±Ð»Ð¾ÐºÐ¸Ñ€Ð¾Ð²Ð°Ñ‚ÑŒ Ð¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ñ‚ÐµÐ»Ñ
+
+message.admin_notification_off_prompt=Ð£Ð²ÐµÐ´Ð¾Ð¼Ð»ÐµÐ½Ð¸Ñ Ð°Ð´Ð¼Ð¸Ð½Ð¸ÑÑ‚Ñ€Ð°Ñ‚Ð¾Ñ€Ð° Ð¾Ñ‚ÐºÐ»ÑŽÑ‡ÐµÐ½Ñ‹. Ð¥Ð¾Ñ‚Ð¸Ñ‚Ðµ Ð²ÐºÐ»ÑŽÑ‡Ð¸Ñ‚ÑŒ Ð¸Ñ…?
+
+
+message.admin_bot_turned_off=ÐÐ´Ð¼Ð¸Ð½-Ð±Ð¾Ñ‚ Ð²Ñ‹ÐºÐ»ÑŽÑ‡ÐµÐ½.
+message.tickets_added_success=âœ… Ð‘Ð¸Ð»ÐµÑ‚Ñ‹ ÑƒÑÐ¿ÐµÑˆÐ½Ð¾ Ð´Ð¾Ð±Ð°Ð²Ð»ÐµÐ½Ñ‹!
+message.balance_deleted_success=âœ… Ð‘Ð°Ð»Ð°Ð½Ñ ÑƒÑÐ¿ÐµÑˆÐ½Ð¾ ÑƒÐ´Ð°Ð»ÐµÐ½!
+message.tickets_deleted_success=âœ… Ð‘Ð¸Ð»ÐµÑ‚Ñ‹ ÑƒÑÐ¿ÐµÑˆÐ½Ð¾ ÑƒÐ´Ð°Ð»ÐµÐ½Ñ‹!
+
+button.lottery_play=Ð˜Ð³Ñ€Ð°Ñ‚ÑŒ
+
+button.wallet=ðŸ’¼ ÐšÐ¾ÑˆÐµÐ»ÐµÐº
+
+# Wallet
+wallet.message.menu=ðŸ’¼ ÐšÐ¾ÑˆÐµÐ»ÐµÐº:\nÐ‘Ð°Ð»Ð°Ð½Ñ: %,d ÑÑƒÐ¼\n\nÐ’Ñ‹Ð±ÐµÑ€Ð¸Ñ‚Ðµ Ð¾Ð´Ð½Ð¾ Ð¸Ð· ÑÐ»ÐµÐ´ÑƒÑŽÑ‰Ð¸Ñ… Ð´ÐµÐ¹ÑÑ‚Ð²Ð¸Ð¹:
+wallet.button.topup=ðŸ’° ÐŸÐ¾Ð¿Ð¾Ð»Ð½Ð¸Ñ‚ÑŒ ÐºÐ¾ÑˆÐµÐ»ÐµÐº
+wallet.button.deposit=ðŸ“¤ ÐŸÐµÑ€ÐµÐ²Ð¾Ð´ Ð½Ð° Ð¿Ð»Ð°Ñ‚Ñ„Ð¾Ñ€Ð¼Ñƒ
+wallet.button.withdraw=ðŸ’³ Ð’Ñ‹Ð²ÐµÑÑ‚Ð¸
+wallet.message.topup_enter_amount=Ð’Ð²ÐµÐ´Ð¸Ñ‚Ðµ ÑÑƒÐ¼Ð¼Ñƒ Ð´Ð»Ñ Ð¿Ð¾Ð¿Ð¾Ð»Ð½ÐµÐ½Ð¸Ñ ÐºÐ¾ÑˆÐµÐ»ÑŒÐºÐ° (%,d - %,d UZS):
+wallet.message.topup_invalid_amount=ÐÐµÐ²ÐµÑ€Ð½Ð°Ñ ÑÑƒÐ¼Ð¼Ð°. Ð’Ð²ÐµÐ´Ð¸Ñ‚Ðµ Ð¾Ñ‚ %,d Ð´Ð¾ %,d UZS.
+wallet.message.invalid_amount=ÐÐµÐ²ÐµÑ€Ð½Ñ‹Ð¹ Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚ ÑÑƒÐ¼Ð¼Ñ‹. Ð’Ð²ÐµÐ´Ð¸Ñ‚Ðµ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ñ†Ð¸Ñ„Ñ€Ñ‹.
+wallet.message.select_platform=Ð’Ñ‹Ð±ÐµÑ€Ð¸Ñ‚Ðµ Ð¿Ð»Ð°Ñ‚Ñ„Ð¾Ñ€Ð¼Ñƒ Ð´Ð»Ñ Ð¿Ð¾Ð¿Ð¾Ð»Ð½ÐµÐ½Ð¸Ñ:
+wallet.message.enter_id=Ð’Ð²ÐµÐ´Ð¸Ñ‚Ðµ Ð²Ð°Ñˆ ID Ð½Ð° %s Ð´Ð»Ñ Ð¿Ð¾Ð¿Ð¾Ð»Ð½ÐµÐ½Ð¸Ñ Ð¸Ð· ÐºÐ¾ÑˆÐµÐ»ÑŒÐºÐ°:
+wallet.message.enter_amount=Ð’Ð²ÐµÐ´Ð¸Ñ‚Ðµ ÑÑƒÐ¼Ð¼Ñƒ Ð´Ð»Ñ ID %s:
+wallet.message.deposit_confirm=ÐŸÐ¾Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¸Ñ‚Ðµ:\n\nÐŸÐ»Ð°Ñ‚Ñ„Ð¾Ñ€Ð¼Ð°: %s\n\ud83d\udc64 Ð¤.Ð˜.Ðž: %s\nID: %s\nÐ¡ÑƒÐ¼Ð¼Ð°: %,d UZS\n\nÐŸÐ¾Ð´Ñ‚Ð²ÐµÑ€Ð¶Ð´Ð°ÐµÑ‚Ðµ Ð¿ÐµÑ€ÐµÐ²Ð¾Ð´ Ð¸Ð· ÐºÐ¾ÑˆÐµÐ»ÑŒÐºÐ° Ð½Ð° Ð¿Ð»Ð°Ñ‚Ñ„Ð¾Ñ€Ð¼Ñƒ?
+wallet.button.transfer=âœ… ÐŸÐµÑ€ÐµÐ²ÐµÑÑ‚Ð¸
+wallet.message.withdraw_enter_amount=Ð’Ð²ÐµÐ´Ð¸Ñ‚Ðµ ÑÑƒÐ¼Ð¼Ñƒ Ð´Ð»Ñ Ð²Ñ‹Ð²Ð¾Ð´Ð° Ð¸Ð· ÐºÐ¾ÑˆÐµÐ»ÑŒÐºÐ° (ÐœÐ¸Ð½: %,d UZS):
+wallet.message.withdraw_enter_card=Ð’Ð²ÐµÐ´Ð¸Ñ‚Ðµ Ð½Ð¾Ð¼ÐµÑ€ ÐºÐ°Ñ€Ñ‚Ñ‹ Ð´Ð»Ñ Ð²Ñ‹Ð²Ð¾Ð´Ð° %,d UZS Ð¸Ð· ÐºÐ¾ÑˆÐµÐ»ÑŒÐºÐ°:
+wallet.message.withdraw_confirm=ÐŸÐ¾Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¸Ñ‚Ðµ:\n\nÐšÐ°Ñ€Ñ‚Ð°: %s\nÐ¡ÑƒÐ¼Ð¼Ð°: %,d UZS\n\nÐŸÐ¾Ð´Ñ‚Ð²ÐµÑ€Ð¶Ð´Ð°ÐµÑ‚Ðµ Ð²Ñ‹Ð²Ð¾Ð´ Ð½Ð° ÐºÐ°Ñ€Ñ‚Ñƒ?
+wallet.message.withdraw_pending=â³ Ð—Ð°Ð¿Ñ€Ð¾Ñ Ð½Ð° Ð²Ñ‹Ð²Ð¾Ð´ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½:\n\nID: %d\nÐ¡ÑƒÐ¼Ð¼Ð°: %,d UZS\nÐšÐ°Ñ€Ñ‚Ð°: %s\n\nÐžÐ¶Ð¸Ð´Ð°Ð¹Ñ‚Ðµ Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð¶Ð´ÐµÐ½Ð¸Ñ Ð°Ð´Ð¼Ð¸Ð½Ð¸ÑÑ‚Ñ€Ð°Ñ‚Ð¾Ñ€Ð°.
+wallet.button.cancel=âŒ ÐžÑ‚Ð¼ÐµÐ½Ð¸Ñ‚ÑŒ
+wallet.message.withdraw_admin_confirmed=âœ… Ð’Ñ‹Ð²Ð¾Ð´ Ð¸Ð· ÐºÐ¾ÑˆÐµÐ»ÑŒÐºÐ° Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð¶Ð´ÐµÐ½:\n\nID: %d\nÐ¡ÑƒÐ¼Ð¼Ð°: %,d UZS\nÐšÐ°Ñ€Ñ‚Ð°: %s
+wallet.message.withdraw_admin_declined=âŒ Ð’Ñ‹Ð²Ð¾Ð´ Ð¸Ð· ÐºÐ¾ÑˆÐµÐ»ÑŒÐºÐ° Ð¾Ñ‚ÐºÐ»Ð¾Ð½ÐµÐ½ (ID: %d). Ð¡Ñ€ÐµÐ´ÑÑ‚Ð²Ð° Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰ÐµÐ½Ñ‹ Ð² ÐºÐ¾ÑˆÐµÐ»ÐµÐº.
+wallet.message.withdraw_already_confirmed=Ð—Ð°Ð¿Ñ€Ð¾Ñ ÑƒÐ¶Ðµ Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð¶Ð´ÐµÐ½ Ð¸Ð»Ð¸ Ð¾Ñ‚ÐºÐ»Ð¾Ð½ÐµÐ½.
+wallet.message.withdraw_user_canceled=Ð’Ñ‹ Ð¾Ñ‚Ð¼ÐµÐ½Ð¸Ð»Ð¸ Ð·Ð°Ð¿Ñ€Ð¾Ñ Ð½Ð° Ð²Ñ‹Ð²Ð¾Ð´ (ID: %d). Ð¡Ñ€ÐµÐ´ÑÑ‚Ð²Ð° Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰ÐµÐ½Ñ‹ Ð² ÐºÐ¾ÑˆÐµÐ»ÐµÐº.
+wallet.message.invalid_id=ÐÐµÐ²ÐµÑ€Ð½Ñ‹Ð¹ ID. ÐŸÐ¾Ð¶Ð°Ð»ÑƒÐ¹ÑÑ‚Ð°, Ð²Ð²ÐµÐ´Ð¸Ñ‚Ðµ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ñ†Ð¸Ñ„Ñ€Ñ‹.
+wallet.message.insufficient_funds=ÐÐµÐ´Ð¾ÑÑ‚Ð°Ñ‚Ð¾Ñ‡Ð½Ð¾ ÑÑ€ÐµÐ´ÑÑ‚Ð² Ð² ÐºÐ¾ÑˆÐµÐ»ÑŒÐºÐµ. Ð‘Ð°Ð»Ð°Ð½Ñ ÐºÐ¾ÑˆÐµÐ»ÑŒÐºÐ°: %,d UZS
+wallet.message.invalid_amount=ÐÐµÐ²ÐµÑ€Ð½Ð°Ñ ÑÑƒÐ¼Ð¼Ð°.
+wallet.message.withdraw_min_error=ÐœÐ¸Ð½Ð¸Ð¼Ð°Ð»ÑŒÐ½Ð°Ñ ÑÑƒÐ¼Ð¼Ð° Ð²Ñ‹Ð²Ð¾Ð´Ð°: %,d UZS
+wallet.message.invalid_card=ÐÐµÐ²ÐµÑ€Ð½Ñ‹Ð¹ Ð½Ð¾Ð¼ÐµÑ€ ÐºÐ°Ñ€Ñ‚Ñ‹. Ð’Ð²ÐµÐ´Ð¸Ñ‚Ðµ 16 Ñ†Ð¸Ñ„Ñ€ Ð±ÐµÐ· Ð¿Ñ€Ð¾Ð±ÐµÐ»Ð¾Ð².
+wallet.message.transfer_success=âœ… Ð£ÑÐ¿ÐµÑˆÐ½Ð¾:\nID: %d\nÐŸÐ»Ð°Ñ‚Ñ„Ð¾Ñ€Ð¼Ð°: %s\nID Ð½Ð° Ð¿Ð»Ð°Ñ‚Ñ„Ð¾Ñ€Ð¼Ðµ: %s\nÐ¡ÑƒÐ¼Ð¼Ð°: %,d UZS
+wallet.message.transfer_failed=âŒ ÐŸÐµÑ€ÐµÐ²Ð¾Ð´ Ð½Ð° Ð¿Ð»Ð°Ñ‚Ñ„Ð¾Ñ€Ð¼Ñƒ Ð½Ðµ ÑƒÐ´Ð°Ð»ÑÑ. Ð¡Ñ€ÐµÐ´ÑÑ‚Ð²Ð° Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰ÐµÐ½Ñ‹ Ð² ÐºÐ¾ÑˆÐµÐ»ÐµÐº.
+topup.button.wallet=ðŸ’¼ ÐšÐ¾ÑˆÐµÐ»ÐµÐº
+withdraw.button.wallet=ðŸ’¼ ÐšÐ¾ÑˆÐµÐ»ÐµÐº
+withdraw.message.wallet_credit_success=âœ… Ð£ÑÐ¿ÐµÑˆÐ½Ð¾ Ð¿ÐµÑ€ÐµÐ²ÐµÐ´ÐµÐ½Ð¾ Ð² ÐºÐ¾ÑˆÐµÐ»ÐµÐº!\nÐ¡ÑƒÐ¼Ð¼Ð°: %s UZS\nÐŸÐ»Ð°Ñ‚Ñ„Ð¾Ñ€Ð¼Ð°: %s\nID: %dw a l l e t . b u t t o n . t i p = <Øß
+ 
+ ;O
+ 
+ @0728B8O
+ 
+ 1>B0
+ 
+ w a l l e t . m e s s a g e . t i p _ c h o o s e = 0:CN
+ 
+ AC<<C
+ 
+ 2K
+ 
+ E>B8B5
+ 
+ 2K45;8BL
+ 
+ =0
+ 
+ @0728B85
+ 
+ 1>B0? 
+ 
+ w a l l e t . b u t t o n . t i p _ o t h e r = @C30O
+ 
+ AC<<0
+ 
+ w a l l e t . m e s s a g e . t i p _ e n t e r = 8=. 
+ 
+ AC<<0: 
+ 
+ % % 
+ 
+ d 
+ 
+ U Z S . 
+ 
+ 2548B5
+ 
+ 4@C3CN
+ 
+ AC<<C: 
+ 
+ w a l l e t . m e s s a g e . t i p _ s u c c e s s = =ØOÞ
+ 
+ !?0A81>! 
+ 
+ 5@52545=>
+ 
+ % % 
+ 
+ d 
+ 
+ U Z S 
+ 
+ =0
+ 
+ @0728B85
+ 
+ 1>B0. 
+ 
+ w a l l e t . m e s s a g e . t i p _ i n v a l i d = 8=. 
+ 
+ AC<<0: 
+ 
+ % % 
+ 
+ d 
+ 
+ U Z S . 
+ 
+ 

@@ -14,7 +14,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * REST API controller for system configuration management.
- * Provides endpoints to retrieve, create, and update dynamic system configuration values
+ * Provides endpoints to retrieve, create, and update dynamic system
+ * configuration values
  * such as top-up limits, ticket calculations, commission percentages, etc.
  * All endpoints require Basic Authentication (MaxUp1000:MaxUp1000998905982808).
  */
@@ -29,7 +30,8 @@ public class SystemConfigurationController {
 
     /**
      * Authenticates the incoming HTTP request using Basic Authentication.
-     * Validates that the Authorization header contains valid credentials (MaxUp1000:MaxUp1000998905982808).
+     * Validates that the Authorization header contains valid credentials
+     * (MaxUp1000:MaxUp1000998905982808).
      *
      * @param request The HTTP servlet request containing the Authorization header
      * @return true if authentication is successful, false otherwise
@@ -40,31 +42,32 @@ public class SystemConfigurationController {
             logger.warn("Authorization header is missing");
             return false;
         }
-        
+
         if (!authHeader.startsWith("Basic ")) {
             logger.warn("Authorization header does not start with 'Basic '");
             return false;
         }
-        
+
         try {
             String encodedCredentials = authHeader.substring(6);
             String credentials = new String(Base64.getDecoder().decode(encodedCredentials));
             String[] parts = credentials.split(":", 2);
-            
+
             if (parts.length != 2) {
-                logger.warn("Invalid credentials format. Expected 'username:password', got: {}", credentials.length() > 50 ? credentials.substring(0, 50) + "..." : credentials);
+                logger.warn("Invalid credentials format. Expected 'username:password', got: {}",
+                        credentials.length() > 50 ? credentials.substring(0, 50) + "..." : credentials);
                 return false;
             }
-            
+
             String username = parts[0].trim();
             String password = parts[1].trim();
-            
+
             boolean isValid = "MaxUp1000".equals(username) && "MaxUp1000998905982808".equals(password);
-            
+
             if (!isValid) {
                 logger.warn("Authentication failed. Username: '{}', Password length: {}", username, password.length());
             }
-            
+
             return isValid;
         } catch (IllegalArgumentException e) {
             logger.error("Failed to decode Base64 credentials: {}", e.getMessage());
@@ -77,12 +80,15 @@ public class SystemConfigurationController {
 
     /**
      * Retrieves the current system configuration.
-     * Returns the latest configuration from the database, or creates a default configuration
-     * if none exists. This includes all dynamic values like top-up limits, ticket calculations,
+     * Returns the latest configuration from the database, or creates a default
+     * configuration
+     * if none exists. This includes all dynamic values like top-up limits, ticket
+     * calculations,
      * commission percentages, etc.
      *
      * @param request The HTTP servlet request for authentication
-     * @return ResponseEntity containing the SystemConfiguration object, or UNAUTHORIZED if authentication fails
+     * @return ResponseEntity containing the SystemConfiguration object, or
+     *         UNAUTHORIZED if authentication fails
      */
     @GetMapping
     public ResponseEntity<SystemConfiguration> getConfiguration(HttpServletRequest request) {
@@ -96,11 +102,14 @@ public class SystemConfigurationController {
      * Creates a new system configuration entry.
      * Saves the provided configuration as the latest configuration in the database.
      * This will be used by all services for dynamic configuration values.
-     * Note: This creates a new entry with a new timestamp, maintaining configuration history.
+     * Note: This creates a new entry with a new timestamp, maintaining
+     * configuration history.
      *
-     * @param config The SystemConfiguration object containing all configuration values to be saved
+     * @param config  The SystemConfiguration object containing all configuration
+     *                values to be saved
      * @param request The HTTP servlet request for authentication
-     * @return ResponseEntity containing the saved SystemConfiguration object, or UNAUTHORIZED if authentication fails
+     * @return ResponseEntity containing the saved SystemConfiguration object, or
+     *         UNAUTHORIZED if authentication fails
      */
     @PostMapping
     public ResponseEntity<SystemConfiguration> createConfiguration(
@@ -118,10 +127,12 @@ public class SystemConfigurationController {
      * Sets the provided ID on the configuration object and saves it as a new entry
      * (maintaining configuration history with timestamp).
      *
-     * @param id The ID of the configuration to update
-     * @param config The SystemConfiguration object containing updated configuration values
+     * @param id      The ID of the configuration to update
+     * @param config  The SystemConfiguration object containing updated
+     *                configuration values
      * @param request The HTTP servlet request for authentication
-     * @return ResponseEntity containing the saved SystemConfiguration object, or UNAUTHORIZED if authentication fails
+     * @return ResponseEntity containing the saved SystemConfiguration object, or
+     *         UNAUTHORIZED if authentication fails
      */
     @PutMapping("/{id}")
     public ResponseEntity<SystemConfiguration> updateConfiguration(
@@ -133,6 +144,78 @@ public class SystemConfigurationController {
         }
         config.setId(id);
         SystemConfiguration saved = configurationService.updateConfiguration(config);
+        return ResponseEntity.ok(saved);
+    }
+
+    /**
+     * Updates only the wallet withdraw ratio.
+     * ratio = how many UZS of withdrawal quota earned per 1 UZS transferred to a
+     * platform.
+     * E.g., ratio=10 → transfer 10,000 to platform → earn 100,000 withdrawal quota.
+     * Only applies to NEW platform transfers after this change; old earned quota
+     * stays unchanged.
+     *
+     * @param ratio   The new multiplier value (must be > 0)
+     * @param request The HTTP servlet request for authentication
+     * @return ResponseEntity with the updated configuration
+     */
+    @PatchMapping("/wallet-withdraw-ratio")
+    public ResponseEntity<?> setWalletWithdrawRatio(
+            @RequestParam Long ratio,
+            HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+        if (ratio == null || ratio <= 0) {
+            return ResponseEntity.badRequest().body("Ratio must be greater than 0");
+        }
+        SystemConfiguration saved = configurationService.setWalletWithdrawRatio(ratio);
+        return ResponseEntity.ok(saved);
+    }
+
+    /**
+     * Gets the current wallet withdraw ratio.
+     */
+    @GetMapping("/wallet-withdraw-ratio")
+    public ResponseEntity<?> getWalletWithdrawRatio(HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+        return ResponseEntity
+                .ok(java.util.Map.of("walletWithdrawRatio", configurationService.getWalletWithdrawRatio()));
+    }
+
+    /**
+     * Gets the current wallet minimum withdraw amount (UZS).
+     */
+    @GetMapping("/wallet-min-withdraw")
+    public ResponseEntity<?> getWalletMinWithdraw(HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+        return ResponseEntity
+                .ok(java.util.Map.of("walletMinWithdrawAmount", configurationService.getWalletMinWithdrawAmount()));
+    }
+
+    /**
+     * Updates only the wallet minimum withdraw amount.
+     * Creates a new configuration record to maintain history.
+     *
+     * @param amount  The new minimum withdraw amount in UZS (must be > 0)
+     * @param request The HTTP servlet request for authentication
+     * @return ResponseEntity with the updated configuration
+     */
+    @PatchMapping("/wallet-min-withdraw")
+    public ResponseEntity<?> setWalletMinWithdraw(
+            @RequestParam Long amount,
+            HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+        if (amount == null || amount <= 0) {
+            return ResponseEntity.badRequest().body("Amount must be greater than 0");
+        }
+        SystemConfiguration saved = configurationService.setWalletMinWithdrawAmount(amount);
         return ResponseEntity.ok(saved);
     }
 }

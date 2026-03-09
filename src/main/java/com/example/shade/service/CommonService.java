@@ -97,7 +97,7 @@ public class CommonService {
             message.setText("F.I.O: " + fullName + "\nSo‘nggi karta: " + latestRequest.getCardNumber() + "\nShu kartani ishlatasizmi yoki yangi karta raqamini kiriting:");
             message.setReplyMarkup(createSavedCardKeyboard(recentRequests, prefix));
         } else {
-            message.setText("F.I.O: " + fullName + "\nKarta raqamini kiriting (8600xxxxxxxxxxxx):");
+            message.setText("F.I.O: " + fullName + "\nKarta raqamini kiriting:");
             message.setReplyMarkup(createNavigationKeyboard());
         }
         messageSender.sendMessage(message, chatId);
@@ -173,7 +173,7 @@ public class CommonService {
                     .map(HizmatRequest::getPlatformUserId)
                     .distinct()
                     .limit(2)
-                    .map(id -> createButton("ID: " + id, prefix + "_PAST_ID:" + id))
+                    .map(id -> createButton("🆔 " + id, prefix + "_PAST_ID:" + id))
                     .collect(Collectors.toList());
             if (!pastIdButtons.isEmpty()) {
                 rows.add(pastIdButtons);

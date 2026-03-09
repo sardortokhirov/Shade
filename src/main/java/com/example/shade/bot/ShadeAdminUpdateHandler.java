@@ -45,13 +45,13 @@ public class ShadeAdminUpdateHandler {
                 CallbackQuery callbackQuery = update.getCallbackQuery();
                 String callbackId = callbackQuery.getId();
                 Long chatId = callbackQuery.getMessage().getChatId();
-                
+
                 // Deduplicate - skip if already processed (prevents multiple clicks issue)
                 if (!callbackDeduplicationService.tryProcess(callbackId)) {
                     log.debug("Duplicate admin panel callback ignored for chatId {}: {}", chatId, callbackId);
                     return true; // Return true to indicate we "handled" it (by skipping)
                 }
-                
+
                 handleCallbackQuery(update);
                 return true;
             }
@@ -324,6 +324,9 @@ public class ShadeAdminUpdateHandler {
             case WAITING_CARD_BALANCE -> {
                 context.put("balance", text);
                 adminBotService.sendPaymentSystemSelection(chatId);
+            }
+            case WAITING_CARD_PAYMENT_SYSTEM -> {
+                adminBotService.requestInput(chatId, "Iltimos, quyidagi tugmalardan to'lov tizimini tanlang.");
             }
             case WAITING_CARD_OSON_ID -> {
                 context.put("osonConfigId", text);

@@ -13,8 +13,13 @@ import java.util.Optional;
  */
 public interface DailyUserStatsRepository extends JpaRepository<DailyUserStats, Long> {
     Optional<DailyUserStats> findByChatIdAndDate(Long chatId, LocalDate date);
-    
-    Page<DailyUserStats> findByChatIdAndDateBetween(Long chatId, LocalDate startDate, LocalDate endDate, Pageable pageable);
-    
+
+    Page<DailyUserStats> findByChatIdAndDateBetween(Long chatId, LocalDate startDate, LocalDate endDate,
+            Pageable pageable);
+
     Page<DailyUserStats> findByChatIdOrderByDateDesc(Long chatId, Pageable pageable);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @jakarta.transaction.Transactional
+    void deleteByChatId(Long chatId);
 }

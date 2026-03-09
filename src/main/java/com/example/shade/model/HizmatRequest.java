@@ -67,5 +67,8 @@ public class HizmatRequest {
     @Column(name = "pay_url")
     private String payUrl;
 
+    /** User's wallet balance (UZS) at the time this transaction was completed; used for history display. */
+    @Column(name = "wallet_balance_at_time")
+    private Long walletBalanceAtTime;
 
 }

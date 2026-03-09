@@ -7,6 +7,7 @@ import com.example.shade.service.AdminLogBotService;
 import com.example.shade.service.BonusService;
 import com.example.shade.service.CallbackDeduplicationService;
 import com.example.shade.service.TopUpService;
+import com.example.shade.service.WalletService;
 import com.example.shade.service.WithdrawService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -39,6 +40,7 @@ public class AdminLogBot extends TelegramLongPollingBot {
     private final WithdrawService withdrawService;
     private final BonusService bonusService;
     private final TopUpService topUpService;
+    private final WalletService walletService;
     private final BlockedUserRepository blockedUserRepository;
     private final CallbackDeduplicationService callbackDeduplicationService;
 
@@ -57,8 +59,7 @@ public class AdminLogBot extends TelegramLongPollingBot {
             "Sizning fidoyiligingiz muhim. Har kuni yangi imkoniyatlar! ✨",
             "Ishingizdagi sadoqat ajoyib natijalar keltiradi! Davom eting! 🏆",
             "Sizning harakatlaringiz jamoamizning muvaffaqiyatidir! Rahmat! 🙌",
-            "Bugun qilgan ishlaringiz kelajakni shakllantiradi! 💼"
-    );
+            "Bugun qilgan ishlaringiz kelajakni shakllantiradi! 💼");
 
     // Lorem ipsum text in Uzbek (>200 words)
     private static final String LOREM_IPSUM_UZBEK = "Lorem ipsum og'riqli bo'lishi kerak, lekin ayni paytda u foydalanuvchilar uchun muhim ma'lumotlarni taqdim etadi. Ushbu matn oddiy so'zlar to'plami emas, balki dizayn va tarkibni sinash uchun ishlatiladigan maxsus shakl hisoblanadi. Har bir loyiha muvaffaqiyatga erishish uchun aniq maqsadlarga ega bo'lishi kerak. Sizning harakatlaringiz ushbu maqsadlarga erishishda muhim ahamiyatga ega. Har bir kichik qadam katta natijalarga olib keladi. Ish jarayonida qiyinchiliklar bo'lishi mumkin, lekin bu qiyinchiliklar faqat sizni yanada kuchliroq qiladi. Har kuni yangi imkoniyatlar ochiladi, va sizning fidoyiligingiz ushbu imkoniyatlarni ro'yobga chiqaradi.";
@@ -103,25 +104,26 @@ public class AdminLogBot extends TelegramLongPollingBot {
                 return;
             }
             if (update.hasMessage() && update.getMessage().hasText()) {
-                handleTextMessage(update.getMessage().getText(), update.getMessage().getChatId(), update.getMessage().getMessageId());
+                handleTextMessage(update.getMessage().getText(), update.getMessage().getChatId(),
+                        update.getMessage().getMessageId());
             } else if (update.hasCallbackQuery()) {
                 CallbackQuery callbackQuery = update.getCallbackQuery();
                 String callbackId = callbackQuery.getId();
                 Long chatId = callbackQuery.getMessage().getChatId();
-                
+
                 // Deduplicate - skip if already processed (prevents multiple clicks issue)
                 if (!callbackDeduplicationService.tryProcess(callbackId)) {
                     logger.debug("Duplicate admin callback ignored for chatId {}: {}", chatId, callbackId);
                     return;
                 }
-                
+
                 // Answer callback to dismiss loading indicator
                 try {
                     execute(new AnswerCallbackQuery(callbackId));
                 } catch (Exception e) {
                     logger.warn("Failed to answer admin callback {}: {}", callbackId, e.getMessage());
                 }
-                
+
                 handleCallbackQuery(callbackQuery.getData(), chatId, callbackQuery.getMessage().getMessageId());
             }
         } catch (Exception e) {
@@ -134,9 +136,9 @@ public class AdminLogBot extends TelegramLongPollingBot {
         SendMessage message = new SendMessage();
         message.setChatId(chatId.toString());
         message.setReplyMarkup(createAdminMenuKeyboard());
-        if(!adminChatRepository.findById(chatId).isPresent()){
+        if (!adminChatRepository.findById(chatId).isPresent()) {
             return;
-        }else if (!adminChatRepository.findById(chatId).get().isReceiveNotifications()){
+        } else if (!adminChatRepository.findById(chatId).get().isReceiveNotifications()) {
             return;
         }
         if (messageText.startsWith("/ban ")) {
@@ -197,7 +199,8 @@ public class AdminLogBot extends TelegramLongPollingBot {
                 }
                 case "/unregister" -> {
                     boolean deleted = adminLogBotService.deleteAdminChat(chatId);
-                    message.setText(deleted ? "✅ Admin ro‘yxatdan o‘chirildi." : "❌ Xatolik: Siz ro‘yxatdan o‘tmagansiz.");
+                    message.setText(
+                            deleted ? "✅ Admin ro‘yxatdan o‘chirildi." : "❌ Xatolik: Siz ro‘yxatdan o‘tmagansiz.");
                 }
                 default -> {
                     adminTelegramMessageSender.clearBotData(chatId, messageId);
@@ -216,12 +219,13 @@ public class AdminLogBot extends TelegramLongPollingBot {
         EditMessageReplyMarkup editMessage = new EditMessageReplyMarkup();
         editMessage.setChatId(chatId.toString());
         editMessage.setMessageId(messageId);
-//        editMessage.setReplyMarkup(null);
+        // editMessage.setReplyMarkup(null);
         try {
             execute(editMessage);
             logger.info("Removed buttons from messageId {} in admin chatId {}", messageId, chatId);
         } catch (Exception e) {
-            logger.error("Failed to remove buttons from messageId {} in admin chatId {}: {}", messageId, chatId, e.getMessage());
+            logger.error("Failed to remove buttons from messageId {} in admin chatId {}: {}", messageId, chatId,
+                    e.getMessage());
         }
 
         SendMessage message = new SendMessage();
@@ -237,9 +241,12 @@ public class AdminLogBot extends TelegramLongPollingBot {
             withdrawService.processAdminApproval(chatId, requestId, false);
             return;
         }
-        // Note: SCREENSHOT_APPROVE_CHAT and SCREENSHOT_REJECT_CHAT handlers have been removed
-        // The new screenshot approval buttons use SCREENSHOT_APPROVE:{requestId} format with the actual request ID
-        // to prevent approval mismatches when multiple screenshots are pending from the same user
+        // Note: SCREENSHOT_APPROVE_CHAT and SCREENSHOT_REJECT_CHAT handlers have been
+        // removed
+        // The new screenshot approval buttons use SCREENSHOT_APPROVE:{requestId} format
+        // with the actual request ID
+        // to prevent approval mismatches when multiple screenshots are pending from the
+        // same user
         else if (callbackData.startsWith("SCREENSHOT_APPROVE:")) {
             Long requestId = Long.parseLong(callbackData.split(":")[1]);
             topUpService.handleScreenshotApproval(chatId, requestId, true);
@@ -263,6 +270,18 @@ public class AdminLogBot extends TelegramLongPollingBot {
         } else if (callbackData.startsWith("ADMIN_REMOVE_BONUS:")) {
             Long userId = Long.parseLong(callbackData.split(":")[1]);
             bonusService.handleAdminRemoveBonus(chatId, userId);
+            return;
+        } else if (callbackData.startsWith("WALLET_ADMIN_TAKE:")) {
+            Long requestId = Long.parseLong(callbackData.split(":")[1]);
+            walletService.handleAdminTake(requestId, chatId);
+            return;
+        } else if (callbackData.startsWith("WALLET_ADMIN_CONFIRM:")) {
+            Long requestId = Long.parseLong(callbackData.split(":")[1]);
+            walletService.handleAdminConfirm(requestId);
+            return;
+        } else if (callbackData.startsWith("WALLET_ADMIN_DECLINE:")) {
+            Long requestId = Long.parseLong(callbackData.split(":")[1]);
+            walletService.handleAdminDecline(requestId);
             return;
         } else if (callbackData.startsWith("ADMIN_BLOCK_USER:")) {
             Long userId = Long.parseLong(callbackData.split(":")[1]);

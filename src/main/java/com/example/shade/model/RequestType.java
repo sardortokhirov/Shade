@@ -7,5 +7,9 @@ package com.example.shade.model;
  */
 public enum RequestType {
     TOP_UP,
-    WITHDRAWAL
+    WITHDRAWAL,
+    WALLET_DEPOSIT,
+    WALLET_WITHDRAWAL,
+    WALLET_TO_PLATFORM,
+    TIP
 }

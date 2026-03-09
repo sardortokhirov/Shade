@@ -16,4 +16,12 @@ public interface ReferralRepository extends JpaRepository<Referral, Long> {
 
     @Query("SELECT COUNT(r) FROM Referral r WHERE r.referrerChatId = :referrerChatId")
     Long countByReferrerChatId(Long referrerChatId);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @jakarta.transaction.Transactional
+    void deleteByReferredChatId(Long chatId);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @jakarta.transaction.Transactional
+    void deleteByReferrerChatId(Long chatId);
 }

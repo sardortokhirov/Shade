@@ -52,19 +52,19 @@ public class UserController {
             @RequestParam(required = false) Long searchChatId,
             @RequestParam(required = false) String searchPhone,
             HttpServletRequest request) {
-        
+
         if (!authenticate(request)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
         }
-        
+
         // Limit page size
         if (size > 100) {
             size = 100;
         }
-        
+
         Pageable pageable = PageRequest.of(page, size);
         UserFilter filter = new UserFilter(blocked, language, hasBalance, searchChatId, searchPhone);
-        
+
         try {
             Page<UserDTO> users = userService.getUsers(pageable, filter);
             return ResponseEntity.ok(users);
@@ -78,11 +78,11 @@ public class UserController {
     public ResponseEntity<?> getUserDetails(
             @PathVariable Long chatId,
             HttpServletRequest request) {
-        
+
         if (!authenticate(request)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
         }
-        
+
         try {
             UserDetailDTO userDetails = userService.getUserDetails(chatId);
             return ResponseEntity.ok(userDetails);
@@ -106,19 +106,19 @@ public class UserController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
             HttpServletRequest request) {
-        
+
         if (!authenticate(request)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
         }
-        
+
         // Limit page size
         if (size > 100) {
             size = 100;
         }
-        
+
         Pageable pageable = PageRequest.of(page, size);
         TransferFilter filter = new TransferFilter(status, platform, type, startDate, endDate);
-        
+
         try {
             Page<HizmatRequest> transfers = userService.getUserTransfers(chatId, pageable, filter);
             return ResponseEntity.ok(transfers);
@@ -133,11 +133,11 @@ public class UserController {
             @PathVariable Long chatId,
             @RequestBody UpdateBalanceRequest request,
             HttpServletRequest httpRequest) {
-        
+
         if (!authenticate(httpRequest)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
         }
-        
+
         try {
             com.example.shade.model.UserBalance balance = userService.updateBalance(chatId, request.getBalance());
             return ResponseEntity.ok(balance);
@@ -154,11 +154,11 @@ public class UserController {
             @PathVariable Long chatId,
             @RequestBody UpdateTicketsRequest request,
             HttpServletRequest httpRequest) {
-        
+
         if (!authenticate(httpRequest)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
         }
-        
+
         try {
             com.example.shade.model.UserBalance balance = userService.updateTickets(chatId, request.getTickets());
             return ResponseEntity.ok(balance);
@@ -175,52 +175,55 @@ public class UserController {
             @PathVariable Long chatId,
             @RequestBody UpdateLimitRequest request,
             HttpServletRequest httpRequest) {
-        
+
         if (!authenticate(httpRequest)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
         }
-        
+
         // Log all limit update requests for audit trail
         String clientInfo = httpRequest.getRemoteAddr();
-        logger.info("LIMIT UPDATE REQUEST - chatId: {}, requested value: {}, client: {}", 
+        logger.info("LIMIT UPDATE REQUEST - chatId: {}, requested value: {}, client: {}",
                 chatId, request.getPermanentLimitIncrease(), clientInfo);
-        
+
         // Pre-validation: Check if trying to reset to 0
         if (request.getPermanentLimitIncrease() != null && request.getPermanentLimitIncrease() == 0) {
             try {
                 // Check current limit before attempting update
                 Long currentLimit = userService.getUserDetails(chatId).getPermanentLimitIncrease();
                 if (currentLimit != null && currentLimit > 0) {
-                    logger.warn("ATTEMPT TO RESET LIMIT VIA API - chatId: {}, current: {}, requested: 0, client: {}", 
+                    logger.warn("ATTEMPT TO RESET LIMIT VIA API - chatId: {}, current: {}, requested: 0, client: {}",
                             chatId, currentLimit, clientInfo);
                     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                            .body(String.format("Cannot reset permanent limit increase to 0 when current limit is %d. " +
-                                    "Permanent limits should never be reset automatically. " +
-                                    "If this is intentional, contact system administrator.", currentLimit));
+                            .body(String
+                                    .format("Cannot reset permanent limit increase to 0 when current limit is %d. " +
+                                            "Permanent limits should never be reset automatically. " +
+                                            "If this is intentional, contact system administrator.", currentLimit));
                 }
             } catch (Exception e) {
                 // If we can't get current limit, let the service handle the validation
                 logger.debug("Could not pre-validate limit reset for chatId {}: {}", chatId, e.getMessage());
             }
         }
-        
+
         try {
-            com.example.shade.model.UserLimitIncrease limit = userService.updateLimit(chatId, request.getPermanentLimitIncrease());
+            com.example.shade.model.UserLimitIncrease limit = userService.updateLimit(chatId,
+                    request.getPermanentLimitIncrease());
             Long effectiveDailyLimit = dailyStatsService.getEffectiveDailyLimit(chatId);
             DailyLimitUpdateResponse response = DailyLimitUpdateResponse.builder()
-                    .permanentLimitIncrease(limit.getAccumulatedLimitIncrease().setScale(0, java.math.RoundingMode.HALF_UP).longValue())
+                    .permanentLimitIncrease(
+                            limit.getAccumulatedLimitIncrease().setScale(0, java.math.RoundingMode.HALF_UP).longValue())
                     .effectiveDailyLimit(effectiveDailyLimit)
                     .lastUpdated(limit.getLastUpdated())
                     .build();
-            logger.info("LIMIT UPDATE SUCCESS - chatId: {}, new value: {}, client: {}", 
+            logger.info("LIMIT UPDATE SUCCESS - chatId: {}, new value: {}, client: {}",
                     chatId, limit.getAccumulatedLimitIncrease(), clientInfo);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
-            logger.error("LIMIT UPDATE FAILED (Validation) - chatId: {}, error: {}, client: {}", 
+            logger.error("LIMIT UPDATE FAILED (Validation) - chatId: {}, error: {}, client: {}",
                     chatId, e.getMessage(), clientInfo);
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         } catch (Exception e) {
-            logger.error("LIMIT UPDATE FAILED (Error) - chatId: {}, error: {}, client: {}", 
+            logger.error("LIMIT UPDATE FAILED (Error) - chatId: {}, error: {}, client: {}",
                     chatId, e.getMessage(), clientInfo);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error updating limit: " + e.getMessage());
@@ -273,12 +276,14 @@ public class UserController {
             try {
                 Long currentLimit = userService.getUserDetails(chatId).getPermanentLimitIncrease();
                 if (currentLimit != null && currentLimit > 0) {
-                    logger.warn("ATTEMPT TO RESET DAILY LIMIT VIA API - chatId: {}, current: {}, requested: 0, client: {}",
+                    logger.warn(
+                            "ATTEMPT TO RESET DAILY LIMIT VIA API - chatId: {}, current: {}, requested: 0, client: {}",
                             chatId, currentLimit, clientInfo);
                     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                            .body(String.format("Cannot reset permanent limit increase to 0 when current limit is %d. " +
-                                    "Permanent limits should never be reset automatically. " +
-                                    "If this is intentional, contact system administrator.", currentLimit));
+                            .body(String
+                                    .format("Cannot reset permanent limit increase to 0 when current limit is %d. " +
+                                            "Permanent limits should never be reset automatically. " +
+                                            "If this is intentional, contact system administrator.", currentLimit));
                 }
             } catch (Exception e) {
                 logger.debug("Could not pre-validate daily limit reset for chatId {}: {}", chatId, e.getMessage());
@@ -286,14 +291,17 @@ public class UserController {
         }
 
         try {
-            com.example.shade.model.UserLimitIncrease limit = userService.updateLimit(chatId, request.getPermanentLimitIncrease());
+            com.example.shade.model.UserLimitIncrease limit = userService.updateLimit(chatId,
+                    request.getPermanentLimitIncrease());
             Long effectiveDailyLimit = dailyStatsService.getEffectiveDailyLimit(chatId);
             DailyLimitUpdateResponse response = DailyLimitUpdateResponse.builder()
-                    .permanentLimitIncrease(limit.getAccumulatedLimitIncrease().setScale(0, java.math.RoundingMode.HALF_UP).longValue())
+                    .permanentLimitIncrease(
+                            limit.getAccumulatedLimitIncrease().setScale(0, java.math.RoundingMode.HALF_UP).longValue())
                     .effectiveDailyLimit(effectiveDailyLimit)
                     .lastUpdated(limit.getLastUpdated())
                     .build();
-            logger.info("DAILY LIMIT UPDATE SUCCESS - chatId: {}, permanentLimit: {}, effectiveDailyLimit: {}, client: {}",
+            logger.info(
+                    "DAILY LIMIT UPDATE SUCCESS - chatId: {}, permanentLimit: {}, effectiveDailyLimit: {}, client: {}",
                     chatId, limit.getAccumulatedLimitIncrease(), effectiveDailyLimit, clientInfo);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
@@ -312,11 +320,11 @@ public class UserController {
     public ResponseEntity<?> blockUser(
             @PathVariable Long chatId,
             HttpServletRequest request) {
-        
+
         if (!authenticate(request)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
         }
-        
+
         try {
             userService.blockUser(chatId);
             return ResponseEntity.ok("User blocked successfully: " + chatId);
@@ -332,11 +340,11 @@ public class UserController {
     public ResponseEntity<?> unblockUser(
             @PathVariable Long chatId,
             HttpServletRequest request) {
-        
+
         if (!authenticate(request)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
         }
-        
+
         try {
             userService.unblockUser(chatId);
             return ResponseEntity.ok("User unblocked successfully: " + chatId);
@@ -351,18 +359,18 @@ public class UserController {
     @DeleteMapping("/{chatId}")
     public ResponseEntity<?> deleteUser(
             @PathVariable Long chatId,
-            @RequestParam(required = false, defaultValue = "soft") String deleteType,
+            @RequestParam(required = false, defaultValue = "hard") String deleteType,
             HttpServletRequest request) {
-        
+
         if (!authenticate(request)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
         }
-        
+
         if (!"soft".equalsIgnoreCase(deleteType) && !"hard".equalsIgnoreCase(deleteType)) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body("Invalid deleteType. Must be 'soft' or 'hard'");
         }
-        
+
         try {
             userService.deleteUser(chatId, deleteType);
             return ResponseEntity.ok("User deleted successfully (type: " + deleteType + "): " + chatId);
@@ -379,11 +387,11 @@ public class UserController {
             @PathVariable Long chatId,
             @RequestBody UpdateLanguageRequest request,
             HttpServletRequest httpRequest) {
-        
+
         if (!authenticate(httpRequest)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
         }
-        
+
         try {
             com.example.shade.model.User user = userService.updateLanguage(chatId, request.getLanguage());
             return ResponseEntity.ok(user);
@@ -401,11 +409,11 @@ public class UserController {
     public ResponseEntity<?> resetDailyStats(
             @PathVariable Long chatId,
             HttpServletRequest request) {
-        
+
         if (!authenticate(request)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
         }
-        
+
         try {
             userService.resetDailyStats(chatId);
             return ResponseEntity.ok("Daily stats reset successfully for user: " + chatId);
@@ -419,11 +427,11 @@ public class UserController {
     public ResponseEntity<?> resetBalance(
             @PathVariable Long chatId,
             HttpServletRequest request) {
-        
+
         if (!authenticate(request)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
         }
-        
+
         try {
             userService.resetBalance(chatId);
             return ResponseEntity.ok("Balance and tickets reset successfully for user: " + chatId);
@@ -437,11 +445,11 @@ public class UserController {
     public ResponseEntity<?> getUserSummary(
             @PathVariable Long chatId,
             HttpServletRequest request) {
-        
+
         if (!authenticate(request)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
         }
-        
+
         try {
             UserSummaryDTO summary = userService.getUserSummary(chatId);
             return ResponseEntity.ok(summary);
@@ -462,14 +470,15 @@ public class UserController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             HttpServletRequest request) {
-        
+
         if (!authenticate(request)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
         }
-        
+
         try {
             Pageable pageable = PageRequest.of(page, size);
-            Page<DailyUserStatsDTO> statsPage = userService.getUserDailyStats(chatId, date, startDate, endDate, pageable);
+            Page<DailyUserStatsDTO> statsPage = userService.getUserDailyStats(chatId, date, startDate, endDate,
+                    pageable);
             return ResponseEntity.ok(statsPage);
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
@@ -483,15 +492,15 @@ public class UserController {
     public ResponseEntity<?> bulkBlockUsers(
             @RequestBody BulkOperationRequest request,
             HttpServletRequest httpRequest) {
-        
+
         if (!authenticate(httpRequest)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
         }
-        
+
         if (request.getChatIds() == null || request.getChatIds().isEmpty()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("chatIds list cannot be empty");
         }
-        
+
         try {
             List<Long> blocked = userService.bulkBlockUsers(request.getChatIds());
             return ResponseEntity.ok("Bulk block completed. Blocked: " + blocked.size() + " users. IDs: " + blocked);
@@ -505,18 +514,19 @@ public class UserController {
     public ResponseEntity<?> bulkUnblockUsers(
             @RequestBody BulkOperationRequest request,
             HttpServletRequest httpRequest) {
-        
+
         if (!authenticate(httpRequest)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
         }
-        
+
         if (request.getChatIds() == null || request.getChatIds().isEmpty()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("chatIds list cannot be empty");
         }
-        
+
         try {
             List<Long> unblocked = userService.bulkUnblockUsers(request.getChatIds());
-            return ResponseEntity.ok("Bulk unblock completed. Unblocked: " + unblocked.size() + " users. IDs: " + unblocked);
+            return ResponseEntity
+                    .ok("Bulk unblock completed. Unblocked: " + unblocked.size() + " users. IDs: " + unblocked);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error in bulk unblock operation: " + e.getMessage());
