@@ -170,6 +170,35 @@ public class UserController {
         }
     }
 
+    @PutMapping("/{chatId}/wallet")
+    public ResponseEntity<?> updateWalletBalance(
+            @PathVariable Long chatId,
+            @RequestBody UpdateWalletBalanceRequest request,
+            HttpServletRequest httpRequest) {
+
+        if (!authenticate(httpRequest)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
+
+        if (request == null || request.getWalletBalance() == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("walletBalance is required");
+        }
+        if (request.getWalletBalance() < 0) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("walletBalance must be >= 0");
+        }
+
+        try {
+            com.example.shade.model.UserBalance balance = userService.updateWalletBalance(chatId,
+                    request.getWalletBalance());
+            return ResponseEntity.ok(balance);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error updating wallet balance: " + e.getMessage());
+        }
+    }
+
     @PutMapping("/{chatId}/withdraw-quota")
     public ResponseEntity<?> addWithdrawQuota(
             @PathVariable Long chatId,

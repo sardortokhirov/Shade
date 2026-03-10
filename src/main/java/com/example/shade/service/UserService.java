@@ -510,6 +510,42 @@ public class UserService {
         return userBalance;
     }
 
+    /**
+     * Sets the user's wallet balance (UZS). Used from user profile API.
+     * Creates UserBalance if it does not exist.
+     */
+    @Transactional
+    public UserBalance updateWalletBalance(Long chatId, Long walletBalance) {
+        if (walletBalance == null || walletBalance < 0) {
+            throw new IllegalArgumentException("Wallet balance must be non-negative");
+        }
+
+        Optional<UserBalance> existingBalance = userBalanceRepository.findById(chatId);
+        UserBalance userBalance;
+        Long oldWallet;
+
+        if (existingBalance.isPresent()) {
+            userBalance = existingBalance.get();
+            oldWallet = userBalance.getWalletBalance() != null ? userBalance.getWalletBalance() : 0L;
+            logger.info("Updating wallet balance for chatId {}", chatId);
+        } else {
+            userBalance = UserBalance.builder()
+                    .chatId(chatId)
+                    .tickets(0L)
+                    .balance(BigDecimal.ZERO)
+                    .walletBalance(0L)
+                    .build();
+            oldWallet = 0L;
+            logger.info("Creating new UserBalance for chatId {} via wallet API", chatId);
+        }
+
+        userBalance.setWalletBalance(walletBalance);
+        userBalanceRepository.save(userBalance);
+
+        logger.info("Updated wallet balance for chatId {}: {} -> {} UZS", chatId, oldWallet, walletBalance);
+        return userBalance;
+    }
+
     @Transactional
     public UserLimitIncrease updateLimit(Long chatId, Long permanentLimitIncrease) {
         if (permanentLimitIncrease == null || permanentLimitIncrease < 0) {
