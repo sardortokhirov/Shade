@@ -247,13 +247,24 @@ public class AdminLogBot extends TelegramLongPollingBot {
         // with the actual request ID
         // to prevent approval mismatches when multiple screenshots are pending from the
         // same user
-        else if (callbackData.startsWith("SCREENSHOT_APPROVE:")) {
-            Long requestId = Long.parseLong(callbackData.split(":")[1]);
-            topUpService.handleScreenshotApproval(chatId, requestId, true);
-            return;
-        } else if (callbackData.startsWith("SCREENSHOT_REJECT:")) {
-            Long requestId = Long.parseLong(callbackData.split(":")[1]);
-            topUpService.handleScreenshotApproval(chatId, requestId, false);
+        else if (callbackData.startsWith("SCREENSHOT_APPROVE:") || callbackData.startsWith("SCREENSHOT_REJECT:")) {
+            boolean approve = callbackData.startsWith("SCREENSHOT_APPROVE:");
+            String[] parts = callbackData.split(":", 2);
+            if (parts.length < 2) {
+                logger.warn("Invalid screenshot callback format: {}", callbackData);
+                adminLogBotService.sendLog("❌ Skrinshot tugmasi: noto'g'ri format.");
+                return;
+            }
+            try {
+                Long requestId = Long.parseLong(parts[1].trim());
+                topUpService.handleScreenshotApproval(chatId, requestId, approve);
+            } catch (NumberFormatException e) {
+                logger.warn("Invalid request ID in screenshot callback: {}", callbackData, e);
+                adminLogBotService.sendLog("❌ Skrinshot tasdiqlash: so'rov ID noto'g'ri.");
+            } catch (Exception e) {
+                logger.error("Screenshot approval failed for callback {}", callbackData, e);
+                adminLogBotService.sendLog(String.format("❌ Skrinshot tasdiqlash xatosi: %s", e.getMessage() != null ? e.getMessage() : e.toString()));
+            }
             return;
         } else if (callbackData.startsWith("ADMIN_APPROVE_TRANSFER:")) {
             Long requestId = Long.parseLong(callbackData.split(":")[1]);

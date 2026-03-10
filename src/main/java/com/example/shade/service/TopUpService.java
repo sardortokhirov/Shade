@@ -1080,8 +1080,17 @@ public class TopUpService {
             return;
         }
 
-        AdminCard adminCard = adminCardRepository.findById(request.getAdminCardId())
-                .orElseThrow(() -> new IllegalStateException("Admin card not found: " + request.getAdminCardId()));
+        if (request.getAdminCardId() == null) {
+            logger.warn("Request {} has no admin card assigned", requestId);
+            adminLogBotService.sendLog(String.format("❌ Skrinshot tasdiqlanmadi. 🆔 `%d` — so'rovga karta biriktirilmagan.", requestId));
+            return;
+        }
+        AdminCard adminCard = adminCardRepository.findById(request.getAdminCardId()).orElse(null);
+        if (adminCard == null) {
+            logger.warn("Admin card not found for request {} (adminCardId={})", requestId, request.getAdminCardId());
+            adminLogBotService.sendLog(String.format("❌ Skrinshot tasdiqlanmadi. 🆔 `%d` — karta topilmadi (id=%s).", requestId, request.getAdminCardId()));
+            return;
+        }
 
         ExchangeRate latest = exchangeRateRepository.findLatest()
                 .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
@@ -1277,15 +1286,30 @@ public class TopUpService {
 
                 adminLogBotService.sendLog(adminLogMessage);
                 Long userChatId = request.getChatId();
+                String dateStr = LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                String shortUserText = String.format(
+                        languageSessionService.getTranslation(userChatId, "topup.message.screenshot_approved"),
+                        request.getId(),
+                        request.getPlatform(),
+                        request.getPlatformUserId(),
+                        request.getUniqueAmount(),
+                        dateStr);
+                if (tickets > 0) {
+                    shortUserText += "\n\n" + String.format(
+                            languageSessionService.getTranslation(userChatId, "topup.message.tickets_received"),
+                            tickets);
+                }
                 SendMessage successMessage = new SendMessage();
                 successMessage.setChatId(userChatId);
-                successMessage.setText(logMessage +
-                        (tickets > 0 ? String.format(
-                                languageSessionService.getTranslation(userChatId, "topup.message.tickets_received"),
-                                tickets) : ""));
+                successMessage.setText(shortUserText);
                 successMessage.setReplyMarkup(createMainMenuOnlyKeyboard(userChatId));
-                messageSender.sendMessage(successMessage, userChatId);
-                logger.info("Sent approval message to user chatId {} for request {}", userChatId, requestId);
+                boolean userNotified = messageSender.trySendMessage(successMessage, userChatId);
+                if (!userNotified) {
+                    logger.warn("Failed to send approval notification to user chatId {} for request {}", userChatId, requestId);
+                    adminLogBotService.sendLog(String.format("⚠️ Foydalanuvchiga tasdiqlash xabari yuborilmadi. 🆔 `%d` chatId `%s`", requestId, userChatId));
+                } else {
+                    logger.info("Sent approval message to user chatId {} for request {}", userChatId, requestId);
+                }
             } else {
                 handleTransferFailure(request.getChatId(), request, adminCard);
             }
@@ -1356,8 +1380,17 @@ public class TopUpService {
             return;
         }
 
-        AdminCard adminCard = adminCardRepository.findById(request.getAdminCardId())
-                .orElseThrow(() -> new IllegalStateException("Admin card not found: " + request.getAdminCardId()));
+        if (request.getAdminCardId() == null) {
+            logger.warn("Request {} has no admin card assigned", requestId);
+            adminLogBotService.sendLog(String.format("❌ Skrinshot tasdiqlanmadi. 🆔 `%d` — so'rovga karta biriktirilmagan.", requestId));
+            return;
+        }
+        AdminCard adminCard = adminCardRepository.findById(request.getAdminCardId()).orElse(null);
+        if (adminCard == null) {
+            logger.warn("Admin card not found for request {} (adminCardId={})", requestId, request.getAdminCardId());
+            adminLogBotService.sendLog(String.format("❌ Skrinshot tasdiqlanmadi. 🆔 `%d` — karta topilmadi (id=%s).", requestId, request.getAdminCardId()));
+            return;
+        }
 
         ExchangeRate latest = exchangeRateRepository.findLatest()
                 .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
@@ -1553,15 +1586,30 @@ public class TopUpService {
 
                 adminLogBotService.sendLog(adminLogMessage);
                 Long userChatId = request.getChatId();
+                String dateStr = LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                String shortUserText = String.format(
+                        languageSessionService.getTranslation(userChatId, "topup.message.screenshot_approved"),
+                        request.getId(),
+                        request.getPlatform(),
+                        request.getPlatformUserId(),
+                        request.getUniqueAmount(),
+                        dateStr);
+                if (tickets > 0) {
+                    shortUserText += "\n\n" + String.format(
+                            languageSessionService.getTranslation(userChatId, "topup.message.tickets_received"),
+                            tickets);
+                }
                 SendMessage successMessage = new SendMessage();
                 successMessage.setChatId(userChatId);
-                successMessage.setText(logMessage +
-                        (tickets > 0 ? String.format(
-                                languageSessionService.getTranslation(userChatId, "topup.message.tickets_received"),
-                                tickets) : ""));
+                successMessage.setText(shortUserText);
                 successMessage.setReplyMarkup(createMainMenuOnlyKeyboard(userChatId));
-                messageSender.sendMessage(successMessage, userChatId);
-                logger.info("Sent approval message to user chatId {} for request {}", userChatId, requestId);
+                boolean userNotified = messageSender.trySendMessage(successMessage, userChatId);
+                if (!userNotified) {
+                    logger.warn("Failed to send approval notification to user chatId {} for request {}", userChatId, requestId);
+                    adminLogBotService.sendLog(String.format("⚠️ Foydalanuvchiga tasdiqlash xabari yuborilmadi. 🆔 `%d` chatId `%s`", requestId, userChatId));
+                } else {
+                    logger.info("Sent approval message to user chatId {} for request {}", userChatId, requestId);
+                }
             } else {
                 handleTransferFailure(request.getChatId(), request, adminCard);
             }

@@ -50,6 +50,31 @@ public class MessageSender {
         }
     }
 
+    /**
+     * Sends a message to the user and returns true if successful, false otherwise.
+     * Use when the caller needs to know if delivery failed (e.g. to notify admin).
+     */
+    public boolean trySendMessage(SendMessage message, Long chatId) {
+        if (bot == null) {
+            logger.error("Bot not set for MessageSender, cannot send to chatId {}", chatId);
+            return false;
+        }
+        try {
+            message.setChatId(chatId);
+            var sentMessage = bot.execute(message);
+            UserSession session = sessionService.getUserSession(chatId).orElse(new UserSession());
+            session.setChatId(chatId);
+            List<Integer> messageIds = sessionService.getMessageIds(chatId);
+            messageIds.add(sentMessage.getMessageId());
+            session.setMessageIds(messageIds);
+            sessionService.saveUserSession(session);
+            return true;
+        } catch (TelegramApiException e) {
+            logger.error("Error sending message to chatId {}: {}", chatId, e.getMessage());
+            return false;
+        }
+    }
+
     public void sendMessage(Long chatId, String text) {
         int maxLength = 4096;
 

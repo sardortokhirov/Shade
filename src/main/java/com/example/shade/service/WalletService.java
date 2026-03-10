@@ -47,6 +47,7 @@ public class WalletService {
     private final LottoBotService lottoBotService;
     private final DailyStatsService dailyStatsService;
     private final BlockedUserRepository blockedUserRepository;
+    private final BonusService bonusService;
 
     @Autowired
     @org.springframework.context.annotation.Lazy
@@ -600,6 +601,18 @@ public class WalletService {
             if (amount <= 0) {
                 throw new NumberFormatException();
             }
+            long minAmount = configurationService.getTopUpMinAmount();
+            if (amount < minAmount) {
+                SendMessage m = new SendMessage();
+                m.setChatId(chatId.toString());
+                m.setText(String.format(
+                        languageSessionService.getTranslation(chatId, "wallet.message.transfer_min_error"),
+                        minAmount));
+                m.enableMarkdown(true);
+                m.setReplyMarkup(createMainMenuOnlyMarkup(chatId));
+                messageSender.sendMessage(m, chatId);
+                return;
+            }
             if (amount > balance.getWalletBalance()) {
                 SendMessage m = new SendMessage();
                 m.setChatId(chatId.toString());
@@ -729,6 +742,19 @@ public class WalletService {
         if (amountStr == null)
             return;
         Long amount = Long.parseLong(amountStr);
+        long minAmount = configurationService.getTopUpMinAmount();
+        if (amount < minAmount) {
+            SendMessage m = new SendMessage();
+            m.setChatId(chatId.toString());
+            m.setText(String.format(
+                    languageSessionService.getTranslation(chatId, "wallet.message.transfer_min_error"),
+                    minAmount));
+            m.enableMarkdown(true);
+            m.setReplyMarkup(createMainMenuOnlyMarkup(chatId));
+            messageSender.sendMessage(m, chatId);
+            sendPaymentMainMenu(chatId, true);
+            return;
+        }
         String platformStr = sessionService.getUserData(chatId, "walletPlatform");
         String platformUserId = sessionService.getUserData(chatId, "walletPlatformUserId");
         String fullName = sessionService.getUserData(chatId, "walletFullName");
@@ -819,8 +845,20 @@ public class WalletService {
             m.setReplyMarkup(createMainMenuOnlyMarkup(chatId));
             messageSender.sendMessage(m, chatId);
 
+            // Same as card-to-platform: increase daily limit, award tickets, credit referral
+            dailyStatsService.addTopUpAmount(chatId, amount);
+
+            long ticketsAwarded = 0L;
+            long ticketCalculationAmount = configurationService.getTicketCalculationAmount();
+            if (ticketCalculationAmount > 0) {
+                ticketsAwarded = amount / ticketCalculationAmount;
+                if (ticketsAwarded > 0) {
+                    lotteryService.awardTickets(chatId, ticketsAwarded);
+                }
+            }
+            bonusService.creditReferral(chatId, amount);
+
             // Quota earned only for wallet-to-platform; never for card-to-wallet top-ups.
-            // Earn withdrawal quota: amount * ratio (uses ratio at the time of transfer)
             Long ratio = configurationService.getWalletWithdrawRatio();
             long earned = amount * ratio;
             UserWalletQuota quota = walletQuotaRepository.findByIdWithLock(chatId)
@@ -829,6 +867,16 @@ public class WalletService {
             walletQuotaRepository.save(quota);
             logger.info("Quota earned for chatId {}: +{} (ratio={}), total earned={}, remaining={}",
                     chatId, earned, ratio, quota.getEarnedQuota(), quota.getRemainingQuota());
+
+            long limitIncrease = 0L;
+            java.math.BigDecimal topUpPercentage = configurationService.getTopUpDailyLimitIncreasePercentage();
+            if (topUpPercentage != null && topUpPercentage.compareTo(java.math.BigDecimal.ZERO) > 0) {
+                limitIncrease = java.math.BigDecimal.valueOf(amount)
+                        .multiply(topUpPercentage)
+                        .divide(java.math.BigDecimal.valueOf(100), 8, java.math.RoundingMode.HALF_UP)
+                        .setScale(0, java.math.RoundingMode.HALF_UP)
+                        .longValue();
+            }
 
             var balanceOpt = userBalanceRepository.findById(chatId);
             long walletLeft = balanceOpt
@@ -842,15 +890,15 @@ public class WalletService {
                 else if (bl.getBalance() != null)
                     platformBalanceUzs = bl.getBalance().longValue();
             }
-            long tickets = balanceOpt.map(ub -> ub.getTickets() != null ? ub.getTickets() : 0L).orElse(0L);
+            long ticketsTotal = balanceOpt.map(ub -> ub.getTickets() != null ? ub.getTickets() : 0L).orElse(0L);
             Long totalLimit = dailyStatsService.getEffectiveDailyLimit(chatId);
             Long availableLimit = dailyStatsService.getAvailableLimit(chatId);
             long totalLimitSafe = totalLimit != null ? totalLimit : 0L;
             long availableLimitSafe = availableLimit != null ? availableLimit : 0L;
             String dateStr = LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
             String adminLog = String.format(
-                    "✅ *Hamyondan kontoraga o'tkazma*\n\n🆔: `%d`\n👤: `%d`\n🌐 Kontora: %s\n📋 Kontora ID: `%s`\n💸 Summa: `%,d UZS`\n🔰 Yechib olish kvotasi: `+%,d UZS`\n🎟️ Chiptalar: %d (+ 0)\n📈 Limit oshdi: 0 so'm\n📊 Limit: %,d / %,d so'm\n🏧 Qoldi: `%,d UZS`\n\n🏦: %,d UZS\n\n📅 %s",
-                    request.getId(), chatId, escapeMarkdown(platformStr), escapeMarkdown(platformUserId), amount, earned, tickets, totalLimitSafe, availableLimitSafe, walletLeft, platformBalanceUzs, dateStr);
+                    "✅ *Hamyondan kontoraga o'tkazma*\n\n🆔: `%d`\n👤: `%d`\n🌐 Kontora: %s\n📋 Kontora ID: `%s`\n💸 Summa: `%,d UZS`\n🔰 Yechib olish kvotasi: `+%,d UZS`\n🎟️ Chiptalar: %d (+ %d)\n📈 Limit oshdi: %,d so'm\n📊 Limit: %,d / %,d so'm\n🏧 Qoldi: `%,d UZS`\n\n🏦: %,d UZS\n\n📅 %s",
+                    request.getId(), chatId, escapeMarkdown(platformStr), escapeMarkdown(platformUserId), amount, earned, ticketsTotal, ticketsAwarded, limitIncrease, totalLimitSafe, availableLimitSafe, walletLeft, platformBalanceUzs, dateStr);
             adminLogBotService.sendLog(adminLog);
         } else {
             // Transfer failed - refund wallet
