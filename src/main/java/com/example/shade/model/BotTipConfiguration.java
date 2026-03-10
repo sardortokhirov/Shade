@@ -37,7 +37,10 @@ public class BotTipConfiguration {
     private Integer bonusTicketsChance = 100;
 
     /** When true, tip awards permanent limit increase per configured ratio. */
-    @Column(name = "tip_limit_increase_enabled", nullable = false)
+    // NOTE: keep nullable at JPA level because spring.jpa.hibernate.ddl-auto=update
+    // can try to add NOT NULL column without default (fails on existing rows).
+    // DB migration enforces NOT NULL + default safely.
+    @Column(name = "tip_limit_increase_enabled", columnDefinition = "boolean default false")
     private Boolean tipLimitIncreaseEnabled = false;
 
     /** Per this many UZS tipped (e.g. 1000). */
