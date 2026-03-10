@@ -218,4 +218,51 @@ public class SystemConfigurationController {
         SystemConfiguration saved = configurationService.setWalletMinWithdrawAmount(amount);
         return ResponseEntity.ok(saved);
     }
+
+    /**
+     * Gets the current wallet -> platform transfer min/max amount (UZS).
+     */
+    @GetMapping("/wallet-transfer-amount-limits")
+    public ResponseEntity<?> getWalletTransferAmountLimits(HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+        return ResponseEntity.ok(java.util.Map.of(
+                "walletTransferMinAmount", configurationService.getWalletTransferMinAmount(),
+                "walletTransferMaxAmount", configurationService.getWalletTransferMaxAmount()));
+    }
+
+    /**
+     * Updates only wallet -> platform transfer minimum amount (UZS).
+     */
+    @PatchMapping("/wallet-transfer-min")
+    public ResponseEntity<?> setWalletTransferMin(
+            @RequestParam Long amount,
+            HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+        if (amount == null || amount <= 0) {
+            return ResponseEntity.badRequest().body("Amount must be greater than 0");
+        }
+        SystemConfiguration saved = configurationService.setWalletTransferMinAmount(amount);
+        return ResponseEntity.ok(saved);
+    }
+
+    /**
+     * Updates only wallet -> platform transfer maximum amount (UZS).
+     */
+    @PatchMapping("/wallet-transfer-max")
+    public ResponseEntity<?> setWalletTransferMax(
+            @RequestParam Long amount,
+            HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+        if (amount == null || amount <= 0) {
+            return ResponseEntity.badRequest().body("Amount must be greater than 0");
+        }
+        SystemConfiguration saved = configurationService.setWalletTransferMaxAmount(amount);
+        return ResponseEntity.ok(saved);
+    }
 }

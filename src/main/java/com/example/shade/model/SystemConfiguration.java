@@ -77,6 +77,15 @@ public class SystemConfiguration {
     @Column(name = "wallet_withdraw_ratio", nullable = false, columnDefinition = "bigint default 10")
     private Long walletWithdrawRatio = 10L;
 
+    /**
+     * Wallet -> Platform transfer amount limits (independent from card top-up limits).
+     */
+    @Column(name = "wallet_transfer_min_amount", columnDefinition = "bigint default 5000")
+    private Long walletTransferMinAmount = 5_000L;
+
+    @Column(name = "wallet_transfer_max_amount", columnDefinition = "bigint default 10000000")
+    private Long walletTransferMaxAmount = 10_000_000L;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 }

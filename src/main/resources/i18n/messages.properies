@@ -259,6 +259,7 @@ wallet.message.insufficient_balance_for_transfer=Kontoraga o'tkazish uchun mabla
 wallet.message.insufficient_balance_for_withdraw=Kartaga yechib olish uchun mablag' yetarli emas. Minimum: %,d so'm
 wallet.message.withdraw_min_error=Minimal yechish summasi: %,d UZS
 wallet.message.transfer_min_error=Minimal o'tkazma summasi: %,d UZS. Kontoraga kamroq summa o'tkazish mumkin emas.
+wallet.message.transfer_max_error=Maksimal o'tkazma summasi: %,d UZS. Kontoraga bundan ko'proq summa o'tkazish mumkin emas.
 wallet.message.invalid_card=Noto'g'ri karta raqami. 16 ta raqam kiriting.
 wallet.message.transfer_success=✅ Muvaffaqiyatli:\nID: %d\nKontora: %s\nKontora ID: %s\nSumma: %,d UZS
 wallet.message.transfer_failed=❌ Kontoraga o'tkazish amalga oshmadi. Pullar hamyonga qaytarildi.

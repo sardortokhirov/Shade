@@ -38,6 +38,8 @@ public class SystemConfigurationService {
     private static final Long DEFAULT_LOTTERY_COOLDOWN_SECONDS = 300L;
     private static final Long DEFAULT_WALLET_MIN_WITHDRAW_AMOUNT = 10_000L;
     private static final Long DEFAULT_WALLET_WITHDRAW_RATIO = 10L;
+    private static final Long DEFAULT_WALLET_TRANSFER_MIN = 5_000L;
+    private static final Long DEFAULT_WALLET_TRANSFER_MAX = 10_000_000L;
 
     @Transactional
     public SystemConfiguration getConfiguration() {
@@ -59,6 +61,8 @@ public class SystemConfigurationService {
                     config.setHumoEnabled(DEFAULT_HUMO_ENABLED);
                     config.setLotteryCooldownSeconds(DEFAULT_LOTTERY_COOLDOWN_SECONDS);
                     config.setWalletMinWithdrawAmount(DEFAULT_WALLET_MIN_WITHDRAW_AMOUNT);
+                    config.setWalletTransferMinAmount(DEFAULT_WALLET_TRANSFER_MIN);
+                    config.setWalletTransferMaxAmount(DEFAULT_WALLET_TRANSFER_MAX);
                     config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
                     return configurationRepository.save(config);
                 });
@@ -170,6 +174,20 @@ public class SystemConfigurationService {
                 : DEFAULT_WALLET_WITHDRAW_RATIO;
     }
 
+    public Long getWalletTransferMinAmount() {
+        SystemConfiguration config = getConfiguration();
+        return config.getWalletTransferMinAmount() != null
+                ? config.getWalletTransferMinAmount()
+                : DEFAULT_WALLET_TRANSFER_MIN;
+    }
+
+    public Long getWalletTransferMaxAmount() {
+        SystemConfiguration config = getConfiguration();
+        return config.getWalletTransferMaxAmount() != null
+                ? config.getWalletTransferMaxAmount()
+                : DEFAULT_WALLET_TRANSFER_MAX;
+    }
+
     @Transactional
     public void setHumoEnabled(boolean enabled) {
         SystemConfiguration current = getConfiguration();
@@ -210,6 +228,28 @@ public class SystemConfigurationService {
         return saved;
     }
 
+    @Transactional
+    public SystemConfiguration setWalletTransferMinAmount(Long amount) {
+        SystemConfiguration current = getConfiguration();
+        SystemConfiguration config = copyConfig(current);
+        config.setWalletTransferMinAmount(amount);
+        config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
+        SystemConfiguration saved = configurationRepository.save(config);
+        logger.info("Wallet transfer min amount updated to {}", amount);
+        return saved;
+    }
+
+    @Transactional
+    public SystemConfiguration setWalletTransferMaxAmount(Long amount) {
+        SystemConfiguration current = getConfiguration();
+        SystemConfiguration config = copyConfig(current);
+        config.setWalletTransferMaxAmount(amount);
+        config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
+        SystemConfiguration saved = configurationRepository.save(config);
+        logger.info("Wallet transfer max amount updated to {}", amount);
+        return saved;
+    }
+
     private SystemConfiguration copyConfig(SystemConfiguration current) {
         SystemConfiguration config = new SystemConfiguration();
         config.setTopUpMinAmount(current.getTopUpMinAmount());
@@ -228,6 +268,8 @@ public class SystemConfigurationService {
         config.setLotteryCooldownSeconds(current.getLotteryCooldownSeconds());
         config.setWalletMinWithdrawAmount(current.getWalletMinWithdrawAmount());
         config.setWalletWithdrawRatio(current.getWalletWithdrawRatio());
+        config.setWalletTransferMinAmount(current.getWalletTransferMinAmount());
+        config.setWalletTransferMaxAmount(current.getWalletTransferMaxAmount());
         return config;
     }
 }

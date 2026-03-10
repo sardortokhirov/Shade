@@ -235,8 +235,8 @@ public class WalletService {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
-        long minAmount = configurationService.getTopUpMinAmount();
-        long maxAmount = configurationService.getTopUpMaxAmount();
+        long minAmount = configurationService.getWalletTransferMinAmount();
+        long maxAmount = configurationService.getWalletTransferMaxAmount();
 
         String minText = String.format("%,d сум", minAmount);
         String maxText = String.format("%,d сум", maxAmount);
@@ -433,10 +433,10 @@ public class WalletService {
             String id = callback.split(":")[1];
             handleDepositId(chatId, id);
         } else if (callback.equals("WALLET_DEPOSIT_MIN")) {
-            long minAmount = configurationService.getTopUpMinAmount();
+            long minAmount = configurationService.getWalletTransferMinAmount();
             handleDepositAmount(chatId, String.valueOf(minAmount));
         } else if (callback.equals("WALLET_DEPOSIT_MAX")) {
-            long maxAmount = configurationService.getTopUpMaxAmount();
+            long maxAmount = configurationService.getWalletTransferMaxAmount();
             handleDepositAmount(chatId, String.valueOf(maxAmount));
         } else if (callback.equals("WALLET_WITHDRAW_MIN")) {
             long minAmount = configurationService.getWalletMinWithdrawAmount();
@@ -570,7 +570,7 @@ public class WalletService {
             return;
         }
 
-        long minAmount = configurationService.getTopUpMinAmount();
+        long minAmount = configurationService.getWalletTransferMinAmount();
         UserBalance balance = getOrCreateUserBalance(chatId);
         if (balance.getWalletBalance() < minAmount) {
             SendMessage m = new SendMessage();
@@ -602,13 +602,25 @@ public class WalletService {
             if (amount <= 0) {
                 throw new NumberFormatException();
             }
-            long minAmount = configurationService.getTopUpMinAmount();
+            long minAmount = configurationService.getWalletTransferMinAmount();
+            long maxAmount = configurationService.getWalletTransferMaxAmount();
             if (amount < minAmount) {
                 SendMessage m = new SendMessage();
                 m.setChatId(chatId.toString());
                 m.setText(String.format(
                         languageSessionService.getTranslation(chatId, "wallet.message.transfer_min_error"),
                         minAmount));
+                m.enableMarkdown(true);
+                m.setReplyMarkup(createMainMenuOnlyMarkup(chatId));
+                messageSender.sendMessage(m, chatId);
+                return;
+            }
+            if (maxAmount > 0 && amount > maxAmount) {
+                SendMessage m = new SendMessage();
+                m.setChatId(chatId.toString());
+                m.setText(String.format(
+                        languageSessionService.getTranslation(chatId, "wallet.message.transfer_max_error"),
+                        maxAmount));
                 m.enableMarkdown(true);
                 m.setReplyMarkup(createMainMenuOnlyMarkup(chatId));
                 messageSender.sendMessage(m, chatId);
@@ -743,13 +755,26 @@ public class WalletService {
         if (amountStr == null)
             return;
         Long amount = Long.parseLong(amountStr);
-        long minAmount = configurationService.getTopUpMinAmount();
+        long minAmount = configurationService.getWalletTransferMinAmount();
+        long maxAmount = configurationService.getWalletTransferMaxAmount();
         if (amount < minAmount) {
             SendMessage m = new SendMessage();
             m.setChatId(chatId.toString());
             m.setText(String.format(
                     languageSessionService.getTranslation(chatId, "wallet.message.transfer_min_error"),
                     minAmount));
+            m.enableMarkdown(true);
+            m.setReplyMarkup(createMainMenuOnlyMarkup(chatId));
+            messageSender.sendMessage(m, chatId);
+            sendPaymentMainMenu(chatId, true);
+            return;
+        }
+        if (maxAmount > 0 && amount > maxAmount) {
+            SendMessage m = new SendMessage();
+            m.setChatId(chatId.toString());
+            m.setText(String.format(
+                    languageSessionService.getTranslation(chatId, "wallet.message.transfer_max_error"),
+                    maxAmount));
             m.enableMarkdown(true);
             m.setReplyMarkup(createMainMenuOnlyMarkup(chatId));
             messageSender.sendMessage(m, chatId);
