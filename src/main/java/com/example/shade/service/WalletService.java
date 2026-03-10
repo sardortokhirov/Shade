@@ -1260,6 +1260,7 @@ public class WalletService {
         if (limitIncrease > 0) {
             userLimitIncreaseService.addPermanentLimitIncrease(chatId, BigDecimal.valueOf(limitIncrease));
         }
+        String limitIncreaseStr = BigDecimal.valueOf(limitIncrease).setScale(5, RoundingMode.DOWN).toPlainString();
 
         SendMessage m = new SendMessage();
         m.setChatId(chatId.toString());
@@ -1271,7 +1272,7 @@ public class WalletService {
         if (limitIncrease > 0) {
             messageText += "\n\n" + String.format(
                     languageSessionService.getTranslation(chatId, "wallet.message.tip_limit_earned"),
-                    limitIncrease);
+                    limitIncreaseStr);
         }
         m.setText(messageText);
         m.enableMarkdown(true);
@@ -1283,11 +1284,11 @@ public class WalletService {
                 .map(ub -> ub.getWalletBalance() != null ? ub.getWalletBalance() : 0L)
                 .orElse(0L);
         String adminLog = String.format(
-                "🎁 #Akkaunt rivoji uchun\n🆔: `%d`\n👤: `%d`\n💸 Summa: %,d UZS\n🎟️ Bonus chiptalar: %d\n📈 Doimiy limit: +%,d so'm\n🏧 Qoldi: `%,d UZS`\n\n📅 %s",
-                request.getId(), chatId, amount, bonusTickets, limitIncrease, walletLeft,
+                "🎁 #Akkaunt rivoji uchun\n🆔: `%d`\n👤: `%d`\n💸 Summa: %,d UZS\n🎟️ Bonus chiptalar: %d\n📈 Doimiy limit: +%s so'm\n🏧 Qoldi: `%,d UZS`\n\n📅 %s",
+                request.getId(), chatId, amount, bonusTickets, limitIncreaseStr, walletLeft,
                 LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         adminLogBotService.sendLog(adminLog);
-        lottoBotService.logTip(request.getId(), chatId, amount, bonusTickets);
+        lottoBotService.logTip(request.getId(), chatId, amount, bonusTickets, limitIncreaseStr);
 
         sendPaymentMainMenu(chatId, true);
     }

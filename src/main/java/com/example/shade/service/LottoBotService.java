@@ -83,12 +83,12 @@ public class LottoBotService {
      * Sends a tip/donation log to all admin chats (lotto log bot).
      * User ID is masked (e.g. 175***3324). Tip/request ID is not shown.
      */
-    public void logTip(Long tipId, Long chatId, Long amount, long bonusTickets) {
+    public void logTip(Long tipId, Long chatId, Long amount, long bonusTickets, String limitIncreaseStr) {
         String date = LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         String maskedUserId = maskUserId(chatId);
         String logMessage = String.format(
-                "🎁 Akkaunt rivoji uchun\n💸 Summa: %,d UZS\n👤 User Id: %s\n🎟️ Bonus chiptalar: %d\n📅 Sana: %s",
-                amount, maskedUserId, bonusTickets, date);
+                "🎁 Akkaunt rivoji uchun\n💸 Summa: %,d UZS\n👤 User Id: %s\n🎟️ Bonus chiptalar: %d\n📈 Doimiy limit: +%s so'm\n📅 Sana: %s",
+                amount, maskedUserId, bonusTickets, (limitIncreaseStr != null ? limitIncreaseStr : "0.00000"), date);
 
         List<AdminChat> adminChats = adminChatRepository.findByReceiveNotificationsTrue();
         if (adminChats.isEmpty()) {
