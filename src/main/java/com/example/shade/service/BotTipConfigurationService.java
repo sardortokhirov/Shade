@@ -33,6 +33,7 @@ public class BotTipConfigurationService {
     private static final Long DEFAULT_MAX_BONUS_TICKETS = 0L;
     private static final Boolean DEFAULT_BONUS_TICKETS_ENABLED = true;
     private static final Integer DEFAULT_BONUS_TICKETS_CHANCE = 100;
+    private static final Boolean DEFAULT_TIP_LIMIT_INCREASE_ENABLED = false;
 
     @Transactional
     public BotTipConfiguration getConfiguration() {
@@ -59,11 +60,15 @@ public class BotTipConfigurationService {
             if (config.getBonusTicketsChance() == null) config.setBonusTicketsChance(existing.getBonusTicketsChance());
             if (config.getMinBonusTickets() == null) config.setMinBonusTickets(existing.getMinBonusTickets());
             if (config.getMaxBonusTickets() == null) config.setMaxBonusTickets(existing.getMaxBonusTickets());
+            if (config.getTipLimitIncreaseEnabled() == null) config.setTipLimitIncreaseEnabled(existing.getTipLimitIncreaseEnabled() != null ? existing.getTipLimitIncreaseEnabled() : DEFAULT_TIP_LIMIT_INCREASE_ENABLED);
+            if (config.getTipLimitPerAmountUzs() == null) config.setTipLimitPerAmountUzs(existing.getTipLimitPerAmountUzs());
+            if (config.getTipLimitAmountUzs() == null) config.setTipLimitAmountUzs(existing.getTipLimitAmountUzs());
         } else {
             if (config.getBonusTicketsEnabled() == null) config.setBonusTicketsEnabled(DEFAULT_BONUS_TICKETS_ENABLED);
             if (config.getBonusTicketsChance() == null) config.setBonusTicketsChance(DEFAULT_BONUS_TICKETS_CHANCE);
             if (config.getMinBonusTickets() == null) config.setMinBonusTickets(DEFAULT_MIN_BONUS_TICKETS);
             if (config.getMaxBonusTickets() == null) config.setMaxBonusTickets(DEFAULT_MAX_BONUS_TICKETS);
+            if (config.getTipLimitIncreaseEnabled() == null) config.setTipLimitIncreaseEnabled(DEFAULT_TIP_LIMIT_INCREASE_ENABLED);
         }
         return repository.save(config);
     }
@@ -83,6 +88,38 @@ public class BotTipConfigurationService {
      * Returns 0 if: disabled, range invalid, or chance roll fails.
      * Uses bonusTicketsEnabled and bonusTicketsChance (0-100) for dynamic control.
      */
+    public boolean isTipLimitIncreaseEnabled() {
+        BotTipConfiguration config = getConfiguration();
+        return Boolean.TRUE.equals(config.getTipLimitIncreaseEnabled());
+    }
+
+    public Long getTipLimitPerAmountUzs() {
+        BotTipConfiguration config = getConfiguration();
+        return config.getTipLimitPerAmountUzs();
+    }
+
+    public Long getTipLimitAmountUzs() {
+        BotTipConfiguration config = getConfiguration();
+        return config.getTipLimitAmountUzs();
+    }
+
+    /**
+     * Computes permanent limit increase (UZS) for a tip amount when tip-limit reward is enabled.
+     * Formula: (tipAmountUzs / tipLimitPerAmountUzs) * tipLimitAmountUzs (integer division).
+     * Returns 0 if disabled or either config value is null or <= 0.
+     */
+    public long computeTipPermanentLimitIncrease(long tipAmountUzs) {
+        if (!isTipLimitIncreaseEnabled()) {
+            return 0;
+        }
+        Long per = getTipLimitPerAmountUzs();
+        Long add = getTipLimitAmountUzs();
+        if (per == null || add == null || per <= 0 || add <= 0) {
+            return 0;
+        }
+        return (tipAmountUzs / per) * add;
+    }
+
     public long getRandomBonusTickets() {
         BotTipConfiguration config = getConfiguration();
         Boolean enabled = config.getBonusTicketsEnabled() != null ? config.getBonusTicketsEnabled() : DEFAULT_BONUS_TICKETS_ENABLED;
@@ -130,6 +167,14 @@ public class BotTipConfigurationService {
             statusDescription = "Tip bonus: " + min + "-" + max + " random tickets per tip, " + chance + "% chance";
         }
 
+        boolean tipLimitEnabled = Boolean.TRUE.equals(config.getTipLimitIncreaseEnabled());
+        Long tipLimitPer = config.getTipLimitPerAmountUzs();
+        Long tipLimitAdd = config.getTipLimitAmountUzs();
+        boolean tipLimitEffective = tipLimitEnabled && tipLimitPer != null && tipLimitAdd != null && tipLimitPer > 0 && tipLimitAdd > 0;
+        String tipLimitSummary = tipLimitEffective
+                ? "Per " + tipLimitPer + " UZS tip → " + tipLimitAdd + " UZS limit"
+                : "Disabled";
+
         return BotTipConfigStatusDTO.builder()
                 .bonusTicketsEnabled(enabled)
                 .minBonusTickets(min != null ? min : 0)
@@ -138,6 +183,10 @@ public class BotTipConfigurationService {
                 .statusCode(statusCode)
                 .statusDescription(statusDescription)
                 .bonusRangeSummary(bonusRangeSummary)
+                .tipLimitIncreaseEnabled(tipLimitEnabled)
+                .tipLimitPerAmountUzs(tipLimitPer)
+                .tipLimitAmountUzs(tipLimitAdd)
+                .tipLimitSummary(tipLimitSummary)
                 .build();
     }
 

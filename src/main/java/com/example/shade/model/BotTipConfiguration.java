@@ -36,6 +36,18 @@ public class BotTipConfiguration {
     @Column(name = "bonus_tickets_chance", nullable = false)
     private Integer bonusTicketsChance = 100;
 
+    /** When true, tip awards permanent limit increase per configured ratio. */
+    @Column(name = "tip_limit_increase_enabled", nullable = false)
+    private Boolean tipLimitIncreaseEnabled = false;
+
+    /** Per this many UZS tipped (e.g. 1000). */
+    @Column(name = "tip_limit_per_amount_uzs")
+    private Long tipLimitPerAmountUzs;
+
+    /** Add this many UZS permanent limit (e.g. 50). */
+    @Column(name = "tip_limit_amount_uzs")
+    private Long tipLimitAmountUzs;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 }

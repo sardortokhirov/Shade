@@ -35,4 +35,16 @@ public class BotTipConfigStatusDTO {
 
     /** Example: "1-10 tickets, 100% chance" or "Disabled" */
     private String bonusRangeSummary;
+
+    /** Whether tip awards permanent limit increase (doimiy limit). */
+    private boolean tipLimitIncreaseEnabled;
+
+    /** Per this many UZS tipped (e.g. 1000). */
+    private Long tipLimitPerAmountUzs;
+
+    /** Add this many UZS permanent limit (e.g. 50). */
+    private Long tipLimitAmountUzs;
+
+    /** Example: "Per 1000 UZS tip → 50 UZS limit" or "Disabled" */
+    private String tipLimitSummary;
 }
