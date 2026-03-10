@@ -990,10 +990,13 @@ public class WalletService {
         message.setReplyMarkup(markup);
         messageSender.sendMessage(message, chatId);
 
-        // Admin Notification
+        // Admin Notification (ID and user copyable via backticks; date for reference)
+        String adminDateStr = request.getCreatedAt() != null
+                ? request.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+                : LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         String adminMsg = String.format(
-                "#Yechish so'rovi\n\n🆔: %d\n👤: %d\n💵 Summa: %,d UZS",
-                request.getId(), chatId, amount);
+                "#Yechish so'rovi\n\n🆔: `%d`\n👤: `%d`\n💵 Summa: `%,d UZS`\n📅 %s",
+                request.getId(), chatId, amount, adminDateStr);
 
         InlineKeyboardMarkup adminMarkup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> adminRows = new ArrayList<>();
