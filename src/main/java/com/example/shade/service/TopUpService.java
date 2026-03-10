@@ -1061,6 +1061,7 @@ public class TopUpService {
                 .replace("[", "\\[");
     }
 
+    @Transactional
     public void handleScreenshotApproval(Long chatId, Long requestId, boolean approve) throws Exception {
         HizmatRequest request = requestRepository.findById(requestId)
                 .orElse(null);
@@ -1130,185 +1131,204 @@ public class TopUpService {
                     request.setWalletBalanceAtTime(w);
                 }
                 requestRepository.save(request);
-
-                Optional<UserBalance> balanceOpt = userBalanceRepository.findById(request.getChatId());
-                UserBalance balance;
-                if (balanceOpt.isPresent()) {
-                    balance = balanceOpt.get();
-                } else {
-                    // Double-check it doesn't exist (prevent race condition)
-                    if (userBalanceRepository.existsById(request.getChatId())) {
-                        // Entity exists but findById returned empty - fetch again
-                        balance = userBalanceRepository.findById(request.getChatId())
-                                .orElseThrow(() -> new IllegalStateException(
-                                        "UserBalance exists but not accessible for chatId: " + request.getChatId()));
+                try {
+                    Optional<UserBalance> balanceOpt = userBalanceRepository.findById(request.getChatId());
+                    UserBalance balance;
+                    if (balanceOpt.isPresent()) {
+                        balance = balanceOpt.get();
                     } else {
-                        // Truly doesn't exist - safe to create
-                        balance = UserBalance.builder()
-                                .chatId(request.getChatId())
-                                .tickets(0L)
-                                .balance(BigDecimal.ZERO)
-                                .build();
-                        balance = userBalanceRepository.save(balance);
-                        logger.info("Created new UserBalance for chatId {}", request.getChatId());
+                        // Double-check it doesn't exist (prevent race condition)
+                        if (userBalanceRepository.existsById(request.getChatId())) {
+                            // Entity exists but findById returned empty - fetch again
+                            balance = userBalanceRepository.findById(request.getChatId())
+                                    .orElseThrow(() -> new IllegalStateException(
+                                            "UserBalance exists but not accessible for chatId: " + request.getChatId()));
+                        } else {
+                            // Truly doesn't exist - safe to create
+                            balance = UserBalance.builder()
+                                    .chatId(request.getChatId())
+                                    .tickets(0L)
+                                    .balance(BigDecimal.ZERO)
+                                    .build();
+                            balance = userBalanceRepository.save(balance);
+                            logger.info("Created new UserBalance for chatId {}", request.getChatId());
+                        }
                     }
-                }
-                long tickets = 0;
-                long limitIncrease = 0L;
-                if (!"Wallet".equals(platformName)) {
-                    long ticketCalculationAmount = configurationService.getTicketCalculationAmount();
-                    tickets = request.getAmount() / ticketCalculationAmount;
-                    if (tickets > 0) {
-                        lotteryService.awardTickets(request.getChatId(), tickets);
+                    long tickets = 0;
+                    long limitIncrease = 0L;
+                    if (!"Wallet".equals(platformName)) {
+                        long ticketCalculationAmount = configurationService.getTicketCalculationAmount();
+                        tickets = request.getAmount() / ticketCalculationAmount;
+                        if (tickets > 0) {
+                            lotteryService.awardTickets(request.getChatId(), tickets);
+                        }
+
+                        bonusService.creditReferral(request.getChatId(), request.getAmount());
+
+                        // Calculate limit increase directly from percentage (optimize: avoid multiple
+                        // DB calls)
+                        java.math.BigDecimal topUpPercentage = configurationService.getTopUpDailyLimitIncreasePercentage();
+                        if (topUpPercentage.compareTo(java.math.BigDecimal.ZERO) > 0) {
+                            java.math.BigDecimal increaseAmountBD = java.math.BigDecimal.valueOf(request.getAmount())
+                                    .multiply(topUpPercentage)
+                                    .divide(java.math.BigDecimal.valueOf(100), 8, java.math.RoundingMode.HALF_UP);
+                            limitIncrease = increaseAmountBD.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
+                        }
+
+                        // Process top-up (this will add the limit increase internally)
+                        dailyStatsService.addTopUpAmount(request.getChatId(), request.getAmount());
                     }
 
-                    bonusService.creditReferral(request.getChatId(), request.getAmount());
-
-                    // Calculate limit increase directly from percentage (optimize: avoid multiple
-                    // DB calls)
-                    java.math.BigDecimal topUpPercentage = configurationService.getTopUpDailyLimitIncreasePercentage();
-                    if (topUpPercentage.compareTo(java.math.BigDecimal.ZERO) > 0) {
-                        java.math.BigDecimal increaseAmountBD = java.math.BigDecimal.valueOf(request.getAmount())
-                                .multiply(topUpPercentage)
-                                .divide(java.math.BigDecimal.valueOf(100), 8, java.math.RoundingMode.HALF_UP);
-                        limitIncrease = increaseAmountBD.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
+                    long quotaEarned = 0L;
+                    if (!"Wallet".equals(platformName)) {
+                        Long ratio = configurationService.getWalletWithdrawRatio();
+                        long amountForQuota = request.getAmount() != null ? request.getAmount() : (request.getUniqueAmount() != null ? request.getUniqueAmount() : 0L);
+                        quotaEarned = amountForQuota * ratio;
+                        UserWalletQuota quota = userWalletQuotaRepository.findByIdWithLock(request.getChatId())
+                                .orElse(UserWalletQuota.builder().chatId(request.getChatId()).earnedQuota(0L).usedQuota(0L).build());
+                        quota.setEarnedQuota(quota.getEarnedQuota() + quotaEarned);
+                        userWalletQuotaRepository.save(quota);
+                        logger.info("Quota earned for chatId {} (card-to-platform screenshot): +{} UZS (ratio={})", request.getChatId(), quotaEarned, ratio);
                     }
 
-                    // Process top-up (this will add the limit increase internally)
-                    dailyStatsService.addTopUpAmount(request.getChatId(), request.getAmount());
-                }
-
-                long quotaEarned = 0L;
-                if (!"Wallet".equals(platformName)) {
-                    Long ratio = configurationService.getWalletWithdrawRatio();
-                    long amountForQuota = request.getAmount() != null ? request.getAmount() : (request.getUniqueAmount() != null ? request.getUniqueAmount() : 0L);
-                    quotaEarned = amountForQuota * ratio;
-                    UserWalletQuota quota = userWalletQuotaRepository.findByIdWithLock(request.getChatId())
-                            .orElse(UserWalletQuota.builder().chatId(request.getChatId()).earnedQuota(0L).usedQuota(0L).build());
-                    quota.setEarnedQuota(quota.getEarnedQuota() + quotaEarned);
-                    userWalletQuotaRepository.save(quota);
-                    logger.info("Quota earned for chatId {} (card-to-platform screenshot): +{} UZS (ratio={})", request.getChatId(), quotaEarned, ratio);
-                }
-
-                // Get limit information (cache to avoid multiple calls)
-                String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
-                Long totalLimit = dailyStatsService.getEffectiveDailyLimit(request.getChatId());
-                Long availableLimit = dailyStatsService.getAvailableLimit(request.getChatId());
-                String cardBlockUser = optionalCardLineBackticks(request.getCardNumber()) + optionalAdminCardLine(adminCard.getCardNumber());
-                String logMessage = String.format(
-                        " 🆔: `%d` To'lov skrinshoti tasdiqlandi ✅\n" +
-                                "👤 ID: `%s` %s\n" +
-                                "🌐 #%s: " + "`%s`\n" +
-                                "💸 Miqdor: %,d UZS\n" +
-                                "💸 Miqdor: %,d RUB\n" +
-                                "%s" +
-                                "🎟️ Chiptalar: %d (+ %d )\n\n" +
-                                "📈 Limit oshdi: %,d so'm\n" +
-                                "📊 Limit: %,d / %,d so'm\n" +
-                                "📅 [%s] ",
-                        request.getId(),
-                        request.getChatId(), number,
-                        request.getPlatform(),
-                        request.getPlatformUserId(),
-                        request.getUniqueAmount(),
-                        rubAmount,
-                        cardBlockUser,
-                        balance.getTickets(),
-                        tickets,
-                        limitIncrease,
-                        totalLimit, availableLimit,
-                        LocalDateTime.now(ZoneId.of("GMT+5"))
-                                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                LocalDate todayForTopUp = LocalDate.now(ZoneId.of("GMT+5"));
-                Optional<DailyUserStats> dailyStatsOptForTopUp = dailyUserStatsRepository
-                        .findByChatIdAndDate(request.getChatId(), todayForTopUp);
-                Long dailyTopUpAmountForLog = dailyStatsOptForTopUp.map(DailyUserStats::getDailyTopUpAmount).orElse(0L);
-                String cardBlockAdmin2 = optionalCardLinePlain(request.getCardNumber()) + optionalBiznikiLine(adminCard.getCardNumber());
-                String adminLogMessage;
-                if ("Wallet".equals(platformName)) {
-                    adminLogMessage = String.format(
-                            "🆔: `%d` To'lov skrinshoti tasdiqlandi ✅\n" +
-                                    "👤: `%d` %s\n" +
-                                    "🌐 #%s: `%s`\n" +
+                    // Get limit information (cache to avoid multiple calls)
+                    String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
+                    Long totalLimit = dailyStatsService.getEffectiveDailyLimit(request.getChatId());
+                    Long availableLimit = dailyStatsService.getAvailableLimit(request.getChatId());
+                    String cardBlockUser = optionalCardLineBackticks(request.getCardNumber()) + optionalAdminCardLine(adminCard.getCardNumber());
+                    String logMessage = String.format(
+                            " 🆔: `%d` To'lov skrinshoti tasdiqlandi ✅\n" +
+                                    "👤 ID: `%s` %s\n" +
+                                    "🌐 #%s: " + "`%s`\n" +
                                     "💸 Miqdor: %,d UZS\n" +
                                     "💸 Miqdor: %,d RUB\n" +
                                     "%s" +
-                                    "🎟️ Chiptalar: %d (+ %d )\n" +
-                                    "🔰 Yechib olish kvotasi: +%,d UZS\n" +
-                                    "\n📊 Limit: %,d / %,d so'm\n" +
-                                    "🏧 Qoldi: %,d UZS\n" +
-                                    "📅 [%s]",
-                            request.getId(),
-                            request.getChatId(), number,
-                            request.getPlatform(),
-                            request.getPlatformUserId(),
-                            request.getUniqueAmount(),
-                            rubAmount,
-                            cardBlockAdmin2,
-                            balance.getTickets(),
-                            tickets,
-                            quotaEarned,
-                            totalLimit, availableLimit,
-                            balance.getWalletBalance() != null ? balance.getWalletBalance() : 0L,
-                            LocalDateTime.now(ZoneId.of("GMT+5"))
-                                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                } else {
-                    adminLogMessage = String.format(
-                            "🆔: `%d` To'lov skrinshoti tasdiqlandi ✅\n" +
-                                    "👤: `%d` %s\n" +
-                                    "🌐 #%s: `%s`\n" +
-                                    "💸 Miqdor: %,d UZS\n" +
-                                    "💸 Miqdor: %,d RUB\n" +
-                                    "%s" +
-                                    "🎟️ Chiptalar: %d (+ %d )\n" +
-                                    "🔰 Yechib olish kvotasi: +%,d UZS\n" +
-                                    "\n🏦: %,d %s\n" +
+                                    "🎟️ Chiptalar: %d (+ %d )\n\n" +
+                                    "📈 Limit oshdi: %,d so'm\n" +
                                     "📊 Limit: %,d / %,d so'm\n" +
-                                    "🏧 Qoldi: %,d UZS\n" +
-                                    "📅 [%s]",
+                                    "📅 [%s] ",
                             request.getId(),
                             request.getChatId(), number,
                             request.getPlatform(),
                             request.getPlatformUserId(),
                             request.getUniqueAmount(),
                             rubAmount,
-                            cardBlockAdmin2,
+                            cardBlockUser,
                             balance.getTickets(),
                             tickets,
-                            quotaEarned,
-                            transferSuccessful.getLimit().longValue(),
-                            request.getCurrency().toString(),
+                            limitIncrease,
                             totalLimit, availableLimit,
-                            balance.getWalletBalance() != null ? balance.getWalletBalance() : 0L,
                             LocalDateTime.now(ZoneId.of("GMT+5"))
                                     .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                }
+                    String cardBlockAdmin2 = optionalCardLinePlain(request.getCardNumber()) + optionalBiznikiLine(adminCard.getCardNumber());
+                    String adminLogMessage;
+                    if ("Wallet".equals(platformName)) {
+                        adminLogMessage = String.format(
+                                "🆔: `%d` To'lov skrinshoti tasdiqlandi ✅\n" +
+                                        "👤: `%d` %s\n" +
+                                        "🌐 #%s: `%s`\n" +
+                                        "💸 Miqdor: %,d UZS\n" +
+                                        "💸 Miqdor: %,d RUB\n" +
+                                        "%s" +
+                                        "🎟️ Chiptalar: %d (+ %d )\n" +
+                                        "🔰 Yechib olish kvotasi: +%,d UZS\n" +
+                                        "\n📊 Limit: %,d / %,d so'm\n" +
+                                        "🏧 Qoldi: %,d UZS\n" +
+                                        "📅 [%s]",
+                                request.getId(),
+                                request.getChatId(), number,
+                                request.getPlatform(),
+                                request.getPlatformUserId(),
+                                request.getUniqueAmount(),
+                                rubAmount,
+                                cardBlockAdmin2,
+                                balance.getTickets(),
+                                tickets,
+                                quotaEarned,
+                                totalLimit, availableLimit,
+                                balance.getWalletBalance() != null ? balance.getWalletBalance() : 0L,
+                                LocalDateTime.now(ZoneId.of("GMT+5"))
+                                        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                    } else {
+                        adminLogMessage = String.format(
+                                "🆔: `%d` To'lov skrinshoti tasdiqlandi ✅\n" +
+                                        "👤: `%d` %s\n" +
+                                        "🌐 #%s: `%s`\n" +
+                                        "💸 Miqdor: %,d UZS\n" +
+                                        "💸 Miqdor: %,d RUB\n" +
+                                        "%s" +
+                                        "🎟️ Chiptalar: %d (+ %d )\n" +
+                                        "🔰 Yechib olish kvotasi: +%,d UZS\n" +
+                                        "\n🏦: %,d %s\n" +
+                                        "📊 Limit: %,d / %,d so'm\n" +
+                                        "🏧 Qoldi: %,d UZS\n" +
+                                        "📅 [%s]",
+                                request.getId(),
+                                request.getChatId(), number,
+                                request.getPlatform(),
+                                request.getPlatformUserId(),
+                                request.getUniqueAmount(),
+                                rubAmount,
+                                cardBlockAdmin2,
+                                balance.getTickets(),
+                                tickets,
+                                quotaEarned,
+                                transferSuccessful.getLimit().longValue(),
+                                request.getCurrency().toString(),
+                                totalLimit, availableLimit,
+                                balance.getWalletBalance() != null ? balance.getWalletBalance() : 0L,
+                                LocalDateTime.now(ZoneId.of("GMT+5"))
+                                        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                    }
 
-                adminLogBotService.sendLog(adminLogMessage);
-                Long userChatId = request.getChatId();
-                String dateStr = LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-                String shortUserText = String.format(
-                        languageSessionService.getTranslation(userChatId, "topup.message.screenshot_approved"),
-                        request.getId(),
-                        request.getPlatform(),
-                        request.getPlatformUserId(),
-                        request.getUniqueAmount(),
-                        dateStr);
-                if (tickets > 0) {
-                    shortUserText += "\n\n" + String.format(
-                            languageSessionService.getTranslation(userChatId, "topup.message.tickets_received"),
-                            tickets);
-                }
-                SendMessage successMessage = new SendMessage();
-                successMessage.setChatId(userChatId);
-                successMessage.setText(shortUserText);
-                successMessage.setReplyMarkup(createMainMenuOnlyKeyboard(userChatId));
-                boolean userNotified = messageSender.trySendMessage(successMessage, userChatId);
-                if (!userNotified) {
-                    logger.warn("Failed to send approval notification to user chatId {} for request {}", userChatId, requestId);
-                    adminLogBotService.sendLog(String.format("⚠️ Foydalanuvchiga tasdiqlash xabari yuborilmadi. 🆔 `%d` chatId `%s`", requestId, userChatId));
-                } else {
-                    logger.info("Sent approval message to user chatId {} for request {}", userChatId, requestId);
+                    adminLogBotService.sendLog(adminLogMessage);
+                    Long userChatId = request.getChatId();
+                    String dateStr = LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                    String shortUserText = String.format(
+                            languageSessionService.getTranslation(userChatId, "topup.message.screenshot_approved"),
+                            request.getId(),
+                            request.getPlatform(),
+                            request.getPlatformUserId(),
+                            request.getUniqueAmount(),
+                            dateStr);
+                    if (tickets > 0) {
+                        shortUserText += "\n\n" + String.format(
+                                languageSessionService.getTranslation(userChatId, "topup.message.tickets_received"),
+                                tickets);
+                    }
+                    SendMessage successMessage = new SendMessage();
+                    successMessage.setChatId(userChatId);
+                    successMessage.setText(shortUserText);
+                    successMessage.setReplyMarkup(createMainMenuOnlyKeyboard(userChatId));
+                    boolean userNotified = messageSender.trySendMessage(successMessage, userChatId);
+                    if (!userNotified) {
+                        logger.warn("Failed to send approval notification to user chatId {} for request {}", userChatId, requestId);
+                        adminLogBotService.sendLog(String.format("⚠️ Foydalanuvchiga tasdiqlash xabari yuborilmadi. 🆔 `%d` chatId `%s`", requestId, userChatId));
+                    } else {
+                        logger.info("Sent approval message to user chatId {} for request {}", userChatId, requestId);
+                    }
+                } catch (Exception postEx) {
+                    // Platform transfer already succeeded and request is saved as APPROVED.
+                    // Do not rollback; notify admins and user with minimal success message.
+                    logger.error("Post-transfer processing failed for approved request {}: {}", requestId, postEx.getMessage(), postEx);
+                    adminLogBotService.sendLog(String.format(
+                            "⚠️ Transfer muvaffaqiyatli (platform), lekin post-processing xatosi. 🆔 `%d` Error: %s",
+                            requestId, postEx.getMessage() != null ? postEx.getMessage() : postEx.toString()));
+
+                    Long userChatId = request.getChatId();
+                    String dateStr = LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                    String shortUserText = String.format(
+                            languageSessionService.getTranslation(userChatId, "topup.message.screenshot_approved"),
+                            request.getId(),
+                            request.getPlatform(),
+                            request.getPlatformUserId(),
+                            request.getUniqueAmount(),
+                            dateStr);
+                    SendMessage successMessage = new SendMessage();
+                    successMessage.setChatId(userChatId);
+                    successMessage.setText(shortUserText);
+                    successMessage.setReplyMarkup(createMainMenuOnlyKeyboard(userChatId));
+                    messageSender.trySendMessage(successMessage, userChatId);
                 }
             } else {
                 handleTransferFailure(request.getChatId(), request, adminCard);
@@ -1358,6 +1378,7 @@ public class TopUpService {
         sendMainMenu(request.getChatId());
     }
 
+    @Transactional
     public void handleScreenshotApprovalChat(Long adminChatId, Long requestId, boolean approve) {
         // Use findById with the actual request ID to ensure we approve the correct
         // request
