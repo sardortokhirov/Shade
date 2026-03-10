@@ -1568,7 +1568,7 @@ public class WalletService {
             case APPROVED, BONUS_APPROVED -> "✅";
             case PENDING, PENDING_SMS, PENDING_ADMIN, PENDING_PAYMENT, PENDING_SCREENSHOT, PROCESSING -> "⏳";
             case CANCELED, USER_CANCELED -> "❌";
-            case FAILED -> "💥";
+            case FAILED, FAILED_REFUNDED -> "💥";
         };
     }
 
@@ -1579,7 +1579,7 @@ public class WalletService {
             case APPROVED, BONUS_APPROVED -> "wallet.message.history_status_approved";
             case PENDING, PENDING_SMS, PENDING_ADMIN, PENDING_PAYMENT, PENDING_SCREENSHOT, PROCESSING -> "wallet.message.history_status_pending";
             case CANCELED, USER_CANCELED -> "wallet.message.history_status_canceled";
-            case FAILED -> "wallet.message.history_status_failed";
+            case FAILED, FAILED_REFUNDED -> "wallet.message.history_status_failed";
         };
         String label = languageSessionService.getTranslation(chatId, key);
         return emoji + " " + label;

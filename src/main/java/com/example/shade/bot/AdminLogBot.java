@@ -294,6 +294,14 @@ public class AdminLogBot extends TelegramLongPollingBot {
             Long requestId = Long.parseLong(callbackData.split(":")[1]);
             walletService.handleAdminDecline(requestId);
             return;
+        } else if (callbackData.startsWith("WALLET_FAIL_REFUND:")) {
+            Long requestId = Long.parseLong(callbackData.split(":")[1]);
+            walletService.handleAdminRefundWalletFail(requestId, chatId);
+            return;
+        } else if (callbackData.startsWith("WALLET_FAIL_NO_REFUND:")) {
+            Long requestId = Long.parseLong(callbackData.split(":")[1]);
+            walletService.handleAdminNoRefundWalletFail(requestId, chatId);
+            return;
         } else if (callbackData.startsWith("ADMIN_BLOCK_USER:")) {
             Long userId = Long.parseLong(callbackData.split(":")[1]);
             BlockedUser user = blockedUserRepository.findById(userId)
