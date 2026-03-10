@@ -299,6 +299,17 @@ public class AdminLogBotService {
         return markup;
     }
 
+    /** Keyboard for failed wallet-to-platform transfer: admin chooses Refund or No refund. */
+    public InlineKeyboardMarkup createWalletFailRefundKeyboard(Long requestId) {
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        rows.add(List.of(
+                createButton("💸 Refund", "WALLET_FAIL_REFUND:" + requestId),
+                createButton("✔️ No refund", "WALLET_FAIL_NO_REFUND:" + requestId)));
+        markup.setKeyboard(rows);
+        return markup;
+    }
+
     private InlineKeyboardButton createButton(String text, String callback) {
         InlineKeyboardButton button = new InlineKeyboardButton();
         button.setText(text);

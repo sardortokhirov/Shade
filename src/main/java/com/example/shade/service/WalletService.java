@@ -927,24 +927,20 @@ public class WalletService {
                     request.getId(), chatId, escapeMarkdown(platformStr), escapeMarkdown(platformUserId), amount, earned, ticketsTotal, ticketsAwarded, limitIncrease, totalLimitSafe, availableLimitSafe, walletLeft, platformBalanceUzs, dateStr);
             adminLogBotService.sendLog(adminLog);
         } else {
-            // Transfer failed - refund wallet
-            UserBalance balance = userBalanceRepository.findByIdWithLock(chatId).orElse(null);
-            if (balance != null) {
-                balance.setWalletBalance(balance.getWalletBalance() + amount);
-                userBalanceRepository.save(balance);
-            }
+            // Transfer reported as failed - do NOT refund. Platform may process with delay;
+            // auto-refund would cause double-credit if user receives on platform later.
             request.setStatus(RequestStatus.FAILED);
             requestRepository.save(request);
 
             SendMessage failMsg = new SendMessage();
             failMsg.setChatId(chatId.toString());
-            failMsg.setText(languageSessionService.getTranslation(chatId, "wallet.message.transfer_failed"));
+            failMsg.setText(languageSessionService.getTranslation(chatId, "wallet.message.transfer_failed_no_refund"));
             failMsg.enableMarkdown(true);
             failMsg.setReplyMarkup(createMainMenuOnlyMarkup(chatId));
             messageSender.sendMessage(failMsg, chatId);
 
             String userDetailMsg = String.format(
-                    languageSessionService.getTranslation(chatId, "wallet.message.transfer_failed_detail"),
+                    languageSessionService.getTranslation(chatId, "wallet.message.transfer_failed_detail_no_refund"),
                     request.getId(), chatId, escapeMarkdown(platformStr), escapeMarkdown(platformUserId), amount);
             SendMessage detailMsg = new SendMessage();
             detailMsg.setChatId(chatId.toString());
@@ -954,9 +950,9 @@ public class WalletService {
             messageSender.sendMessage(detailMsg, chatId);
 
             String adminLog = String.format(
-                    "❌ Wallet to Platform transfer FAILED (refunded):\n🆔 ID: `%d`\n👤 User: `%d`\n🌐 Platform: %s\n📋 Platform ID: `%s`\n💸 Amount: %,d UZS",
+                    "❌ Wallet to Platform transfer FAILED (choose Refund or No refund):\n🆔 ID: `%d`\n👤 User: `%d`\n🌐 Platform: %s\n📋 Platform ID: `%s`\n💸 Amount: %,d UZS",
                     request.getId(), chatId, escapeMarkdown(platformStr), escapeMarkdown(platformUserId), amount);
-            adminLogBotService.sendLog(adminLog);
+            adminLogBotService.sendToAdmins(adminLog, adminLogBotService.createWalletFailRefundKeyboard(request.getId()));
         }
 
         sendPaymentMainMenu(chatId, true);
@@ -1165,6 +1161,70 @@ public class WalletService {
         m.enableMarkdown(true);
         m.setReplyMarkup(createMainMenuOnlyMarkup(request.getChatId()));
         messageSender.sendMessage(m, request.getChatId());
+    }
+
+    /**
+     * Admin chose "Refund" for a failed wallet-to-platform transfer. Credit the user's wallet.
+     */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public void handleAdminRefundWalletFail(Long requestId, Long adminChatId) {
+        HizmatRequest request = requestRepository.findByIdWithLock(requestId).orElse(null);
+        if (request == null || request.getType() != RequestType.WALLET_TO_PLATFORM) {
+            adminLogBotService.sendToSingleAdmin(adminChatId,
+                    "❌ So'rov topilmadi yoki bu hamyon→kontora o'tkazmasi emas: 🆔 " + requestId);
+            return;
+        }
+        if (request.getStatus() == RequestStatus.FAILED_REFUNDED) {
+            adminLogBotService.sendToSingleAdmin(adminChatId,
+                    "⚠️ Bu so'rov uchun hamyon allaqachon qaytarilgan: 🆔 " + requestId);
+            return;
+        }
+        if (request.getStatus() != RequestStatus.FAILED) {
+            adminLogBotService.sendToSingleAdmin(adminChatId,
+                    "❌ So'rov holati refund uchun mos emas: 🆔 " + requestId);
+            return;
+        }
+        Long amount = request.getAmount() != null ? request.getAmount() : 0L;
+        if (amount <= 0) {
+            adminLogBotService.sendToSingleAdmin(adminChatId, "❌ Summa noto'g'ri: 🆔 " + requestId);
+            return;
+        }
+        UserBalance balance = userBalanceRepository.findByIdWithLock(request.getChatId()).orElse(null);
+        if (balance != null) {
+            balance.setWalletBalance(balance.getWalletBalance() + amount);
+            userBalanceRepository.save(balance);
+        }
+        request.setStatus(RequestStatus.FAILED_REFUNDED);
+        requestRepository.save(request);
+
+        String adminMsg = String.format(
+                "✅ *Refund qilindi*\n🆔 ID: `%d`\n👤 User: `%d`\n💸 Summa: %,d UZS — hamyonga qaytarildi.",
+                requestId, request.getChatId(), amount);
+        adminLogBotService.sendToSingleAdmin(adminChatId, adminMsg);
+
+        SendMessage m = new SendMessage();
+        m.setChatId(request.getChatId().toString());
+        m.setText(String.format(
+                languageSessionService.getTranslation(request.getChatId(), "wallet.message.transfer_failed_refunded_by_admin"),
+                requestId, amount));
+        m.enableMarkdown(true);
+        m.setReplyMarkup(createMainMenuOnlyMarkup(request.getChatId()));
+        messageSender.sendMessage(m, request.getChatId());
+    }
+
+    /**
+     * Admin chose "No refund" for a failed wallet-to-platform transfer (platform likely received).
+     */
+    public void handleAdminNoRefundWalletFail(Long requestId, Long adminChatId) {
+        HizmatRequest request = requestRepository.findById(requestId).orElse(null);
+        if (request == null) {
+            adminLogBotService.sendToSingleAdmin(adminChatId, "❌ So'rov topilmadi: 🆔 " + requestId);
+            return;
+        }
+        String msg = String.format(
+                "✔️ *No refund* — kontorada pul tushgan deb qabul qilindi.\n🆔 ID: `%d`\n👤 User: `%d`\n💸 Summa: %,d UZS",
+                requestId, request.getChatId(), request.getAmount() != null ? request.getAmount() : 0L);
+        adminLogBotService.sendToSingleAdmin(adminChatId, msg);
     }
 
     @Transactional
