@@ -28,7 +28,8 @@ public class FeatureSettings {
     @Column(name = "bonus_enabled", nullable = false)
     private Boolean bonusEnabled = true;
 
-    @Column(name = "wallet_enabled", nullable = false)
+    /** Nullable so Hibernate DDL does not add NOT NULL (existing rows would get null). Null treated as enabled in canPerformWallet(). */
+    @Column(name = "wallet_enabled")
     private Boolean walletEnabled = true;
 
     @Column(name = "promo_enabled", nullable = false)

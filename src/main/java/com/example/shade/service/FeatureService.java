@@ -117,7 +117,8 @@ public class FeatureService {
     }
 
     public boolean canPerformWallet() {
-        return getGlobalSettings().getWalletEnabled() != null && getGlobalSettings().getWalletEnabled();
+        Boolean w = getGlobalSettings().getWalletEnabled();
+        return w == null || w;
     }
 
     @Transactional
