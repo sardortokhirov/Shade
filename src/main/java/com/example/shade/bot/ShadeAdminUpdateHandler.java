@@ -119,6 +119,7 @@ public class ShadeAdminUpdateHandler {
             case "toggle_topup" -> adminBotService.toggleTopUp(chatId);
             case "toggle_withdraw" -> adminBotService.toggleWithdraw(chatId);
             case "toggle_bonus" -> adminBotService.toggleBonus(chatId);
+            case "toggle_wallet" -> adminBotService.toggleWallet(chatId);
             case "toggle_bonus_limit" -> adminBotService.toggleBonusLimit(chatId);
             case "toggle_humo" -> adminBotService.toggleHumo(chatId);
 

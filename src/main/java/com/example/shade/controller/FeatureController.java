@@ -79,6 +79,16 @@ public class FeatureController {
         return ResponseEntity.ok("Bonus " + (enabled ? "yoqildi" : "o'chirildi"));
     }
 
+    @PostMapping("/toggle/wallet")
+    public ResponseEntity<String> toggleWallet(@RequestParam boolean enabled, HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        featureService.toggleWallet(enabled);
+        logger.info("Wallet set to {}", enabled);
+        return ResponseEntity.ok("Hamyon " + (enabled ? "yoqildi" : "o'chirildi"));
+    }
+
     @PostMapping("/toggle/promo")
     public ResponseEntity<String> togglePromo(@RequestParam boolean enabled, HttpServletRequest request) {
         if (!authenticate(request)) {

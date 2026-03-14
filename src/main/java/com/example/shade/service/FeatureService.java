@@ -31,6 +31,7 @@ public class FeatureService {
                     settings.setTopUpEnabled(true);
                     settings.setWithdrawEnabled(true);
                     settings.setBonusEnabled(true);
+                    settings.setWalletEnabled(true);
                     settings.setPromoEnabled(false);
                     settings.setBonusLimitEnabled(true);
                     settings.setPayToggleEnabled(false);
@@ -46,6 +47,7 @@ public class FeatureService {
         settings.setTopUpEnabled(enabled);
         settings.setWithdrawEnabled(current.getWithdrawEnabled());
         settings.setBonusEnabled(current.getBonusEnabled());
+        settings.setWalletEnabled(current.getWalletEnabled());
         settings.setPromoEnabled(current.getPromoEnabled());
         settings.setBonusLimitEnabled(current.getBonusLimitEnabled());
         settings.setPayToggleEnabled(current.getPayToggleEnabled());
@@ -61,6 +63,7 @@ public class FeatureService {
         settings.setTopUpEnabled(current.getTopUpEnabled());
         settings.setWithdrawEnabled(enabled);
         settings.setBonusEnabled(current.getBonusEnabled());
+        settings.setWalletEnabled(current.getWalletEnabled());
         settings.setPromoEnabled(current.getPromoEnabled());
         settings.setBonusLimitEnabled(current.getBonusLimitEnabled());
         settings.setPayToggleEnabled(current.getPayToggleEnabled());
@@ -76,6 +79,7 @@ public class FeatureService {
         settings.setTopUpEnabled(current.getTopUpEnabled());
         settings.setWithdrawEnabled(current.getWithdrawEnabled());
         settings.setBonusEnabled(enabled);
+        settings.setWalletEnabled(current.getWalletEnabled());
         settings.setPromoEnabled(current.getPromoEnabled());
         settings.setBonusLimitEnabled(current.getBonusLimitEnabled());
         settings.setPayToggleEnabled(current.getPayToggleEnabled());
@@ -97,12 +101,33 @@ public class FeatureService {
     }
 
     @Transactional
+    public void toggleWallet(boolean enabled) {
+        FeatureSettings current = getGlobalSettings();
+        FeatureSettings settings = new FeatureSettings();
+        settings.setTopUpEnabled(current.getTopUpEnabled());
+        settings.setWithdrawEnabled(current.getWithdrawEnabled());
+        settings.setBonusEnabled(current.getBonusEnabled());
+        settings.setWalletEnabled(enabled);
+        settings.setPromoEnabled(current.getPromoEnabled());
+        settings.setBonusLimitEnabled(current.getBonusLimitEnabled());
+        settings.setPayToggleEnabled(current.getPayToggleEnabled());
+        settings.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
+        featureSettingsRepository.save(settings);
+        logger.info("Wallet {} globally", enabled ? "enabled" : "disabled");
+    }
+
+    public boolean canPerformWallet() {
+        return getGlobalSettings().getWalletEnabled() != null && getGlobalSettings().getWalletEnabled();
+    }
+
+    @Transactional
     public void togglePromo(boolean enabled) {
         FeatureSettings current = getGlobalSettings();
         FeatureSettings settings = new FeatureSettings();
         settings.setTopUpEnabled(current.getTopUpEnabled());
         settings.setWithdrawEnabled(current.getWithdrawEnabled());
         settings.setBonusEnabled(current.getBonusEnabled());
+        settings.setWalletEnabled(current.getWalletEnabled());
         settings.setPromoEnabled(enabled);
         settings.setBonusLimitEnabled(current.getBonusLimitEnabled());
         settings.setPayToggleEnabled(current.getPayToggleEnabled());
@@ -122,6 +147,7 @@ public class FeatureService {
         settings.setTopUpEnabled(current.getTopUpEnabled());
         settings.setWithdrawEnabled(current.getWithdrawEnabled());
         settings.setBonusEnabled(current.getBonusEnabled());
+        settings.setWalletEnabled(current.getWalletEnabled());
         settings.setPromoEnabled(current.getPromoEnabled());
         settings.setBonusLimitEnabled(enabled);
         settings.setPayToggleEnabled(current.getPayToggleEnabled());
@@ -142,6 +168,7 @@ public class FeatureService {
         settings.setTopUpEnabled(current.getTopUpEnabled());
         settings.setWithdrawEnabled(current.getWithdrawEnabled());
         settings.setBonusEnabled(current.getBonusEnabled());
+        settings.setWalletEnabled(current.getWalletEnabled());
         settings.setPromoEnabled(current.getPromoEnabled());
         settings.setBonusLimitEnabled(current.getBonusLimitEnabled());
         settings.setPayToggleEnabled(enabled);

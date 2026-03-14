@@ -864,11 +864,6 @@ public class WithdrawService {
         List<Platform> uzsPlatforms = platformRepository.findByCurrency(Currency.UZS);
         List<Platform> rubPlatforms = platformRepository.findByCurrency(Currency.RUB);
 
-        // Always add Wallet button as the first option
-        rows.add(List.of(createButton(
-                languageSessionService.getTranslation(chatId, "withdraw.button.wallet"),
-                "WITHDRAW_PLATFORM:Wallet")));
-
         if ((uzsPlatforms == null || uzsPlatforms.isEmpty()) && (rubPlatforms == null || rubPlatforms.isEmpty())) {
             logger.warn("No platforms found in database, showing Wallet only");
             rows.add(createNavigationButtons(chatId));
@@ -974,6 +969,7 @@ public class WithdrawService {
                 createButton(languageSessionService.getTranslation(chatId, "withdraw.button.withdraw"), "WITHDRAW")));
         rows.add(
                 List.of(createButton(languageSessionService.getTranslation(chatId, "withdraw.button.bonus"), "BONUS")));
+        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.wallet"), "WALLET")));
         rows.add(List
                 .of(createButton(languageSessionService.getTranslation(chatId, "withdraw.button.contact"), "CONTACT")));
         InlineKeyboardButton instructionButton = new InlineKeyboardButton();

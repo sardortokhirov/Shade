@@ -119,6 +119,21 @@ public class AdminBotService {
     }
 
     @Transactional
+    public void toggleWallet(Long chatId) {
+        try {
+            boolean currentStatus = featureService.canPerformWallet();
+            featureService.toggleWallet(!currentStatus);
+            boolean newStatus = !currentStatus;
+            String status = newStatus ? "Yoqildi ✅" : "O'chirildi ❌";
+            messageSender.sendTextMessage(chatId, "Hamyon funksiyasi " + status);
+            sendFeaturesMenu(chatId);
+        } catch (Exception e) {
+            log.error("Error toggling wallet", e);
+            messageSender.sendTextMessage(chatId, "❌ Xatolik yuz berdi: " + e.getMessage());
+        }
+    }
+
+    @Transactional
     public void toggleBonusLimit(Long chatId) {
         try {
             boolean currentStatus = featureService.isBonusLimitEnabled();

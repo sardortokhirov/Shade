@@ -2162,11 +2162,6 @@ public class TopUpService {
         List<Platform> uzsPlatforms = platformRepository.findByCurrency(Currency.UZS);
         List<Platform> rubPlatforms = platformRepository.findByCurrency(Currency.RUB);
 
-        // Add Wallet button as the first option
-        rows.add(List.of(createButton(
-                languageSessionService.getTranslation(chatId, "topup.button.wallet"),
-                "TOPUP_PLATFORM:Wallet")));
-
         int maxRows = Math.max(uzsPlatforms.size(), rubPlatforms.size());
         for (int i = 0; i < maxRows; i++) {
             List<InlineKeyboardButton> row = new ArrayList<>();
@@ -2311,6 +2306,7 @@ public class TopUpService {
         rows.add(List
                 .of(createButton(languageSessionService.getTranslation(chatId, "topup.button.withdraw"), "WITHDRAW")));
         rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "topup.button.bonus"), "BONUS")));
+        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.wallet"), "WALLET")));
         rows.add(List
                 .of(createButton(languageSessionService.getTranslation(chatId, "topup.button.contact"), "CONTACT")));
 

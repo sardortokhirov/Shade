@@ -455,6 +455,14 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                     // sessionService.getMessageIds(chatId), "OPEN");
                     bonusService.startBonus(chatId);
                 }
+                case "WALLET" -> {
+                    if (!featureService.canPerformWallet()) {
+                        messageSender.sendMessage(chatId,
+                                languageSessionService.getTranslation(chatId, "message.feature_unavailable"));
+                        return;
+                    }
+                    walletService.startWallet(chatId, "MAIN");
+                }
                 case "CONTACT" -> {
                     // messageSender.animateAndDeleteMessages(chatId,
                     // sessionService.getMessageIds(chatId), "OPEN");
@@ -497,6 +505,11 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                             // sessionService.getMessageIds(chatId), "OPEN");
                         }
                         if (callback.equals("TOPUP_PLATFORM:Wallet")) {
+                            if (!featureService.canPerformWallet()) {
+                                messageSender.sendMessage(chatId,
+                                        languageSessionService.getTranslation(chatId, "message.feature_unavailable"));
+                                return;
+                            }
                             walletService.startWallet(chatId, "TOPUP");
                         } else {
                             topUpService.handleCallback(chatId, callback);
@@ -510,6 +523,11 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                         // messageSender.animateAndDeleteMessages(chatId,
                         // sessionService.getMessageIds(chatId), "OPEN");
                         if (callback.equals("WITHDRAW_PLATFORM:Wallet")) {
+                            if (!featureService.canPerformWallet()) {
+                                messageSender.sendMessage(chatId,
+                                        languageSessionService.getTranslation(chatId, "message.feature_unavailable"));
+                                return;
+                            }
                             walletService.startWallet(chatId, "WITHDRAW");
                         } else {
                             withdrawService.handleCallback(chatId, callback);
@@ -524,6 +542,11 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                         // sessionService.getMessageIds(chatId), "OPEN");
                         bonusService.handleCallback(chatId, callback);
                     } else if (callback.startsWith("WALLET_")) {
+                        if (!featureService.canPerformWallet()) {
+                            messageSender.sendMessage(chatId,
+                                    languageSessionService.getTranslation(chatId, "message.feature_unavailable"));
+                            return;
+                        }
                         walletService.handleCallback(chatId, callback);
                     } else {
                         logger.warn("Unknown callback for chatId {}: {}", chatId, callback);
@@ -589,6 +612,7 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
         rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.topup"), "TOPUP")));
         rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.withdraw"), "WITHDRAW")));
         rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.bonus"), "BONUS")));
+        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.wallet"), "WALLET")));
 
         rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.contact"), "CONTACT")));
 
