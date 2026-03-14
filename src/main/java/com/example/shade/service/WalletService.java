@@ -1043,7 +1043,19 @@ public class WalletService {
         request.setStatus(RequestStatus.PENDING_ADMIN);
         request.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
         request.setWalletBalanceAtTime(balance.getWalletBalance() != null ? balance.getWalletBalance() : 0L);
-        return requestRepository.save(request);
+        request = requestRepository.save(request);
+
+        // Decrease quota immediately when request is sent to admin (not on approval)
+        walletQuotaRepository.findByIdWithLock(chatId).ifPresent(quota -> {
+            long totalAvailable = quota.getEarnedQuota() + (quota.getBonusQuota() != null ? quota.getBonusQuota() : 0L);
+            long newUsed = Math.min(quota.getUsedQuota() + amount, totalAvailable);
+            quota.setUsedQuota(newUsed);
+            walletQuotaRepository.save(quota);
+            logger.info("Quota used for chatId {} at submit: +{}, total used={}, remaining={}",
+                    chatId, amount, newUsed, quota.getRemainingQuota());
+        });
+
+        return request;
     }
 
     // ----- ADMIN AND CANCEL ACTIONS -----
@@ -1101,15 +1113,7 @@ public class WalletService {
         request.setWalletBalanceAtTime(walletLeft);
         requestRepository.save(request);
 
-        // Deduct used quota (withdrawal confirmed by admin)
-        walletQuotaRepository.findByIdWithLock(request.getChatId()).ifPresent(quota -> {
-            long totalAvailable = quota.getEarnedQuota() + (quota.getBonusQuota() != null ? quota.getBonusQuota() : 0L);
-            long newUsed = Math.min(quota.getUsedQuota() + request.getAmount(), totalAvailable);
-            quota.setUsedQuota(newUsed);
-            walletQuotaRepository.save(quota);
-            logger.info("Quota used for chatId {}: +{}, total used={}, remaining={}",
-                    request.getChatId(), request.getAmount(), newUsed, quota.getRemainingQuota());
-        });
+        // Quota was already decreased when request was sent to admin; nothing to do here
 
         // Notify Admins (Uzbek, with emojis and wallet balance left)
         String confirmDateStr = LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
@@ -1146,6 +1150,15 @@ public class WalletService {
             balance.setWalletBalance(balance.getWalletBalance() + request.getAmount());
             userBalanceRepository.save(balance);
         }
+
+        // Return quota (was decreased when request was sent to admin)
+        walletQuotaRepository.findByIdWithLock(request.getChatId()).ifPresent(quota -> {
+            long newUsed = Math.max(0L, quota.getUsedQuota() - request.getAmount());
+            quota.setUsedQuota(newUsed);
+            walletQuotaRepository.save(quota);
+            logger.info("Quota returned on decline for chatId {}: -{}, total used={}, remaining={}",
+                    request.getChatId(), request.getAmount(), newUsed, quota.getRemainingQuota());
+        });
 
         // Mark as declined/canceled
         request.setStatus(RequestStatus.CANCELED);
@@ -1260,6 +1273,15 @@ public class WalletService {
             balance.setWalletBalance(balance.getWalletBalance() + request.getAmount());
             userBalanceRepository.save(balance);
         }
+
+        // Return quota (was decreased when request was sent to admin)
+        walletQuotaRepository.findByIdWithLock(chatId).ifPresent(quota -> {
+            long newUsed = Math.max(0L, quota.getUsedQuota() - request.getAmount());
+            quota.setUsedQuota(newUsed);
+            walletQuotaRepository.save(quota);
+            logger.info("Quota returned on user cancel for chatId {}: -{}, total used={}, remaining={}",
+                    chatId, request.getAmount(), newUsed, quota.getRemainingQuota());
+        });
 
         // Mark as canceled
         request.setStatus(RequestStatus.USER_CANCELED);
