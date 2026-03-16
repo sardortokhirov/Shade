@@ -15,6 +15,7 @@ import org.telegram.telegrambots.meta.api.methods.GetFile;
 import org.telegram.telegrambots.meta.api.methods.send.*;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageReplyMarkup;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.File;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.Message;
@@ -284,6 +285,20 @@ public class MessageSender {
             logger.info("Removed buttons from message {} in chat {}", messageId, chatId);
         } catch (TelegramApiException e) {
             logger.error("Failed to remove buttons from message {} in chat {}: {}", messageId, chatId, e.getMessage());
+        }
+    }
+
+    public void editMessageText(Long chatId, Integer messageId, String newText) {
+        EditMessageText edit = new EditMessageText();
+        edit.setChatId(chatId.toString());
+        edit.setMessageId(messageId);
+        edit.setText(newText);
+        edit.setParseMode("Markdown");
+        try {
+            bot.execute(edit);
+            logger.info("Edited text of message {} in chat {}", messageId, chatId);
+        } catch (TelegramApiException e) {
+            logger.error("Failed to edit text of message {} in chat {}: {}", messageId, chatId, e.getMessage());
         }
     }
 

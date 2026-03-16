@@ -64,6 +64,7 @@ public class TopUpService {
     private final UserLimitIncreaseService userLimitIncreaseService;
     private final DailyUserStatsRepository dailyUserStatsRepository;
     private final UserWalletQuotaRepository userWalletQuotaRepository;
+    private final PendingPaymentMessageRepository pendingPaymentMessageRepository;
 
     @Autowired
     @Lazy
@@ -1988,6 +1989,15 @@ public class TopUpService {
         Integer messageId = messageIds.isEmpty() ? null : messageIds.get(messageIds.size() - 1);
         if (messageId != null) {
             sessionService.setUserData(chatId, PAYMENT_MESSAGE_KEY, String.valueOf(messageId));
+
+            PendingPaymentMessage pending = PendingPaymentMessage.builder()
+                    .chatId(chatId)
+                    .messageId(messageId)
+                    .originalText(messageText)
+                    .createdAt(LocalDateTime.now(ZoneId.of("GMT+5")))
+                    .blurred(false)
+                    .build();
+            pendingPaymentMessageRepository.save(pending);
         } else {
             logger.error("Failed to retrieve messageId for chatId {}", chatId);
             messageSender.sendMessage(chatId,
