@@ -2039,7 +2039,22 @@ public class TopUpService {
 
     private static String optionalBiznikiLineBackticks(String bizniki) {
         if (bizniki == null || bizniki.trim().isEmpty()) return "";
-        return "💳 Bizniki: `" + bizniki + "`\n";
+        return "💳 Bizniki: `" + maskCardLast4(bizniki) + "`\n";
+    }
+
+    private static String maskCardLast4(String card) {
+        if (card == null) return "";
+        String digits = card.replaceAll("\\D", "");
+        if (digits.length() <= 4) return digits;
+        String last4 = digits.substring(digits.length() - 4);
+        String maskedPrefix = "*".repeat(digits.length() - 4);
+        String combined = maskedPrefix + last4;
+        StringBuilder grouped = new StringBuilder();
+        for (int i = 0; i < combined.length(); i++) {
+            if (i > 0 && i % 4 == 0) grouped.append(' ');
+            grouped.append(combined.charAt(i));
+        }
+        return grouped.toString();
     }
 
     private void sendPlatformSelection(Long chatId) {
