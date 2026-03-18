@@ -374,6 +374,8 @@ public class TopUpService {
         String platformName = sessionService.getUserData(chatId, "platform").replace("_", "");
         Platform platform = platformRepository.findByName(platformName)
                 .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
+        logger.warn("TopUp validateUserId: chatId={} platformName={} platformType={} playerId={}",
+                chatId, platformName, platform.getType(), trimmedUserId);
         if (platform.getType().equals("mostbet")) {
             if (!mostbetService.isPlayerValid(platform, trimmedUserId)) {
                 sendNoUserFound(chatId);

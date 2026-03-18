@@ -5,6 +5,7 @@ import com.example.shade.model.*;
 import com.example.shade.repository.ExchangeRateRepository;
 import com.example.shade.repository.PlatformRepository;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.http.*;
 import org.springframework.web.client.RestTemplate;
@@ -22,6 +23,7 @@ import java.util.List;
 
 @Service
 @AllArgsConstructor
+@Slf4j
 public class MostbetService {
 
     private static final String BASE_URL = "https://apimb.com";
@@ -144,13 +146,11 @@ public class MostbetService {
 
     /**
      * Validates that the player ID exists on the platform WITHOUT calling player/deposit.
-     * The previous implementation used deposit(amount=0) and could fail with MIN_LIMIT_NOT_REACHED.
      *
-     * Used at ID entry in wallet transfer-to-platform flow (and top-up user validation) so invalid IDs
-     * are rejected immediately.
+     * Docs: GET /cashpoint/{cashpointId}/player/name?brandId=1&clientId={playerId}
+     * Response: { "exists": true/false, "name": "...", "warning": null }
      *
-     * Returns true if the cashout list request succeeds (HTTP 2xx). We do not require non-empty items,
-     * because new players may have zero cashouts.
+     * Returns true only when `exists == true`.
      */
     public boolean isPlayerValid(Platform platform, String playerId) {
         if (platform == null || playerId == null || playerId.isBlank()) {
@@ -164,14 +164,66 @@ public class MostbetService {
             return false;
         }
         try {
-            // Non-deposit validation call to avoid MIN_LIMIT_NOT_REACHED (from player/deposit(amount=0)).
-            // page=1,size=1 keeps the request lightweight; searchString is used to filter by playerId.
-            CashoutListResponse response = getCashoutList(
-                    apiKey, secret, cashpointId, 1, 1, playerId.trim());
-            // Some invalid IDs may still return a non-null response but with empty items/0 totalCount.
-            // We should treat "empty result" as invalid to prevent letting wrong playerIds through.
-            return response != null && response.items() != null && !response.items().isEmpty();
+            String trimmed = playerId.trim();
+
+            // player/name is a GET informational method; X-Project is optional per docs.
+            String path = API_PATH_PREFIX + "/" + cashpointId + "/player/name?brandId=1&clientId=" + trimmed;
+            String url = FULL_BASE_URL + "/" + cashpointId + "/player/name?brandId=1&clientId=" + trimmed;
+            log.warn("Mostbet validation: calling player/name URL={} (playerId={})", url, trimmed);
+
+            HttpHeaders h = headers(apiKey, secret, path, "");
+            // Some cashpoint deployments require X-Project even for GET info calls.
+            h.set("X-Project", project);
+            HttpEntity<?> req = new HttpEntity<>(h);
+            ResponseEntity<PlayerNameResponse> resp =
+                    restTemplate.exchange(url, HttpMethod.GET, req, PlayerNameResponse.class);
+
+            PlayerNameResponse body = resp.getBody();
+            if (body != null && body.exists() != null) {
+                // Strict contract: accept only when `exists == true`.
+                boolean accepted = Boolean.TRUE.equals(body.exists());
+                log.warn("Mostbet validation: player/name response exists={} name={} warning={} accepted={}",
+                        body.exists(), body.name(), body.warning(), accepted);
+                return accepted;
+            }
+
+            if (body == null) {
+                log.warn("Mostbet player/name returned null body for playerId={}", trimmed);
+            } else {
+                log.warn("Mostbet player/name returned null exists for playerId={} name={} warning={}",
+                        trimmed, body.name(), body.warning());
+            }
+
+            // `exists` missing/unexpected: do NOT accept based on non-empty items.
+            // Use strict exact-match check via cashout/list fallback.
+            boolean accepted = playerExistsByCashoutExact(apiKey, secret, cashpointId, trimmed);
+            log.warn("Mostbet validation: fallback cashout/exact-match accepted={}", accepted);
+            return accepted;
         } catch (Exception e) {
+            // If player/name fails, do a strict cashout/list exact-match check.
+            log.warn("Mostbet player/name validation failed for playerId={}: {}", playerId, e.getMessage());
+            boolean accepted = playerExistsByCashoutExact(apiKey, secret, cashpointId, playerId.trim());
+            log.warn("Mostbet validation: fallback cashout/exact-match accepted={}", accepted);
+            return accepted;
+        }
+    }
+
+    private boolean playerExistsByCashoutExact(String apiKey, String secret, String cashpointId, String playerId) {
+        try {
+            // Use a larger `size` so the exact playerId is returned in the first page (common API behavior).
+            String qs = "page=1&size=10&searchString=" + playerId;
+            String url = FULL_BASE_URL + "/" + cashpointId + "/player/cashout/list/page?" + qs;
+            log.warn("Mostbet validation: calling cashout/list fallback URL={} (playerId={})", url, playerId);
+            CashoutListResponse response = getCashoutList(apiKey, secret, cashpointId, 1, 10, playerId);
+            if (response == null || response.items() == null || response.items().isEmpty()) {
+                return false;
+            }
+            boolean accepted = response.items().stream().anyMatch(item ->
+                    item.playerId() != null && item.playerId().equals(playerId));
+            log.warn("Mostbet validation: cashout/list itemsSize={} exactMatchAccepted={}",
+                    response.items().size(), accepted);
+            return accepted;
+        } catch (Exception ignored) {
             return false;
         }
     }
@@ -215,6 +267,7 @@ public class MostbetService {
     public record DepositRequest(int brandId, String playerId, double amount, String currency) {}
     public record TransactionResponse(long transactionId, String status) {}
     public record CashoutConfirm(String code, long transactionId) {}
+    public record PlayerNameResponse(Boolean exists, String name, String warning) {}
     public record TransactionItem(long transactionId, String type, String status, String subject, int brandId, String playerId, String date, double amount, String currency) {}
     public record TransactionListResponse(List<TransactionItem> items) {}
     public record WithdrawalResult(long transactionId, String status, double amount, String currency) {}
