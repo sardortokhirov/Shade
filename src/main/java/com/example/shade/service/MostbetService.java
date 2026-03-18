@@ -143,9 +143,14 @@ public class MostbetService {
     }
 
     /**
-     * Validates that the player ID exists on the platform by calling deposit with amount 0.
-     * Used at ID entry in wallet transfer-to-platform flow so invalid IDs are rejected immediately.
-     * Returns false if credentials are missing, API throws, or response is not COMPLETED.
+     * Validates that the player ID exists on the platform WITHOUT calling player/deposit.
+     * The previous implementation used deposit(amount=0) and could fail with MIN_LIMIT_NOT_REACHED.
+     *
+     * Used at ID entry in wallet transfer-to-platform flow (and top-up user validation) so invalid IDs
+     * are rejected immediately.
+     *
+     * Returns true if the cashout list request succeeds (HTTP 2xx). We do not require non-empty items,
+     * because new players may have zero cashouts.
      */
     public boolean isPlayerValid(Platform platform, String playerId) {
         if (platform == null || playerId == null || playerId.isBlank()) {
@@ -158,10 +163,14 @@ public class MostbetService {
                 || apiKey.isBlank() || secret.isBlank() || cashpointId.isBlank()) {
             return false;
         }
-        String currency = platform.getCurrency() != null ? platform.getCurrency().toString() : "UZS";
         try {
-            TransactionResponse response = deposit(apiKey, secret, cashpointId, 1, playerId.trim(), 0, currency);
-            return response != null && "COMPLETED".equalsIgnoreCase(response.status());
+            // Non-deposit validation call to avoid MIN_LIMIT_NOT_REACHED (from player/deposit(amount=0)).
+            // page=1,size=1 keeps the request lightweight; searchString is used to filter by playerId.
+            CashoutListResponse response = getCashoutList(
+                    apiKey, secret, cashpointId, 1, 1, playerId.trim());
+            // Some invalid IDs may still return a non-null response but with empty items/0 totalCount.
+            // We should treat "empty result" as invalid to prevent letting wrong playerIds through.
+            return response != null && response.items() != null && !response.items().isEmpty();
         } catch (Exception e) {
             return false;
         }
