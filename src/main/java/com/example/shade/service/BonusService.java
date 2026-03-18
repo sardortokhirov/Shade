@@ -1638,6 +1638,9 @@ public class BonusService {
                 .of(createButton(languageSessionService.getTranslation(chatId, "button.lottery"), "BONUS_LOTTERY")));
         rows.add(List
                 .of(createButton(languageSessionService.getTranslation(chatId, "button.referral"), "BONUS_REFERRAL")));
+        rows.add(List.of(createButton(
+                languageSessionService.getTranslation(chatId, "wallet.button.tip"),
+                "WALLET_TIP_MENU")));
         rows.add(List
                 .of(createButton(languageSessionService.getTranslation(chatId, "button.topup_bonus"), "BONUS_TOPUP")));
         rows.add(createNavigationButtons(chatId));
