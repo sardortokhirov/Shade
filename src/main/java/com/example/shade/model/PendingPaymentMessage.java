@@ -33,5 +33,9 @@ public class PendingPaymentMessage {
 
     @Column(name = "blurred", nullable = false)
     private boolean blurred;
+
+    /** {@link com.example.shade.model.HizmatRequest#getId()} for the payment this instruction belongs to. */
+    @Column(name = "hizmat_request_id")
+    private Long hizmatRequestId;
 }
 

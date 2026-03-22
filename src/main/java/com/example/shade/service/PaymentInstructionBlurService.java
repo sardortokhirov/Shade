@@ -49,7 +49,8 @@ public class PaymentInstructionBlurService {
                 String blurredText = maskCardNumberInText(pending.getOriginalText());
                 messageSender.editMessageText(pending.getChatId(), pending.getMessageId(), blurredText);
                 try {
-                    topUpService.enterScreenshotFlowAfterPaymentTimeout(pending.getChatId());
+                    topUpService.enterScreenshotFlowAfterPaymentTimeout(
+                            pending.getChatId(), pending.getHizmatRequestId());
                 } catch (Exception ex) {
                     logger.error("Failed screenshot flow after blur for chatId {}: {}",
                             pending.getChatId(), ex.getMessage());

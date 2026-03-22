@@ -688,14 +688,26 @@ public class TopUpService {
     }
 
     /**
-     * Called when payment instruction message is blurred after 8 minutes. If the user never confirmed,
-     * moves them into the same screenshot flow as Oson/Humo verification errors.
+     * Called when payment instruction message is blurred after 8 minutes. If the linked request is still
+     * {@link RequestStatus#PENDING_PAYMENT}, moves the user into the screenshot flow. Uses request id so we
+     * do not send a second screenshot after the user already reached {@link RequestStatus#PENDING_SCREENSHOT}
+     * (e.g. two Confirm attempts).
      */
     @Transactional
-    public void enterScreenshotFlowAfterPaymentTimeout(Long chatId) {
-        HizmatRequest request = requestRepository.findByChatIdAndStatusForUpdate(chatId, RequestStatus.PENDING_PAYMENT)
-                .orElse(null);
+    public void enterScreenshotFlowAfterPaymentTimeout(Long chatId, Long hizmatRequestId) {
+        if (hizmatRequestId == null) {
+            logger.debug("enterScreenshotFlowAfterPaymentTimeout: skip (no hizmatRequestId) for chatId {}", chatId);
+            return;
+        }
+        HizmatRequest request = requestRepository.findByIdWithLock(hizmatRequestId).orElse(null);
         if (request == null) {
+            return;
+        }
+        if (!chatId.equals(request.getChatId())) {
+            logger.warn("enterScreenshotFlowAfterPaymentTimeout: chatId mismatch for request {}", hizmatRequestId);
+            return;
+        }
+        if (request.getStatus() != RequestStatus.PENDING_PAYMENT) {
             return;
         }
         AdminCard adminCard = adminCardRepository.findById(request.getAdminCardId()).orElse(null);
@@ -1010,20 +1022,8 @@ public class TopUpService {
                     chatId, request.getUniqueAmount(), request.getCardNumber());
 
             if (attempts >= 2) {
-                request.setStatus(RequestStatus.PENDING_SCREENSHOT);
-                requestRepository.save(request);
-                SendMessage message = new SendMessage();
-                message.setChatId(chatId);
-                message.setText(languageSessionService.getTranslation(chatId, "topup.message.send_screenshot"));
-                InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-
-                List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-                rows.add(createNavigationButtons(chatId));
-                markup.setKeyboard(rows);
-                message.setReplyMarkup(markup);
-                messageSender.sendMessage(message, chatId);
-
-                sessionService.setUserState(chatId, "TOPUP_AWAITING_SCREENSHOT");
+                sendTopupScreenshotFlow(chatId, request, adminCard, rubAmount,
+                        "2 marta tasdiqlanmadi — skrinshot so'rovi ⚠\uFE0F");
             } else {
                 messageSender.sendMessage(chatId,
                         languageSessionService.getTranslation(chatId, "topup.message.payment_not_received"));
@@ -2036,6 +2036,7 @@ public class TopUpService {
                     .originalText(messageText)
                     .createdAt(LocalDateTime.now(ZoneId.of("GMT+5")))
                     .blurred(false)
+                    .hizmatRequestId(request.getId())
                     .build();
             pendingPaymentMessageRepository.save(pending);
         } else {
