@@ -687,6 +687,77 @@ public class TopUpService {
         sendPaymentInstruction(chatId);
     }
 
+    /**
+     * Called when payment instruction message is blurred after 8 minutes. If the user never confirmed,
+     * moves them into the same screenshot flow as Oson/Humo verification errors.
+     */
+    @Transactional
+    public void enterScreenshotFlowAfterPaymentTimeout(Long chatId) {
+        HizmatRequest request = requestRepository.findByChatIdAndStatusForUpdate(chatId, RequestStatus.PENDING_PAYMENT)
+                .orElse(null);
+        if (request == null) {
+            return;
+        }
+        AdminCard adminCard = adminCardRepository.findById(request.getAdminCardId()).orElse(null);
+        if (adminCard == null) {
+            logger.error("enterScreenshotFlowAfterPaymentTimeout: admin card not found for request {}", request.getId());
+            return;
+        }
+        long rubAmount = 0L;
+        try {
+            ExchangeRate latest = exchangeRateRepository.findLatest()
+                    .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
+            rubAmount = BigDecimal.valueOf(request.getUniqueAmount())
+                    .multiply(latest.getUzsToRub())
+                    .divide(BigDecimal.valueOf(1000), 0, RoundingMode.HALF_UP)
+                    .longValue();
+        } catch (Exception e) {
+            logger.warn("enterScreenshotFlowAfterPaymentTimeout: could not compute rubAmount for chatId {}: {}", chatId,
+                    e.getMessage());
+        }
+        sendTopupScreenshotFlow(chatId, request, adminCard, rubAmount,
+                "8 daqiqada tasdiqlanmadi — avtomatik skrinshot so'rovi ⚠\uFE0F");
+    }
+
+    private void sendTopupScreenshotFlow(Long chatId, HizmatRequest request, AdminCard adminCard, long rubAmount,
+            String adminLogTitle) {
+        request.setStatus(RequestStatus.PENDING_SCREENSHOT);
+        requestRepository.save(request);
+        SendMessage message = new SendMessage();
+        message.setChatId(chatId);
+        message.setText(languageSessionService.getTranslation(chatId, "topup.message.send_screenshot"));
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        rows.add(createNavigationButtons(chatId));
+        markup.setKeyboard(rows);
+        message.setReplyMarkup(markup);
+        messageSender.sendMessage(message, chatId);
+
+        sessionService.setUserState(chatId, "TOPUP_AWAITING_SCREENSHOT");
+
+        String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
+        String cardBlock = optionalCardLineBackticks(request.getCardNumber()) + optionalAdminCardLine(adminCard.getCardNumber());
+        String logMessage = String.format(
+                "🆔: `%d`\n" +
+                        "👤: `%s` %s\n" +
+                        "🌐 #%s: " + "`%s`\n" +
+                        "💸 Miqdor: %,d UZS\n" +
+                        "💸 Miqdor: %,d RUB\n" +
+                        "%s" +
+                        "📅 [%s]",
+                request.getId(),
+                chatId,
+                number,
+                request.getPlatform(),
+                request.getPlatformUserId(),
+                request.getUniqueAmount(),
+                rubAmount,
+                cardBlock,
+                LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        adminLogBotService.sendLog(adminLogTitle + " \n\n" + logMessage);
+    }
+
     @Transactional
     public void verifyPayment(Long chatId) throws Exception {
         // Pessimistic lock prevents double processing when user double-clicks Confirm
@@ -736,41 +807,8 @@ public class TopUpService {
                 }
             }
         } catch (Exception e) {
-            request.setStatus(RequestStatus.PENDING_SCREENSHOT);
-            requestRepository.save(request);
-            SendMessage message = new SendMessage();
-            message.setChatId(chatId);
-            message.setText(languageSessionService.getTranslation(chatId, "topup.message.send_screenshot"));
-            InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-
-            List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-            rows.add(createNavigationButtons(chatId));
-            markup.setKeyboard(rows);
-            message.setReplyMarkup(markup);
-            messageSender.sendMessage(message, chatId);
-
-            sessionService.setUserState(chatId, "TOPUP_AWAITING_SCREENSHOT");
-
-            String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
-            String cardBlock = optionalCardLineBackticks(request.getCardNumber()) + optionalAdminCardLine(adminCard.getCardNumber());
-            String logMessage = String.format(
-                    "🆔: `%d`\n" +
-                            "👤: `%s` %s\n" +
-                            "🌐 #%s: " + "`%s`\n" +
-                            "💸 Miqdor: %,d UZS\n" +
-                            "💸 Miqdor: %,d RUB\n" +
-                            "%s" +
-                            "📅 [%s]",
-                    request.getId(),
-                    chatId,
-                    number,
-                    request.getPlatform(),
-                    request.getPlatformUserId(),
-                    request.getUniqueAmount(),
-                    rubAmount,
-                    cardBlock,
-                    LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-            adminLogBotService.sendLog("Osonda Xatolik Yuz berdi ⚠\uFE0F \n\n" + logMessage);
+            sendTopupScreenshotFlow(chatId, request, adminCard, rubAmount,
+                    "Osonda Xatolik Yuz berdi ⚠\uFE0F");
         }
 
         boolean isPaymentReceived = response

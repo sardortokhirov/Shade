@@ -3,9 +3,9 @@ package com.example.shade.service;
 import com.example.shade.bot.MessageSender;
 import com.example.shade.model.PendingPaymentMessage;
 import com.example.shade.repository.PendingPaymentMessageRepository;
-import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -16,13 +16,22 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Service
-@RequiredArgsConstructor
 public class PaymentInstructionBlurService {
     private static final Logger logger = LoggerFactory.getLogger(PaymentInstructionBlurService.class);
     private static final long BLUR_DELAY_MINUTES = 8L;
 
     private final PendingPaymentMessageRepository pendingPaymentMessageRepository;
     private final MessageSender messageSender;
+    private final TopUpService topUpService;
+
+    public PaymentInstructionBlurService(
+            PendingPaymentMessageRepository pendingPaymentMessageRepository,
+            MessageSender messageSender,
+            @Lazy TopUpService topUpService) {
+        this.pendingPaymentMessageRepository = pendingPaymentMessageRepository;
+        this.messageSender = messageSender;
+        this.topUpService = topUpService;
+    }
 
     private static final Pattern BACKTICK_CARD_PATTERN = Pattern.compile("`([^`]+)`");
 
@@ -39,6 +48,12 @@ public class PaymentInstructionBlurService {
             try {
                 String blurredText = maskCardNumberInText(pending.getOriginalText());
                 messageSender.editMessageText(pending.getChatId(), pending.getMessageId(), blurredText);
+                try {
+                    topUpService.enterScreenshotFlowAfterPaymentTimeout(pending.getChatId());
+                } catch (Exception ex) {
+                    logger.error("Failed screenshot flow after blur for chatId {}: {}",
+                            pending.getChatId(), ex.getMessage());
+                }
             } catch (Exception e) {
                 logger.error("Failed to blur payment instruction for chatId {}, messageId {}: {}",
                         pending.getChatId(), pending.getMessageId(), e.getMessage());
