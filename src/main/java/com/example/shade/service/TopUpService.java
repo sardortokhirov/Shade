@@ -727,8 +727,7 @@ public class TopUpService {
             logger.warn("enterScreenshotFlowAfterPaymentTimeout: could not compute rubAmount for chatId {}: {}", chatId,
                     e.getMessage());
         }
-        sendTopupScreenshotFlow(chatId, request, adminCard, rubAmount,
-                "8 daqiqada tasdiqlanmadi — avtomatik skrinshot so'rovi ⚠\uFE0F");
+        sendTopupScreenshotFlow(chatId, request, adminCard, rubAmount, null);
     }
 
     private void sendTopupScreenshotFlow(Long chatId, HizmatRequest request, AdminCard adminCard, long rubAmount,
@@ -767,7 +766,9 @@ public class TopUpService {
                 rubAmount,
                 cardBlock,
                 LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-        adminLogBotService.sendLog(adminLogTitle + " \n\n" + logMessage);
+        if (adminLogTitle != null && !adminLogTitle.isBlank()) {
+            adminLogBotService.sendLog(adminLogTitle + " \n\n" + logMessage);
+        }
     }
 
     @Transactional
@@ -1022,8 +1023,7 @@ public class TopUpService {
                     chatId, request.getUniqueAmount(), request.getCardNumber());
 
             if (attempts >= 2) {
-                sendTopupScreenshotFlow(chatId, request, adminCard, rubAmount,
-                        "2 marta tasdiqlanmadi — skrinshot so'rovi ⚠\uFE0F");
+                sendTopupScreenshotFlow(chatId, request, adminCard, rubAmount, null);
             } else {
                 messageSender.sendMessage(chatId,
                         languageSessionService.getTranslation(chatId, "topup.message.payment_not_received"));
