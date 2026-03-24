@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 
@@ -25,6 +26,7 @@ public class SystemConfigurationService {
     private static final Long DEFAULT_MIN_TICKETS = 5L;
     private static final Long DEFAULT_MAX_TICKETS = 400L;
     private static final BigDecimal DEFAULT_REFERRAL_COMMISSION = new BigDecimal("0.001");
+    private static final BigDecimal DEFAULT_WITHDRAW_FEE_PERCENTAGE = new BigDecimal("1.00");
     private static final Long DEFAULT_TICKET_CALCULATION = 10_000L;
 
     @Transactional
@@ -39,6 +41,7 @@ public class SystemConfigurationService {
                     config.setMinTickets(DEFAULT_MIN_TICKETS);
                     config.setMaxTickets(DEFAULT_MAX_TICKETS);
                     config.setReferralCommissionPercentage(DEFAULT_REFERRAL_COMMISSION);
+                    config.setWithdrawFeePercentage(DEFAULT_WITHDRAW_FEE_PERCENTAGE);
                     config.setTicketCalculationAmount(DEFAULT_TICKET_CALCULATION);
                     config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
                     return configurationRepository.save(config);
@@ -88,6 +91,32 @@ public class SystemConfigurationService {
         return config.getReferralCommissionPercentage() != null
                 ? config.getReferralCommissionPercentage()
                 : DEFAULT_REFERRAL_COMMISSION;
+    }
+
+    /**
+     * Effective withdraw fee percent (0–100). Null in DB defaults to 1% (legacy behavior was hardcoded 0.99 multiplier).
+     */
+    public BigDecimal getWithdrawFeePercentage() {
+        SystemConfiguration config = getConfiguration();
+        BigDecimal v = config.getWithdrawFeePercentage() != null
+                ? config.getWithdrawFeePercentage()
+                : DEFAULT_WITHDRAW_FEE_PERCENTAGE;
+        if (v.compareTo(BigDecimal.ZERO) < 0) {
+            return BigDecimal.ZERO;
+        }
+        if (v.compareTo(BigDecimal.valueOf(100)) > 0) {
+            return BigDecimal.valueOf(100);
+        }
+        return v;
+    }
+
+    /**
+     * Multiplier applied to gross withdrawal amount to get net UZS credited (after fee). E.g. fee 1% → 0.99.
+     */
+    public BigDecimal getWithdrawNetMultiplier() {
+        BigDecimal fee = getWithdrawFeePercentage();
+        return BigDecimal.valueOf(100).subtract(fee)
+                .divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP);
     }
 
     public Long getTicketCalculationAmount() {

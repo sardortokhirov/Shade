@@ -35,6 +35,13 @@ public class SystemConfiguration {
     @Column(name = "referral_commission_percentage", nullable = false, precision = 5, scale = 4)
     private BigDecimal referralCommissionPercentage = new BigDecimal("0.001");
 
+    /**
+     * Percentage withheld from the gross withdrawal (e.g. 1 = 1%; user receives 99% of gross in UZS).
+     * Nullable for legacy rows; service treats null as default 1%.
+     */
+    @Column(name = "withdraw_fee_percentage", precision = 5, scale = 2)
+    private BigDecimal withdrawFeePercentage;
+
     @Column(name = "ticket_calculation_amount", nullable = false)
     private Long ticketCalculationAmount = 10_000L;
 

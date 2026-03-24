@@ -46,6 +46,7 @@ public class WithdrawService {
     private final RestTemplate restTemplate = new RestTemplate();
     private final BlockedUserRepository blockedUserRepository;
     private final MostbetService mostbetService;
+    private final SystemConfigurationService systemConfigurationService;
 
     public void startWithdrawal(Long chatId) {
         logger.info("Starting withdrawal for chatId: {}", chatId);
@@ -598,16 +599,16 @@ public class WithdrawService {
             }
             String number = blockedUserRepository.findByChatId(chatId).get().getPhoneNumber();
 
+            BigDecimal netMultiplier = systemConfigurationService.getWithdrawNetMultiplier();
+
             BigDecimal netAmount = paidAmount;
 
-
             if (!request.getCurrency().equals(Currency.RUB)) {
-                netAmount=paidAmount.multiply(BigDecimal.valueOf(0.99)).setScale(2, RoundingMode.DOWN);
-
+                netAmount = paidAmount.multiply(netMultiplier).setScale(2, RoundingMode.DOWN);
             } else {
                 ExchangeRate latest = exchangeRateRepository.findLatest()
                         .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
-                netAmount = paidAmount.multiply(latest.getRubToUzs()).multiply(BigDecimal.valueOf(0.99)).setScale(2, RoundingMode.DOWN);
+                netAmount = paidAmount.multiply(latest.getRubToUzs()).multiply(netMultiplier).setScale(2, RoundingMode.DOWN);
             }
 
             String escapedCardNumber = cardNumber
