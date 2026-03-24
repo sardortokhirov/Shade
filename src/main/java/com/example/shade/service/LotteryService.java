@@ -39,9 +39,8 @@ public class LotteryService {
     private final MessageSender messageSender;
     private final AdminLogBotService adminLogBotService;
     private final LanguageSessionService languageSessionService;
+    private final SystemConfigurationService systemConfigurationService;
     private final Random random = new Random();
-    private static final long MINIMUM_TICKETS = 5L;
-    private static final long MAXIMUM_TICKETS = 400L;
 
     public void awardTickets(Long chatId, Long amount) {
         UserBalance balance = userBalanceRepository.findById(chatId)
@@ -78,8 +77,10 @@ public class LotteryService {
     public Map<Long, BigDecimal> playLotteryWithDetails(Long chatId, Long numberOfPlays) {
         UserBalance balance = userBalanceRepository.findById(chatId)
                 .orElseThrow(() -> new IllegalStateException("User balance not found: " + chatId));
-        if (balance.getTickets() < numberOfPlays || numberOfPlays < MINIMUM_TICKETS || numberOfPlays > MAXIMUM_TICKETS) {
-            throw new IllegalStateException(String.format("Invalid ticket count: %d. Must be between %d and %d", balance.getTickets(), MINIMUM_TICKETS, MAXIMUM_TICKETS));
+        long minT = systemConfigurationService.getMinTickets();
+        long maxT = systemConfigurationService.getMaxTickets();
+        if (balance.getTickets() < numberOfPlays || numberOfPlays < minT || numberOfPlays > maxT) {
+            throw new IllegalStateException(String.format("Invalid ticket count: %d. Must be between %d and %d", balance.getTickets(), minT, maxT));
         }
         List<LotteryPrize> prizes = lotteryPrizeRepository.findAll();
         if (prizes.isEmpty()) {

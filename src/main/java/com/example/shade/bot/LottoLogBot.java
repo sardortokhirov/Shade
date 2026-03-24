@@ -2,6 +2,7 @@ package com.example.shade.bot;
 
 import com.example.shade.repository.AdminChatRepository;
 import com.example.shade.service.LotteryService;
+import com.example.shade.service.SystemConfigurationService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,9 +29,7 @@ public class LottoLogBot extends TelegramLongPollingBot {
     private final LottoMessageSender messageSender;
     private final AdminChatRepository adminChatRepository;
     private final LotteryService lotteryService;
-
-    private static final Long MINIMUM_TICKETS = 1L;
-    private static final Long MAXIMUM_TICKETS = 400L;
+    private final SystemConfigurationService systemConfigurationService;
     private final Map<Long, String> userState = new HashMap<>();
 
     @Value("${telegram.logbot.token}")
@@ -104,14 +103,20 @@ public class LottoLogBot extends TelegramLongPollingBot {
 
     private void handlePlayCommand(Long chatId) {
         userState.put(chatId, "AWAITING_TICKET_COUNT");
-        messageSender.sendMessage(chatId.toString(), "Nechta chipta o‘ynamoqchisiz? (1-400)", createLotteryMenu());
+        long minT = systemConfigurationService.getMinTickets();
+        long maxT = systemConfigurationService.getMaxTickets();
+        messageSender.sendMessage(chatId.toString(),
+                String.format("Nechta chipta o‘ynamoqchisiz? (%d-%d)", minT, maxT), createLotteryMenu());
     }
 
     private void handleTicketCountInput(Long chatId, String input) {
         try {
             Long numberOfPlays = Long.parseLong(input.trim());
-            if (numberOfPlays < MINIMUM_TICKETS || numberOfPlays > MAXIMUM_TICKETS) {
-                messageSender.sendMessage(chatId.toString(), String.format("Noto‘g‘ri son! 1 dan %d gacha son kiriting.", MAXIMUM_TICKETS), createLotteryMenu());
+            long minT = systemConfigurationService.getMinTickets();
+            long maxT = systemConfigurationService.getMaxTickets();
+            if (numberOfPlays < minT || numberOfPlays > maxT) {
+                messageSender.sendMessage(chatId.toString(),
+                        String.format("Noto‘g‘ri son! %d dan %d gacha son kiriting.", minT, maxT), createLotteryMenu());
                 return;
             }
 
@@ -126,7 +131,10 @@ public class LottoLogBot extends TelegramLongPollingBot {
 
             messageSender.sendMessage(chatId.toString(), winningsLog.toString(), createLotteryMenu());
         } catch (NumberFormatException e) {
-            messageSender.sendMessage(chatId.toString(), "Iltimos, faqat raqam kiriting (1-400).", createLotteryMenu());
+            long minT = systemConfigurationService.getMinTickets();
+            long maxT = systemConfigurationService.getMaxTickets();
+            messageSender.sendMessage(chatId.toString(),
+                    String.format("Iltimos, faqat raqam kiriting (%d-%d).", minT, maxT), createLotteryMenu());
         } catch (IllegalStateException e) {
             messageSender.sendMessage(chatId.toString(), "Xatolik: " + e.getMessage(), createLotteryMenu());
             userState.remove(chatId);
