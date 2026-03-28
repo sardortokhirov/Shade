@@ -31,6 +31,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final UserBalanceRepository userBalanceRepository;
     private final BlockedUserRepository blockedUserRepository;
+    private final BlockedUserService blockedUserService;
     private final HizmatRequestRepository hizmatRequestRepository;
     private final DailyStatsService dailyStatsService;
     private final UserLimitIncreaseService userLimitIncreaseService;
@@ -621,26 +622,19 @@ public class UserService {
 
     @Transactional
     public void blockUser(Long chatId) {
-        Optional<BlockedUser> existing = blockedUserRepository.findByChatId(chatId);
-        if (existing.isPresent() && "BLOCKED".equals(existing.get().getPhoneNumber())) {
+        BlockedUserService.BlockChatResult result = blockedUserService.blockChat(chatId);
+        if (result == BlockedUserService.BlockChatResult.ALREADY_BLOCKED) {
             throw new IllegalStateException("User is already blocked");
         }
-
-        BlockedUser blockedUser = existing.orElse(BlockedUser.builder().chatId(chatId).build());
-        blockedUser.setPhoneNumber("BLOCKED");
-        blockedUserRepository.save(blockedUser);
-
         logger.info("Blocked user with chatId: {}", chatId);
     }
 
     @Transactional
     public void unblockUser(Long chatId) {
-        Optional<BlockedUser> blockedUser = blockedUserRepository.findByChatId(chatId);
-        if (blockedUser.isEmpty() || !"BLOCKED".equals(blockedUser.get().getPhoneNumber())) {
+        BlockedUserService.UnblockChatResult result = blockedUserService.unblockChat(chatId);
+        if (result == BlockedUserService.UnblockChatResult.NOT_BLOCKED) {
             throw new IllegalStateException("User is not blocked");
         }
-
-        blockedUserRepository.deleteById(chatId);
         logger.info("Unblocked user with chatId: {}", chatId);
     }
 
@@ -670,6 +664,7 @@ public class UserService {
             lotteryTicketPurchaseRepository.deleteById(chatId);
             userWalletQuotaRepository.deleteById(chatId);
             sessionDataRepository.deleteByChatId(chatId);
+            blockedUserService.removePhoneLinksForChat(chatId);
             blockedUserRepository.deleteById(chatId);
 
             // Finally delete the user main record

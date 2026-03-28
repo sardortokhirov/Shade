@@ -47,6 +47,7 @@ public class BonusService {
     private final PlatformRepository platformRepository;
     private final HizmatRequestRepository requestRepository;
     private final BlockedUserRepository blockedUserRepository;
+    private final BlockedUserService blockedUserService;
     private final AdminChatRepository adminChatRepository;
     private final ExchangeRateRepository exchangeRateRepository;
     private final AllowedPromoUserRepository allowedPromoUserRepository;
@@ -1370,8 +1371,11 @@ public class BonusService {
                     languageSessionService.getTranslation(chatId, "message.no_admin_permission"));
             return;
         }
-        BlockedUser blockedUser = BlockedUser.builder().chatId(userChatId).phoneNumber("BLOCKED").build();
-        blockedUserRepository.save(blockedUser);
+        BlockedUserService.BlockChatResult result = blockedUserService.blockChat(userChatId);
+        if (result == BlockedUserService.BlockChatResult.ALREADY_BLOCKED) {
+            messageSender.sendMessage(chatId, "❌ Bu foydalanuvchi allaqachon bloklangan.");
+            return;
+        }
 
         messageSender.sendMessage(userChatId,
                 languageSessionService.getTranslation(userChatId, "message.user_blocked"));

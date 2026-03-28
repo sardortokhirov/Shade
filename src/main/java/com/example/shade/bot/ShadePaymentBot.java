@@ -217,10 +217,15 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
             if (update.hasMessage() && update.getMessage().hasContact()) {
                 String receivedPhoneNumber = update.getMessage().getContact().getPhoneNumber();
 
-                // Use transactional service method to safely handle phone number update
-                // This ensures UserBalance is never overwritten if it already exists
-                boolean isNewUser = contactService.handlePhoneNumberUpdate(chatId, receivedPhoneNumber);
+                PhoneRegistrationResult registration = contactService.handlePhoneNumberUpdate(chatId, receivedPhoneNumber);
 
+                if (registration == PhoneRegistrationResult.REJECTED_PHONE_BLOCKED) {
+                    logger.info("Phone registration rejected for chatId {}: blocklist or invalid number", chatId);
+                    sessionService.clearSession(chatId);
+                    return;
+                }
+
+                boolean isNewUser = registration == PhoneRegistrationResult.ACCEPTED_NEW_BALANCE;
                 logger.info("Phone number saved for chatId {}: {} (new user: {})",
                         chatId, receivedPhoneNumber, isNewUser);
 

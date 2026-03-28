@@ -1,9 +1,8 @@
 package com.example.shade.bot;
 
-import com.example.shade.model.BlockedUser;
 import com.example.shade.repository.AdminChatRepository;
-import com.example.shade.repository.BlockedUserRepository;
 import com.example.shade.service.AdminLogBotService;
+import com.example.shade.service.BlockedUserService;
 import com.example.shade.service.BonusService;
 import com.example.shade.service.CallbackDeduplicationService;
 import com.example.shade.service.TopUpService;
@@ -41,7 +40,7 @@ public class AdminLogBot extends TelegramLongPollingBot {
     private final BonusService bonusService;
     private final TopUpService topUpService;
     private final WalletService walletService;
-    private final BlockedUserRepository blockedUserRepository;
+    private final BlockedUserService blockedUserService;
     private final CallbackDeduplicationService callbackDeduplicationService;
 
     @Value("${telegram.admin.log.bot.token}")
@@ -150,13 +149,10 @@ public class AdminLogBot extends TelegramLongPollingBot {
                     return;
                 }
                 Long userId = Long.parseLong(parts[1]);
-                BlockedUser user = blockedUserRepository.findById(userId)
-                        .orElse(BlockedUser.builder().chatId(userId).build());
-                if ("BLOCKED".equals(user.getPhoneNumber())) {
+                BlockedUserService.BlockChatResult result = blockedUserService.blockChat(userId);
+                if (result == BlockedUserService.BlockChatResult.ALREADY_BLOCKED) {
                     message.setText("❌ Bu foydalanuvchi allaqachon bloklangan.");
                 } else {
-                    user.setPhoneNumber("BLOCKED");
-                    blockedUserRepository.save(user);
                     message.setText("✅ Foydalanuvchi (ID: " + userId + ") bloklandi.");
                     logger.info("User {} blocked by admin chatId {}", userId, chatId);
                 }
@@ -173,12 +169,10 @@ public class AdminLogBot extends TelegramLongPollingBot {
                     return;
                 }
                 Long userId = Long.parseLong(parts[1]);
-                BlockedUser user = blockedUserRepository.findById(userId).orElse(null);
-                if (user == null || !"BLOCKED".equals(user.getPhoneNumber())) {
+                BlockedUserService.UnblockChatResult result = blockedUserService.unblockChat(userId);
+                if (result == BlockedUserService.UnblockChatResult.NOT_BLOCKED) {
                     message.setText("❌ Bu foydalanuvchi bloklanmagan.");
                 } else {
-                    user.setPhoneNumber(null);
-                    blockedUserRepository.save(user);
                     message.setText("✅ Foydalanuvchi (ID: " + userId + ") blokdan chiqarildi.");
                     logger.info("User {} unblocked by admin chatId {}", userId, chatId);
                 }
@@ -304,13 +298,10 @@ public class AdminLogBot extends TelegramLongPollingBot {
             return;
         } else if (callbackData.startsWith("ADMIN_BLOCK_USER:")) {
             Long userId = Long.parseLong(callbackData.split(":")[1]);
-            BlockedUser user = blockedUserRepository.findById(userId)
-                    .orElse(BlockedUser.builder().chatId(userId).build());
-            if ("BLOCKED".equals(user.getPhoneNumber())) {
+            BlockedUserService.BlockChatResult result = blockedUserService.blockChat(userId);
+            if (result == BlockedUserService.BlockChatResult.ALREADY_BLOCKED) {
                 message.setText("❌ Bu foydalanuvchi allaqachon bloklangan.");
             } else {
-                user.setPhoneNumber("BLOCKED");
-                blockedUserRepository.save(user);
                 message.setText("✅ Foydalanuvchi (ID: " + userId + ") bloklandi.");
                 logger.info("User {} blocked by admin chatId {}", userId, chatId);
             }

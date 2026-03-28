@@ -1,7 +1,6 @@
 package com.example.shade.controller;
 
-import com.example.shade.model.BlockedUser;
-import com.example.shade.repository.BlockedUserRepository;
+import com.example.shade.service.BlockedUserService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -19,7 +18,7 @@ import java.util.Base64;
 @CrossOrigin(origins = "*")
 public class BlockedUserController {
 
-    private final BlockedUserRepository blockedUserRepository;
+    private final BlockedUserService blockedUserService;
     private final com.example.shade.repository.UserRepository userRepository;
 
     private boolean authenticate(HttpServletRequest request) {
@@ -49,11 +48,32 @@ public class BlockedUserController {
         if (!authenticate(request)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("❌ Autentifikatsiya xatosi");
         }
-        com.example.shade.model.BlockedUser user = blockedUserRepository.findByChatId(chatId).orElse(null);
-        if (user == null || !"BLOCKED".equals(user.getPhoneNumber())) {
+        BlockedUserService.UnblockChatResult result = blockedUserService.unblockChat(chatId);
+        if (result == BlockedUserService.UnblockChatResult.NOT_BLOCKED) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("❌ Foydalanuvchi bloklanganlar ro‘yxatida emas");
         }
-        blockedUserRepository.deleteById(chatId);
         return ResponseEntity.ok("✅ Foydalanuvchi blokdan chiqarildi: " + chatId);
+    }
+
+    @PostMapping("/block-phone")
+    public ResponseEntity<String> blockPhone(HttpServletRequest request, @RequestParam String phone) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("❌ Autentifikatsiya xatosi");
+        }
+        if (!blockedUserService.blockPhoneNumber(phone)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("❌ Telefon raqami noto‘g‘ri yoki bo‘sh");
+        }
+        return ResponseEntity.ok("✅ Telefon raqami bloklandi: " + phone.trim());
+    }
+
+    @PostMapping("/unblock-phone")
+    public ResponseEntity<String> unblockPhone(HttpServletRequest request, @RequestParam String phone) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("❌ Autentifikatsiya xatosi");
+        }
+        if (!blockedUserService.unblockPhoneNumber(phone)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("❌ Bu raqam bloklanganlar ro‘yxatida emas");
+        }
+        return ResponseEntity.ok("✅ Telefon raqami blokdan chiqarildi: " + phone.trim());
     }
 }

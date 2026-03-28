@@ -3,6 +3,8 @@
 ## Overview
 This API allows admins to view all users and manage blocks. A user is considered "Blocked" if their phone number entry in the system is explicitly set to the string `"BLOCKED"`.
 
+Additionally, **blocked phone numbers** are stored in table `blocked_phone_number`. When a user is blocked by chat ID, their current real phone (if any) is added to that list so they cannot register again with the same number under a new Telegram account. **Unblocking by chat** removes the row linked to that chat. **Block/unblock by phone** manages entries without a chat link.
+
 ## Endpoints
 
 ### 1. Get All Users (Sorted by Blocked)
@@ -58,7 +60,33 @@ Removes the block from a user. This will only work if the user's phone number is
 
 ---
 
+### 3. Block by phone number
+**URL**: `POST /api/admin/blocked-users/block-phone`
+
+**Query parameters**:
+- `phone` (String, required): Raw or formatted number; normalized internally (digits + leading `+`, spaces/dashes stripped).
+
+**Responses**:
+- `200 OK`: Phone added to global blocklist (`linked_chat_id` is null).
+- `400 Bad Request`: Normalization failed (empty/invalid).
+
+**Example**: `POST /api/admin/blocked-users/block-phone?phone=%2B998901234567`
+
+---
+
+### 4. Unblock by phone number
+**URL**: `POST /api/admin/blocked-users/unblock-phone`
+
+**Query parameters**:
+- `phone` (String, required): Same normalization as block-phone.
+
+**Responses**:
+- `200 OK`: Row removed from blocklist.
+- `404 Not Found`: No matching normalized phone on the list.
+
+---
+
 ## Authentication
-All requests require **Basic Authentication**:
-- **Header**: `Authorization: Basic TWF4VXAxMDAwOk1heFVwMTAwMA==`
-- **Credentials**: `MaxUp1000 : MaxUp1000`
+All requests require **Basic Authentication** (same as other admin APIs in this deployment):
+- **Header**: `Authorization: Basic <base64(username:password)>`
+- **Credentials**: match `BlockedUserController` (e.g. `MaxUp1000` and the configured password).

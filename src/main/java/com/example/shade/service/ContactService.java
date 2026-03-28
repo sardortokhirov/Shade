@@ -3,8 +3,10 @@ package com.example.shade.service;
 import com.example.shade.bot.MessageSender;
 import com.example.shade.model.BlockedUser;
 import com.example.shade.model.UserBalance;
+import com.example.shade.repository.BlockedPhoneNumberRepository;
 import com.example.shade.repository.BlockedUserRepository;
 import com.example.shade.repository.UserBalanceRepository;
+import com.example.shade.util.PhoneNormalization;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -12,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardRemove;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 
 import java.math.BigDecimal;
@@ -26,6 +29,7 @@ public class ContactService {
     private final MessageSender messageSender;
     private final LanguageSessionService languageSessionService;
     private final BlockedUserRepository blockedUserRepository;
+    private final BlockedPhoneNumberRepository blockedPhoneNumberRepository;
     private final UserBalanceRepository userBalanceRepository;
 
     public void handleContact(Long chatId) {
@@ -76,29 +80,43 @@ public class ContactService {
      * 3. All operations are atomic within a transaction
      * 
      * @param chatId The user's chat ID
-     * @param phoneNumber The phone number to save (will be normalized with + prefix)
-     * @return true if UserBalance was created (new user), false if it already existed
+     * @param phoneNumber The phone number to save (normalized to E.164-style)
+     * @return outcome including blocklist rejection (no DB changes in that case)
      */
     @Transactional
-    public boolean handlePhoneNumberUpdate(Long chatId, String phoneNumber) {
+    public PhoneRegistrationResult handlePhoneNumberUpdate(Long chatId, String phoneNumber) {
         logger.info("Handling phone number update for chatId: {}", chatId);
-        
-        // Normalize phone number
-        if (phoneNumber != null && !phoneNumber.startsWith("+")) {
-            phoneNumber = "+" + phoneNumber;
+
+        String normalized = PhoneNormalization.normalize(phoneNumber);
+        if (normalized == null) {
+            logger.warn("Could not normalize phone for chatId {}", chatId);
+            SendMessage bad = new SendMessage();
+            bad.setChatId(chatId.toString());
+            bad.setText(languageSessionService.getTranslation(chatId, "message.phone_number_invalid"));
+            bad.setReplyMarkup(new ReplyKeyboardRemove(true));
+            messageSender.sendMessage(bad, chatId);
+            return PhoneRegistrationResult.REJECTED_PHONE_BLOCKED;
         }
-        
-        // Safely retrieve or create BlockedUser
+
+        if (blockedPhoneNumberRepository.existsById(normalized)) {
+            logger.info("Rejected phone registration for chatId {}: number on blocklist", chatId);
+            SendMessage blockedMsg = new SendMessage();
+            blockedMsg.setChatId(chatId.toString());
+            blockedMsg.setText(languageSessionService.getTranslation(chatId, "message.phone_number_blocked"));
+            blockedMsg.setReplyMarkup(new ReplyKeyboardRemove(true));
+            messageSender.sendMessage(blockedMsg, chatId);
+            return PhoneRegistrationResult.REJECTED_PHONE_BLOCKED;
+        }
+
         BlockedUser blockedUser = blockedUserRepository.findById(chatId)
                 .orElse(BlockedUser.builder().chatId(chatId).build());
-        
+
         String oldPhoneNumber = blockedUser.getPhoneNumber();
-        
-        // Update phone number
-        blockedUser.setPhoneNumber(phoneNumber);
+
+        blockedUser.setPhoneNumber(normalized);
         blockedUserRepository.save(blockedUser);
         
-        logger.info("BlockedUser updated for chatId {}: {} -> {}", chatId, oldPhoneNumber, phoneNumber);
+        logger.info("BlockedUser updated for chatId {}: {} -> {}", chatId, oldPhoneNumber, normalized);
         
         // Safely check and create UserBalance if it doesn't exist
         // Use double-check pattern to prevent race condition overwrites
@@ -128,7 +146,7 @@ public class ContactService {
                 logger.info("Created new UserBalance for chatId {}: tickets=0, balance=0", chatId);
             }
         }
-        
-        return balanceCreated;
+
+        return balanceCreated ? PhoneRegistrationResult.ACCEPTED_NEW_BALANCE : PhoneRegistrationResult.ACCEPTED_EXISTING_BALANCE;
     }
 }
