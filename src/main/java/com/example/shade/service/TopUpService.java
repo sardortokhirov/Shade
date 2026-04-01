@@ -819,11 +819,8 @@ public class TopUpService {
             } else {
                 try {
                     Thread.sleep(2000); // 2-second delay
-                    if (configurationService.useHumoLegacyDualCheck()) {
-                        response = humoService.verifyPaymentAmount(request.getUniqueAmount());
-                    } else {
-                        response = humoService.verifyHumoOnly(request.getUniqueAmount());
-                    }
+                    // Always CardXabar-then-HUMO (see HumoService.verifyPaymentAmount)
+                    response = humoService.verifyPaymentAmount(request.getUniqueAmount());
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt(); // Restore interrupted status
                     response = false; // Handle as needed

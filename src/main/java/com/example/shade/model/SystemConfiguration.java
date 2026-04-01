@@ -1,5 +1,6 @@
 package com.example.shade.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import jakarta.persistence.*;
 import lombok.Data;
@@ -71,9 +72,9 @@ public class SystemConfiguration {
     private UzcardRail uzcardRail = UzcardRail.OSON;
 
     /**
-     * When null: HUMO cards use legacy CardXabar-then-HUMO check (current production default).
-     * When set: dual check applies only while {@code now() < this instant}; after that, HUMO-only on 2805.
+     * Deprecated — no longer read; always null on save. Column kept for DB compatibility.
      */
+    @JsonIgnore
     @Column(name = "humo_legacy_dual_check_end")
     private Instant humoLegacyDualCheckEnd;
 

@@ -10,7 +10,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 
@@ -78,6 +77,7 @@ public class SystemConfigurationService {
         if (config.getUzcardRail() == null) {
             config.setUzcardRail(DEFAULT_UZCARD_RAIL);
         }
+        config.setHumoLegacyDualCheckEnd(null);
         config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
         SystemConfiguration saved = configurationRepository.save(config);
         logger.info("System configuration updated: {}", saved.getId());
@@ -164,18 +164,6 @@ public class SystemConfigurationService {
     public UzcardRail getUzcardRail() {
         SystemConfiguration config = getConfiguration();
         return config.getUzcardRail() != null ? config.getUzcardRail() : DEFAULT_UZCARD_RAIL;
-    }
-
-    /**
-     * When true, HUMO cards use legacy CardXabar-then-HUMO verification (null end date, or now before end).
-     */
-    public boolean useHumoLegacyDualCheck() {
-        SystemConfiguration config = getConfiguration();
-        Instant end = config.getHumoLegacyDualCheckEnd();
-        if (end == null) {
-            return true;
-        }
-        return Instant.now().isBefore(end);
     }
 
     public Long getLotteryCooldownSeconds() {
@@ -307,7 +295,7 @@ public class SystemConfigurationService {
         config.setDepositDailyLimitIncreasePercentage(current.getDepositDailyLimitIncreasePercentage());
         config.setHumoEnabled(current.getHumoEnabled());
         config.setUzcardRail(current.getUzcardRail() != null ? current.getUzcardRail() : DEFAULT_UZCARD_RAIL);
-        config.setHumoLegacyDualCheckEnd(current.getHumoLegacyDualCheckEnd());
+        config.setHumoLegacyDualCheckEnd(null);
         config.setLotteryCooldownSeconds(current.getLotteryCooldownSeconds());
         config.setWalletMinWithdrawAmount(current.getWalletMinWithdrawAmount());
         config.setWalletWithdrawRatio(current.getWalletWithdrawRatio());
