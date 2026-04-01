@@ -2,6 +2,7 @@ package com.example.shade.bot;
 
 import com.example.shade.model.AdminCard;
 import com.example.shade.model.OsonConfig;
+import com.example.shade.model.PaymentSystem;
 import com.example.shade.model.Platform;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -82,6 +83,7 @@ public class AdminBotMessageSender {
         rows.add(createRow("💳 Hamyon yoq/o'chir", "toggle_wallet"));
         rows.add(createRow("📊 Bonus Limiti yoq/o'chir", "toggle_bonus_limit"));
         rows.add(createRow("🟩 HUMO yoq/o'chir", "toggle_humo"));
+        rows.add(createRow("🔀 UZ tekshiruv (Oson/CardXabar)", "features_uz_rail"));
         rows.add(createRow("🔙 Ortga", "main_menu"));
 
         keyboard.setKeyboard(rows);
@@ -91,6 +93,28 @@ public class AdminBotMessageSender {
             shadePaymentBot.execute(message);
         } catch (TelegramApiException e) {
             log.error("Error sending features menu", e);
+        }
+    }
+
+    /** Global system UZ mode (not per-card). Callbacks: {@code config_set_uz_rail_OSON}, {@code CARDXABAR}, {@code OFF}. */
+    public void sendUzRailConfigMenu(Long chatId, String currentMode) {
+        SendMessage message = new SendMessage();
+        message.setChatId(chatId.toString());
+        message.setText("🔀 UZ to'lovlari (global)\n\nHozirgi rejim: " + currentMode + "\n\nTanlang:");
+
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        rows.add(createRow("Oson API", "config_set_uz_rail_OSON"));
+        rows.add(createRow("CardXabar (2806)", "config_set_uz_rail_CARDXABAR"));
+        rows.add(createRow("UZ o'chiq (Oson+CardXabar)", "config_set_uz_rail_OFF"));
+        rows.add(createRow("🔙 Funksiyalar", "features_menu"));
+        keyboard.setKeyboard(rows);
+        message.setReplyMarkup(keyboard);
+
+        try {
+            shadePaymentBot.execute(message);
+        } catch (TelegramApiException e) {
+            log.error("Error sending uz rail config menu", e);
         }
     }
 
@@ -130,6 +154,9 @@ public class AdminBotMessageSender {
             text.append("👤 Egasi: ").append(card.getOwnerName()).append("\n");
             text.append("💰 Balans: ").append(formatBalance(card.getBalance())).append("\n");
             text.append("🏦 To'lov tizimi: ").append(card.getPaymentSystem()).append("\n");
+            if (card.getPaymentSystem() == PaymentSystem.UZCARD && card.getUzcardRail() != null) {
+                text.append("🔀 UZ tekshiruv: ").append(card.getUzcardRail()).append("\n");
+            }
             text.append("⚙️ OsonConfig: ").append(card.getOsonConfig().getPhone()).append("\n");
             if (card.getLastUsed() != null) {
                 text.append("🕐 Oxirgi foydalanish: ").append(card.getLastUsed().format(DATE_FORMATTER)).append("\n");
@@ -147,6 +174,9 @@ public class AdminBotMessageSender {
         text.append("👤 Egasi: ").append(card.getOwnerName()).append("\n");
         text.append("💰 Balans: ").append(formatBalance(card.getBalance())).append("\n");
         text.append("🏦 To'lov tizimi: ").append(card.getPaymentSystem()).append("\n");
+        if (card.getPaymentSystem() == PaymentSystem.UZCARD && card.getUzcardRail() != null) {
+            text.append("🔀 UZ tekshiruv: ").append(card.getUzcardRail()).append("\n");
+        }
         text.append("⚙️ OsonConfig: ").append(card.getOsonConfig().getPhone()).append("\n");
         if (card.getLastUsed() != null) {
             text.append("🕐 Oxirgi foydalanish: ").append(card.getLastUsed().format(DATE_FORMATTER)).append("\n");
@@ -197,6 +227,29 @@ public class AdminBotMessageSender {
             shadePaymentBot.execute(message);
         } catch (TelegramApiException e) {
             log.error("Error sending payment system selection", e);
+        }
+    }
+
+    /**
+     * @param forUpdate if true, callback data uses prefix {@code card_update_uz_rail_} for edit flow
+     */
+    public void sendUzcardRailSelection(Long chatId, boolean forUpdate) {
+        SendMessage message = new SendMessage();
+        message.setChatId(chatId.toString());
+        message.setText("🔀 UZCARD tekshiruv yo'lini tanlang (Oson yoki CardXabar):");
+
+        String prefix = forUpdate ? "card_update_uz_rail_" : "card_uz_rail_";
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        rows.add(createRow("Oson API", prefix + "OSON"));
+        rows.add(createRow("CardXabar (2805)", prefix + "CARDXABAR"));
+        keyboard.setKeyboard(rows);
+        message.setReplyMarkup(keyboard);
+
+        try {
+            shadePaymentBot.execute(message);
+        } catch (TelegramApiException e) {
+            log.error("Error sending uzcard rail selection", e);
         }
     }
 

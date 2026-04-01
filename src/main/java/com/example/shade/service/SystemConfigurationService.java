@@ -224,6 +224,22 @@ public class SystemConfigurationService {
     }
 
     /**
+     * Sets global UZ top-up mode (Oson / CardXabar / off). New config row for history.
+     */
+    @Transactional
+    public void setUzcardRail(UzcardRail rail) {
+        if (rail == null) {
+            rail = DEFAULT_UZCARD_RAIL;
+        }
+        SystemConfiguration current = getConfiguration();
+        SystemConfiguration config = copyConfig(current);
+        config.setUzcardRail(rail);
+        config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
+        configurationRepository.save(config);
+        logger.info("UZCARD rail set to {}", rail);
+    }
+
+    /**
      * Updates only the wallet withdraw ratio by creating a new config row (history preserved).
      * Does not modify the managed entity, so no Hibernate "identifier altered" error.
      */

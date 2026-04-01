@@ -150,6 +150,7 @@ topup.message.confirm_payment=Iltimos, to‘lovni tasdiqlash uchun 'Tasdiqlash' 
 topup.message.tickets_received=Siz %d ta lotereya chiptasi oldingiz!
 topup.message.transfer_failure=✳️ *Sizning almashuv buyurtmangiz:*\n\n🆔 *ID:* `%d`\n📤 *Berish:* `%,d UZS`\n📥 *Olish:* `%,d UZS`\n🌐 #*%s:* `%s`\n📅 *Sana:* `%s`\n\n⌛️ *Buyurtmangiz tekshiruvga yuborildi!*
 topup.message.no_uzcard_available=UZCARD kartalar hozircha mavjud emas. Iltimos, keyinroq urinib ko'ring.
+topup.message.no_payment_method_available=Hozircha to'lov kartalari mavjud emas (HUMO o'chiq yoki UZ tekshiruv o'chiq). Keyinroq urinib ko'ring yoki administrator bilan bog'laning.
 
 topup.button.back=🔙 Orqaga
 topup.button.home=🏠 Bosh sahifa

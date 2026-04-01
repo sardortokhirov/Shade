@@ -1,6 +1,7 @@
 package com.example.shade.bot;
 
 import com.example.shade.model.Platform;
+import com.example.shade.model.UzcardRail;
 import com.example.shade.service.AdminBotService;
 import com.example.shade.service.CallbackDeduplicationService;
 import lombok.RequiredArgsConstructor;
@@ -122,6 +123,35 @@ public class ShadeAdminUpdateHandler {
             case "toggle_wallet" -> adminBotService.toggleWallet(chatId);
             case "toggle_bonus_limit" -> adminBotService.toggleBonusLimit(chatId);
             case "toggle_humo" -> adminBotService.toggleHumo(chatId);
+            case "features_uz_rail" -> adminBotService.openUzRailConfigMenu(chatId);
+            case "config_set_uz_rail_OSON" -> adminBotService.setGlobalUzcardRail(chatId, UzcardRail.OSON);
+            case "config_set_uz_rail_CARDXABAR" -> adminBotService.setGlobalUzcardRail(chatId, UzcardRail.CARDXABAR);
+            case "config_set_uz_rail_OFF" -> adminBotService.setGlobalUzcardRail(chatId, UzcardRail.OFF);
+
+            case "card_uz_rail_OSON" -> {
+                Map<String, Object> context = userContext.computeIfAbsent(chatId, k -> new HashMap<>());
+                context.put("uzcardRail", "OSON");
+                userStates.put(chatId, BotState.WAITING_CARD_OSON_ID);
+                adminBotService.requestInput(chatId, "OsonConfig ID sini kiriting:");
+            }
+            case "card_uz_rail_CARDXABAR" -> {
+                Map<String, Object> context = userContext.computeIfAbsent(chatId, k -> new HashMap<>());
+                context.put("uzcardRail", "CARDXABAR");
+                userStates.put(chatId, BotState.WAITING_CARD_OSON_ID);
+                adminBotService.requestInput(chatId, "OsonConfig ID sini kiriting:");
+            }
+            case "card_update_uz_rail_OSON" -> {
+                Map<String, Object> context = userContext.computeIfAbsent(chatId, k -> new HashMap<>());
+                context.put("uzcardRail", "OSON");
+                userStates.put(chatId, BotState.WAITING_CARD_UPDATE_OWNER);
+                adminBotService.requestInput(chatId, "Yangi egasi nomini kiriting:");
+            }
+            case "card_update_uz_rail_CARDXABAR" -> {
+                Map<String, Object> context = userContext.computeIfAbsent(chatId, k -> new HashMap<>());
+                context.put("uzcardRail", "CARDXABAR");
+                userStates.put(chatId, BotState.WAITING_CARD_UPDATE_OWNER);
+                adminBotService.requestInput(chatId, "Yangi egasi nomini kiriting:");
+            }
 
             // Admin Cards
             case "cards_menu" -> adminBotService.sendCardsMenu(chatId);
@@ -293,10 +323,15 @@ public class ShadeAdminUpdateHandler {
                     adminBotService.getCardsByOsonConfig(chatId, osonId);
                 } else if (data.startsWith("card_payment_")) {
                     String paymentSystem = data.replace("card_payment_", "");
-                    Map<String, Object> context = userContext.get(chatId);
+                    Map<String, Object> context = userContext.computeIfAbsent(chatId, k -> new HashMap<>());
                     context.put("paymentSystem", paymentSystem);
-                    userStates.put(chatId, BotState.WAITING_CARD_OSON_ID);
-                    adminBotService.requestInput(chatId, "OsonConfig ID sini kiriting:");
+                    if ("UZCARD".equals(paymentSystem)) {
+                        adminBotMessageSender.sendUzcardRailSelection(chatId, false);
+                        userStates.put(chatId, BotState.WAITING_CARD_UZ_RAIL);
+                    } else {
+                        userStates.put(chatId, BotState.WAITING_CARD_OSON_ID);
+                        adminBotService.requestInput(chatId, "OsonConfig ID sini kiriting:");
+                    }
                 }
             }
         }
@@ -329,6 +364,9 @@ public class ShadeAdminUpdateHandler {
             case WAITING_CARD_PAYMENT_SYSTEM -> {
                 adminBotService.requestInput(chatId, "Iltimos, quyidagi tugmalardan to'lov tizimini tanlang.");
             }
+            case WAITING_CARD_UZ_RAIL -> {
+                adminBotService.requestInput(chatId, "Iltimos, Oson yoki CardXabar tugmasini bosing.");
+            }
             case WAITING_CARD_OSON_ID -> {
                 context.put("osonConfigId", text);
                 userContext.put(chatId, context);
@@ -343,8 +381,21 @@ public class ShadeAdminUpdateHandler {
             }
             case WAITING_CARD_UPDATE_NUMBER -> {
                 context.put("cardNumber", text);
-                userStates.put(chatId, BotState.WAITING_CARD_UPDATE_OWNER);
-                adminBotService.requestInput(chatId, "Yangi egasi nomini kiriting:");
+                try {
+                    Long cardId = Long.parseLong((String) context.get("updateCardId"));
+                    if (adminBotService.isUzcardCard(cardId)) {
+                        adminBotMessageSender.sendUzcardRailSelection(chatId, true);
+                        userStates.put(chatId, BotState.WAITING_CARD_UPDATE_RAIL);
+                    } else {
+                        userStates.put(chatId, BotState.WAITING_CARD_UPDATE_OWNER);
+                        adminBotService.requestInput(chatId, "Yangi egasi nomini kiriting:");
+                    }
+                } catch (NumberFormatException e) {
+                    adminBotService.requestInput(chatId, "❌ Karta ID noto'g'ri.");
+                }
+            }
+            case WAITING_CARD_UPDATE_RAIL -> {
+                adminBotService.requestInput(chatId, "Iltimos, Oson yoki CardXabar tugmasini bosing.");
             }
             case WAITING_CARD_UPDATE_OWNER -> {
                 context.put("ownerName", text);
@@ -652,9 +703,11 @@ public class ShadeAdminUpdateHandler {
         WAITING_CARD_OWNER,
         WAITING_CARD_BALANCE,
         WAITING_CARD_PAYMENT_SYSTEM,
+        WAITING_CARD_UZ_RAIL,
         WAITING_CARD_OSON_ID,
         WAITING_CARD_UPDATE_ID,
         WAITING_CARD_UPDATE_NUMBER,
+        WAITING_CARD_UPDATE_RAIL,
         WAITING_CARD_UPDATE_OWNER,
         WAITING_CARD_UPDATE_BALANCE,
         WAITING_CARD_DELETE_ID,

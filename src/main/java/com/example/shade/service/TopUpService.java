@@ -650,26 +650,16 @@ public class TopUpService {
             adminCard = adminCardRepository.findById(request.getAdminCardId())
                     .orElseThrow(() -> new IllegalStateException("Admin card not found: " + request.getAdminCardId()));
         } else {
-            // Check HUMO toggle setting
-            if (!configurationService.getHumoEnabled()) {
-                // Try to get UZCARD card first
-                Optional<AdminCard> uzcardCard = adminCardRepository
-                        .findLeastRecentlyUsedByPaymentSystem(PaymentSystem.UZCARD);
-                if (uzcardCard.isPresent()) {
-                    adminCard = uzcardCard.get();
-                } else {
-                    // No UZCARD available and HUMO is disabled - show error to user
-                    logger.warn("No UZCARD cards available for chatId {} when HUMO is disabled", chatId);
-                    messageSender.sendMessage(chatId,
-                            languageSessionService.getTranslation(chatId, "topup.message.no_uzcard_available"));
-                    sendMainMenu(chatId);
-                    return;
-                }
-            } else {
-                // Normal behavior - get any card
-                adminCard = adminCardRepository.findLeastRecentlyUsed()
-                        .orElseThrow(() -> new IllegalStateException("No admin cards available"));
+            Optional<AdminCard> picked = pickLeastRecentlyUsedTopUpAdminCard();
+            if (picked.isEmpty()) {
+                logger.warn("No eligible admin card for chatId {} (humoEnabled={}, uzcardRail={})",
+                        chatId, configurationService.getHumoEnabled(), configurationService.getUzcardRail());
+                messageSender.sendMessage(chatId,
+                        languageSessionService.getTranslation(chatId, "topup.message.no_payment_method_available"));
+                sendMainMenu(chatId);
+                return;
             }
+            adminCard = picked.get();
             request.setAdminCardId(adminCard.getId());
             adminCard.setLastUsed(LocalDateTime.now(ZoneId.of("GMT+5")));
             adminCardRepository.save(adminCard);
@@ -806,13 +796,16 @@ public class TopUpService {
                 .longValue();
         try {
             if (adminCard.getPaymentSystem().equals(PaymentSystem.UZCARD)) {
-                if (configurationService.getUzcardRail() == UzcardRail.OSON) {
+                UzcardRail uzMode = configurationService.getUzcardRail();
+                if (uzMode == UzcardRail.OFF) {
+                    logger.warn("UZ verify skipped for adminCard {}: global uzcardRail is OFF", adminCard.getId());
+                } else if (uzMode == UzcardRail.OSON) {
                     String userCard = request.getCardNumber() != null ? request.getCardNumber() : "";
                     statusResponse = osonService.verifyPaymentByAmountAndCard(
                             chatId, request.getPlatform(), request.getPlatformUserId(),
                             request.getAmount(), userCard, adminCard.getCardNumber(),
                             request.getUniqueAmount());
-                } else {
+                } else if (uzMode == UzcardRail.CARDXABAR) {
                     try {
                         Thread.sleep(2000);
                         response = humoService.verifyCardXabarOnly(request.getUniqueAmount());
@@ -820,6 +813,8 @@ public class TopUpService {
                         Thread.currentThread().interrupt();
                         response = false;
                     }
+                } else {
+                    logger.warn("Unexpected uzcardRail {} for UZ verify", uzMode);
                 }
             } else {
                 try {
@@ -2113,6 +2108,50 @@ public class TopUpService {
             grouped.append(combined.charAt(i));
         }
         return grouped.toString();
+    }
+
+    /**
+     * Primary Oson pool cards eligible under {@code humoEnabled} and global {@link UzcardRail}
+     * ({@link UzcardRail#OFF} excludes all UZCARD from rotation). LRU matches legacy
+     * {@code findLeastRecentlyUsed} semantics.
+     */
+    private Optional<AdminCard> pickLeastRecentlyUsedTopUpAdminCard() {
+        boolean humoEnabled = configurationService.getHumoEnabled();
+        UzcardRail uzMode = configurationService.getUzcardRail();
+        boolean uzOn = uzMode != UzcardRail.OFF;
+        List<AdminCard> primary = adminCardRepository.findAllByOsonConfigPrimaryConfigTrue();
+        List<AdminCard> eligible = primary.stream()
+                .filter(a -> {
+                    if (a.getPaymentSystem() == PaymentSystem.HUMO) {
+                        return humoEnabled;
+                    }
+                    if (a.getPaymentSystem() == PaymentSystem.UZCARD) {
+                        return uzOn && uzMode.equals(a.getUzcardRail());
+                    }
+                    return false;
+                })
+                .collect(Collectors.toList());
+        if (eligible.isEmpty()) {
+            return Optional.empty();
+        }
+        Optional<LocalDateTime> minNonNull = eligible.stream()
+                .map(AdminCard::getLastUsed)
+                .filter(Objects::nonNull)
+                .min(Comparator.naturalOrder());
+        List<AdminCard> tiedForMin;
+        if (minNonNull.isEmpty()) {
+            tiedForMin = eligible.stream()
+                    .filter(a -> a.getLastUsed() == null)
+                    .collect(Collectors.toList());
+        } else {
+            LocalDateTime m = minNonNull.get();
+            tiedForMin = eligible.stream()
+                    .filter(a -> m.equals(a.getLastUsed()))
+                    .collect(Collectors.toList());
+        }
+        List<AdminCard> candidates = tiedForMin.isEmpty() ? eligible : tiedForMin;
+        return candidates.stream()
+                .max(Comparator.comparing(AdminCard::getLastUsed, Comparator.nullsFirst(Comparator.naturalOrder())));
     }
 
     private void sendPlatformSelection(Long chatId) {

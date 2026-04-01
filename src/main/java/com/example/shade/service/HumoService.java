@@ -23,7 +23,7 @@ public class HumoService {
     private final RestTemplate restTemplate  = new RestTemplate();
 
     public ResponseEntity<Object> forwardRequest(String path, HttpMethod method, HttpServletRequest request) {
-        String targetUrl = "http://localhost:2806" + path;
+        String targetUrl = "http://localhost:2805" + path;
         HttpHeaders headers = new HttpHeaders();
         Enumeration<String> headerNames = request.getHeaderNames();
         while (headerNames.hasMoreElements()) {
@@ -56,7 +56,7 @@ public class HumoService {
     }
 
     /**
-     * Legacy: CardXabar on 2806 first, then HUMO bot (used for HUMO cards until legacy cutover).
+     * Legacy: CardXabar on 2805 first, then HUMO bot (used for HUMO cards until legacy cutover).
      */
     public boolean verifyPaymentAmount(Long uniqueAmount) {
         if (verifyCardXabarOnly(uniqueAmount)) {
@@ -74,7 +74,7 @@ public class HumoService {
     }
 
     private boolean checkBotTransactions(Long amount, String sourceBot) {
-        String targetUrl = "http://localhost:2806/last_transactions?amount=" + amount + "&source_bot=" + sourceBot;
+        String targetUrl = "http://localhost:2805/last_transactions?amount=" + amount + "&source_bot=" + sourceBot;
         try {
             ResponseEntity<Map> response = restTemplate.getForEntity(targetUrl, Map.class);
             Map<String, Object> body = response.getBody();

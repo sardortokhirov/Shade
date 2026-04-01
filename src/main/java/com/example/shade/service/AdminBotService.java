@@ -7,6 +7,7 @@ import com.example.shade.model.Currency;
 import com.example.shade.model.LotteryPrize;
 import com.example.shade.model.OsonConfig;
 import com.example.shade.model.PaymentSystem;
+import com.example.shade.model.UzcardRail;
 import com.example.shade.model.Platform;
 import com.example.shade.model.User;
 import com.example.shade.model.UserBalance;
@@ -15,7 +16,6 @@ import com.example.shade.repository.LotteryPrizeRepository;
 import com.example.shade.repository.OsonConfigRepository;
 import com.example.shade.repository.PlatformRepository;
 import com.example.shade.repository.UserRepository;
-import com.example.shade.service.SystemConfigurationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -48,6 +48,7 @@ public class AdminBotService {
     private final FeatureService featureService;
     private final SystemConfigurationService systemConfigurationService;
     private final AdminCardRepository adminCardRepository;
+    private final AdminCardService adminCardService;
     private final OsonConfigRepository osonConfigRepository;
     private final PlatformRepository platformRepository;
     private final ExchangeRateService exchangeRateService;
@@ -148,6 +149,33 @@ public class AdminBotService {
         }
     }
 
+    public void openUzRailConfigMenu(Long chatId) {
+        UzcardRail r = systemConfigurationService.getUzcardRail();
+        String label = switch (r) {
+            case OSON -> "Oson API";
+            case CARDXABAR -> "CardXabar";
+            case OFF -> "O'chiq";
+        };
+        messageSender.sendUzRailConfigMenu(chatId, label);
+    }
+
+    @Transactional
+    public void setGlobalUzcardRail(Long chatId, UzcardRail rail) {
+        try {
+            systemConfigurationService.setUzcardRail(rail);
+            String label = switch (rail) {
+                case OSON -> "Oson API";
+                case CARDXABAR -> "CardXabar";
+                case OFF -> "O'chiq (UZ kartalar berilmaydi)";
+            };
+            messageSender.sendTextMessage(chatId, "✅ UZ global rejim: " + label);
+            messageSender.sendFeaturesMenu(chatId);
+        } catch (Exception e) {
+            log.error("Error setting uzcard rail", e);
+            messageSender.sendTextMessage(chatId, "❌ Xatolik: " + e.getMessage());
+        }
+    }
+
     @Transactional
     public void toggleHumo(Long chatId) {
         try {
@@ -213,6 +241,12 @@ public class AdminBotService {
         }
     }
 
+    public boolean isUzcardCard(Long cardId) {
+        return adminCardRepository.findById(cardId)
+                .map(c -> c.getPaymentSystem() == PaymentSystem.UZCARD)
+                .orElse(false);
+    }
+
     public void getCardById(Long chatId, String cardIdStr) {
         try {
             Long cardId = Long.parseLong(cardIdStr);
@@ -253,8 +287,16 @@ public class AdminBotService {
             card.setBalance(balance);
             card.setOsonConfig(osonConfig);
             card.setPaymentSystem(paymentSystem);
+            if (paymentSystem == PaymentSystem.UZCARD) {
+                String railStr = (String) context.get("uzcardRail");
+                if (railStr != null) {
+                    card.setUzcardRail(UzcardRail.valueOf(railStr));
+                }
+            }
             card.setLastUsed(LocalDateTime.now(ZoneId.of("GMT+5")));
 
+            adminCardService.prepareForSave(card);
+            adminCardService.assertUnique(card, null);
             adminCardRepository.save(card);
             messageSender.sendTextMessage(chatId, "✅ Karta muvaffaqiyatli qo'shildi!\nID: " + card.getId());
             sendCardsMenu(chatId);
@@ -278,7 +320,15 @@ public class AdminBotService {
             card.setCardNumber(cardNumber);
             card.setOwnerName(ownerName);
             card.setBalance(balance);
+            if (card.getPaymentSystem() == PaymentSystem.UZCARD) {
+                String railStr = (String) context.get("uzcardRail");
+                if (railStr != null) {
+                    card.setUzcardRail(UzcardRail.valueOf(railStr));
+                }
+            }
 
+            adminCardService.prepareForSave(card);
+            adminCardService.assertUnique(card, card.getId());
             adminCardRepository.save(card);
             messageSender.sendTextMessage(chatId, "✅ Karta muvaffaqiyatli yangilandi!");
             sendCardsMenu(chatId);

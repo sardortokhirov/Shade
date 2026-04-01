@@ -63,8 +63,8 @@ public class SystemConfiguration {
     private Boolean humoEnabled = true;
 
     /**
-     * Verification path for {@link PaymentSystem#UZCARD} cards (same PAN pool).
-     * Nullable in DB so Hibernate can add the column to existing rows (null = treat as OSON in code).
+     * Global UZ top-up mode: Oson lane, CardXabar lane, or off (no UZ cards in rotation).
+     * Nullable in DB (null = treat as OSON in {@link #normalizeUzcardRailDefault}).
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "uzcard_rail", length = 32)
@@ -72,7 +72,7 @@ public class SystemConfiguration {
 
     /**
      * When null: HUMO cards use legacy CardXabar-then-HUMO check (current production default).
-     * When set: dual check applies only while {@code now() < this instant}; after that, HUMO-only on 2806.
+     * When set: dual check applies only while {@code now() < this instant}; after that, HUMO-only on 2805.
      */
     @Column(name = "humo_legacy_dual_check_end")
     private Instant humoLegacyDualCheckEnd;

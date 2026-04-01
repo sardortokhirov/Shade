@@ -3,6 +3,7 @@ package com.example.shade.controller;
 import com.example.shade.model.AdminCard;
 import com.example.shade.repository.AdminCardRepository;
 import com.example.shade.repository.OsonConfigRepository;
+import com.example.shade.service.AdminCardService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,6 +26,7 @@ public class AdminCardController {
     private static final Logger logger = LoggerFactory.getLogger(AdminCardController.class);
     private final AdminCardRepository adminCardRepository;
     private final OsonConfigRepository osonConfigRepository;
+    private final AdminCardService adminCardService;
 
     private boolean authenticate(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
@@ -100,8 +102,14 @@ public class AdminCardController {
         }
         return osonConfigRepository.findById(osonConfigId)
                 .map(osonConfig -> {
-                    card.setCardNumber(card.getCardNumber().replaceAll("\\s+", ""));
                     card.setOsonConfig(osonConfig);
+                    try {
+                        adminCardService.prepareForSave(card);
+                        adminCardService.assertUnique(card, null);
+                    } catch (IllegalStateException e) {
+                        logger.warn("Duplicate admin card: {}", e.getMessage());
+                        return ResponseEntity.status(HttpStatus.CONFLICT).<AdminCard>body(null);
+                    }
                     logger.info("Adding new admin card for OsonConfig ID: {}: {}", osonConfigId, card.getCardNumber());
                     AdminCard savedCard = adminCardRepository.save(card);
                     return ResponseEntity.ok(savedCard);
@@ -131,9 +139,19 @@ public class AdminCardController {
                     if (card.getPaymentSystem() != null) {
                         existing.setPaymentSystem(card.getPaymentSystem());
                     }
+                    if (card.getUzcardRail() != null) {
+                        existing.setUzcardRail(card.getUzcardRail());
+                    }
                     if (card.getOsonConfig() != null && card.getOsonConfig().getId() != null) {
                         osonConfigRepository.findById(card.getOsonConfig().getId())
                                 .ifPresent(existing::setOsonConfig);
+                    }
+                    try {
+                        adminCardService.prepareForSave(existing);
+                        adminCardService.assertUnique(existing, existing.getId());
+                    } catch (IllegalStateException e) {
+                        logger.warn("Duplicate admin card on update: {}", e.getMessage());
+                        return ResponseEntity.status(HttpStatus.CONFLICT).<AdminCard>body(null);
                     }
                     logger.info("Updating card ID: {}, new card number: {}", id, card.getCardNumber());
                     return ResponseEntity.ok(adminCardRepository.save(existing));
