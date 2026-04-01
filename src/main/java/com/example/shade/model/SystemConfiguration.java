@@ -60,8 +60,12 @@ public class SystemConfiguration {
     @JsonSerialize(using = BigDecimalPlainSerializer.class)
     private BigDecimal depositDailyLimitIncreasePercentage = BigDecimal.ZERO;
 
+    /**
+     * No Java default — Jackson must deserialize null when {@code humoEnabled} is absent from JSON,
+     * so {@link com.example.shade.service.SystemConfigurationService#updateConfiguration} can keep the DB value.
+     */
     @Column(name = "humo_enabled", nullable = false)
-    private Boolean humoEnabled = true;
+    private Boolean humoEnabled;
 
     /**
      * Global UZ top-up mode: Oson lane, CardXabar lane, or off (no UZ cards in rotation).

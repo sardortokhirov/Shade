@@ -45,7 +45,7 @@ public class SystemConfigurationService {
 
     @Transactional
     public SystemConfiguration getConfiguration() {
-        return configurationRepository.findLatest()
+        return configurationRepository.findFirstByOrderByCreatedAtDesc()
                 .orElseGet(() -> {
                     SystemConfiguration config = new SystemConfiguration();
                     config.setTopUpMinAmount(DEFAULT_TOP_UP_MIN);
@@ -74,6 +74,13 @@ public class SystemConfigurationService {
 
     @Transactional
     public SystemConfiguration updateConfiguration(SystemConfiguration config) {
+        if (config.getHumoEnabled() == null) {
+            config.setHumoEnabled(
+                    configurationRepository
+                            .findFirstByOrderByCreatedAtDesc()
+                            .map(c -> c.getHumoEnabled() != null ? c.getHumoEnabled() : DEFAULT_HUMO_ENABLED)
+                            .orElse(DEFAULT_HUMO_ENABLED));
+        }
         if (config.getUzcardRail() == null) {
             config.setUzcardRail(DEFAULT_UZCARD_RAIL);
         }
@@ -293,7 +300,8 @@ public class SystemConfigurationService {
         config.setDailyBonusTransferLimit(current.getDailyBonusTransferLimit());
         config.setTopUpDailyLimitIncreasePercentage(current.getTopUpDailyLimitIncreasePercentage());
         config.setDepositDailyLimitIncreasePercentage(current.getDepositDailyLimitIncreasePercentage());
-        config.setHumoEnabled(current.getHumoEnabled());
+        config.setHumoEnabled(
+                current.getHumoEnabled() != null ? current.getHumoEnabled() : DEFAULT_HUMO_ENABLED);
         config.setUzcardRail(current.getUzcardRail() != null ? current.getUzcardRail() : DEFAULT_UZCARD_RAIL);
         config.setHumoLegacyDualCheckEnd(null);
         config.setLotteryCooldownSeconds(current.getLotteryCooldownSeconds());
