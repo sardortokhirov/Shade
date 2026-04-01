@@ -759,6 +759,28 @@ public class TopUpService {
             return;
         }
 
+        if (pendingPaymentMessageRepository.existsByChatIdAndHizmatRequestIdAndBlurredTrue(chatId, request.getId())) {
+            logger.info("Confirm after blurred payment instruction for chatId {} request {} — skipping API verify, screenshot flow",
+                    chatId, request.getId());
+            AdminCard adminCardBlur = adminCardRepository.findById(request.getAdminCardId()).orElse(null);
+            if (adminCardBlur == null) {
+                logger.error("Post-blur confirm: admin card not found for request {}", request.getId());
+                sessionService.clearMessageIds(chatId);
+                messageSender.sendMessage(chatId,
+                        languageSessionService.getTranslation(chatId, "topup.message.request_not_found"));
+                sendMainMenu(chatId);
+                return;
+            }
+            ExchangeRate latestBlur = exchangeRateRepository.findLatest()
+                    .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
+            long rubAmountBlur = BigDecimal.valueOf(request.getUniqueAmount())
+                    .multiply(latestBlur.getUzsToRub())
+                    .divide(BigDecimal.valueOf(1000), 0, RoundingMode.HALF_UP)
+                    .longValue();
+            sendTopupScreenshotFlow(chatId, request, adminCardBlur, rubAmountBlur, null);
+            return;
+        }
+
         int attempts = Integer.parseInt(sessionService.getUserData(chatId, PAYMENT_ATTEMPTS_KEY, "0"));
         attempts++;
         sessionService.setUserData(chatId, PAYMENT_ATTEMPTS_KEY, String.valueOf(attempts));

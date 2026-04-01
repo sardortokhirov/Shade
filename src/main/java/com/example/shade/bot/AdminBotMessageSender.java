@@ -105,7 +105,7 @@ public class AdminBotMessageSender {
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         rows.add(createRow("Oson API", "config_set_uz_rail_OSON"));
-        rows.add(createRow("CardXabar (2806)", "config_set_uz_rail_CARDXABAR"));
+        rows.add(createRow("CardXabar (2805)", "config_set_uz_rail_CARDXABAR"));
         rows.add(createRow("UZ o'chiq (Oson+CardXabar)", "config_set_uz_rail_OFF"));
         rows.add(createRow("🔙 Funksiyalar", "features_menu"));
         keyboard.setKeyboard(rows);

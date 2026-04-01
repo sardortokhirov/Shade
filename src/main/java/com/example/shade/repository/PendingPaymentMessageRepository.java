@@ -8,5 +8,7 @@ import java.util.List;
 
 public interface PendingPaymentMessageRepository extends JpaRepository<PendingPaymentMessage, Long> {
     List<PendingPaymentMessage> findByBlurredFalseAndCreatedAtBefore(LocalDateTime before);
+
+    boolean existsByChatIdAndHizmatRequestIdAndBlurredTrue(Long chatId, Long hizmatRequestId);
 }
 
