@@ -1,6 +1,7 @@
 package com.example.shade.service;
 
 import com.example.shade.model.SystemConfiguration;
+import com.example.shade.model.UzcardRail;
 import com.example.shade.repository.SystemConfigurationRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -9,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 
@@ -35,6 +37,7 @@ public class SystemConfigurationService {
     private static final BigDecimal DEFAULT_TOP_UP_DAILY_LIMIT_INCREASE_PERCENTAGE = BigDecimal.ZERO;
     private static final BigDecimal DEFAULT_DEPOSIT_DAILY_LIMIT_INCREASE_PERCENTAGE = BigDecimal.ZERO;
     private static final Boolean DEFAULT_HUMO_ENABLED = true;
+    private static final UzcardRail DEFAULT_UZCARD_RAIL = UzcardRail.OSON;
     private static final Long DEFAULT_LOTTERY_COOLDOWN_SECONDS = 300L;
     private static final Long DEFAULT_WALLET_MIN_WITHDRAW_AMOUNT = 10_000L;
     private static final Long DEFAULT_WALLET_WITHDRAW_RATIO = 10L;
@@ -59,6 +62,8 @@ public class SystemConfigurationService {
                     config.setTopUpDailyLimitIncreasePercentage(DEFAULT_TOP_UP_DAILY_LIMIT_INCREASE_PERCENTAGE);
                     config.setDepositDailyLimitIncreasePercentage(DEFAULT_DEPOSIT_DAILY_LIMIT_INCREASE_PERCENTAGE);
                     config.setHumoEnabled(DEFAULT_HUMO_ENABLED);
+                    config.setUzcardRail(DEFAULT_UZCARD_RAIL);
+                    config.setHumoLegacyDualCheckEnd(null);
                     config.setLotteryCooldownSeconds(DEFAULT_LOTTERY_COOLDOWN_SECONDS);
                     config.setWalletMinWithdrawAmount(DEFAULT_WALLET_MIN_WITHDRAW_AMOUNT);
                     config.setWalletTransferMinAmount(DEFAULT_WALLET_TRANSFER_MIN);
@@ -70,6 +75,9 @@ public class SystemConfigurationService {
 
     @Transactional
     public SystemConfiguration updateConfiguration(SystemConfiguration config) {
+        if (config.getUzcardRail() == null) {
+            config.setUzcardRail(DEFAULT_UZCARD_RAIL);
+        }
         config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
         SystemConfiguration saved = configurationRepository.save(config);
         logger.info("System configuration updated: {}", saved.getId());
@@ -151,6 +159,23 @@ public class SystemConfigurationService {
     public Boolean getHumoEnabled() {
         SystemConfiguration config = getConfiguration();
         return config.getHumoEnabled() != null ? config.getHumoEnabled() : DEFAULT_HUMO_ENABLED;
+    }
+
+    public UzcardRail getUzcardRail() {
+        SystemConfiguration config = getConfiguration();
+        return config.getUzcardRail() != null ? config.getUzcardRail() : DEFAULT_UZCARD_RAIL;
+    }
+
+    /**
+     * When true, HUMO cards use legacy CardXabar-then-HUMO verification (null end date, or now before end).
+     */
+    public boolean useHumoLegacyDualCheck() {
+        SystemConfiguration config = getConfiguration();
+        Instant end = config.getHumoLegacyDualCheckEnd();
+        if (end == null) {
+            return true;
+        }
+        return Instant.now().isBefore(end);
     }
 
     public Long getLotteryCooldownSeconds() {
@@ -265,6 +290,8 @@ public class SystemConfigurationService {
         config.setTopUpDailyLimitIncreasePercentage(current.getTopUpDailyLimitIncreasePercentage());
         config.setDepositDailyLimitIncreasePercentage(current.getDepositDailyLimitIncreasePercentage());
         config.setHumoEnabled(current.getHumoEnabled());
+        config.setUzcardRail(current.getUzcardRail() != null ? current.getUzcardRail() : DEFAULT_UZCARD_RAIL);
+        config.setHumoLegacyDualCheckEnd(current.getHumoLegacyDualCheckEnd());
         config.setLotteryCooldownSeconds(current.getLotteryCooldownSeconds());
         config.setWalletMinWithdrawAmount(current.getWalletMinWithdrawAmount());
         config.setWalletWithdrawRatio(current.getWalletWithdrawRatio());

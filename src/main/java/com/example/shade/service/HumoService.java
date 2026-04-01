@@ -1,8 +1,6 @@
 package com.example.shade.service;
 
 import jakarta.servlet.http.HttpServletRequest;
-import lombok.AllArgsConstructor;
-import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
@@ -57,14 +55,21 @@ public class HumoService {
         }
     }
 
+    /**
+     * Legacy: CardXabar on 2806 first, then HUMO bot (used for HUMO cards until legacy cutover).
+     */
     public boolean verifyPaymentAmount(Long uniqueAmount) {
-        // Check CardXabar first
-        boolean cardXabarFound = checkBotTransactions(uniqueAmount, "CardXabar");
-        if (cardXabarFound) {
+        if (verifyCardXabarOnly(uniqueAmount)) {
             return true;
         }
+        return verifyHumoOnly(uniqueAmount);
+    }
 
-        // Check HUMO as fallback
+    public boolean verifyCardXabarOnly(Long uniqueAmount) {
+        return checkBotTransactions(uniqueAmount, "CardXabar");
+    }
+
+    public boolean verifyHumoOnly(Long uniqueAmount) {
         return checkBotTransactions(uniqueAmount, "HUMO");
     }
 

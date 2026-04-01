@@ -6,6 +6,7 @@ import com.example.shade.dto.WalletUserIdValidationResult;
 import com.example.shade.model.*;
 import com.example.shade.model.Currency;
 import com.example.shade.model.PaymentSystem;
+import com.example.shade.model.UzcardRail;
 import com.example.shade.repository.*;
 import java.util.Optional;
 import jakarta.xml.bind.DatatypeConverter;
@@ -805,15 +806,29 @@ public class TopUpService {
                 .longValue();
         try {
             if (adminCard.getPaymentSystem().equals(PaymentSystem.UZCARD)) {
-                String userCard = request.getCardNumber() != null ? request.getCardNumber() : "";
-                statusResponse = osonService.verifyPaymentByAmountAndCard(
-                        chatId, request.getPlatform(), request.getPlatformUserId(),
-                        request.getAmount(), userCard, adminCard.getCardNumber(),
-                        request.getUniqueAmount());
+                if (configurationService.getUzcardRail() == UzcardRail.OSON) {
+                    String userCard = request.getCardNumber() != null ? request.getCardNumber() : "";
+                    statusResponse = osonService.verifyPaymentByAmountAndCard(
+                            chatId, request.getPlatform(), request.getPlatformUserId(),
+                            request.getAmount(), userCard, adminCard.getCardNumber(),
+                            request.getUniqueAmount());
+                } else {
+                    try {
+                        Thread.sleep(2000);
+                        response = humoService.verifyCardXabarOnly(request.getUniqueAmount());
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        response = false;
+                    }
+                }
             } else {
                 try {
                     Thread.sleep(2000); // 2-second delay
-                    response = humoService.verifyPaymentAmount(request.getUniqueAmount());
+                    if (configurationService.useHumoLegacyDualCheck()) {
+                        response = humoService.verifyPaymentAmount(request.getUniqueAmount());
+                    } else {
+                        response = humoService.verifyHumoOnly(request.getUniqueAmount());
+                    }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt(); // Restore interrupted status
                     response = false; // Handle as needed
@@ -828,7 +843,9 @@ public class TopUpService {
                 || (statusResponse != null ? "SUCCESS".equals(statusResponse.get("status")) : false);
 
         if (isPaymentReceived) {
-            if (adminCard.getPaymentSystem().equals(PaymentSystem.UZCARD)) {
+            if (adminCard.getPaymentSystem().equals(PaymentSystem.UZCARD)
+                    && statusResponse != null
+                    && "SUCCESS".equals(statusResponse.get("status"))) {
                 request.setTransactionId((String) statusResponse.get("transactionId"));
                 request.setBillId(Long.parseLong(String.valueOf(statusResponse.get("billId"))));
                 request.setPayUrl((String) statusResponse.get("payUrl"));

@@ -1,7 +1,6 @@
 package com.example.shade.controller;
 
 import com.example.shade.model.AdminCard;
-import com.example.shade.model.OsonConfig;
 import com.example.shade.repository.AdminCardRepository;
 import com.example.shade.repository.OsonConfigRepository;
 import lombok.RequiredArgsConstructor;
@@ -129,6 +128,9 @@ public class AdminCardController {
                     existing.setOwnerName(card.getOwnerName());
                     existing.setLastUsed(card.getLastUsed());
                     existing.setBalance(card.getBalance());
+                    if (card.getPaymentSystem() != null) {
+                        existing.setPaymentSystem(card.getPaymentSystem());
+                    }
                     if (card.getOsonConfig() != null && card.getOsonConfig().getId() != null) {
                         osonConfigRepository.findById(card.getOsonConfig().getId())
                                 .ifPresent(existing::setOsonConfig);

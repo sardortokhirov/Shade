@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
 
 /**
@@ -61,6 +62,20 @@ public class SystemConfiguration {
     @Column(name = "humo_enabled", nullable = false)
     private Boolean humoEnabled = true;
 
+    /**
+     * Verification path for {@link PaymentSystem#UZCARD} cards (same PAN pool).
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "uzcard_rail", nullable = false, length = 32)
+    private UzcardRail uzcardRail = UzcardRail.OSON;
+
+    /**
+     * When null: HUMO cards use legacy CardXabar-then-HUMO check (current production default).
+     * When set: dual check applies only while {@code now() < this instant}; after that, HUMO-only on 2806.
+     */
+    @Column(name = "humo_legacy_dual_check_end")
+    private Instant humoLegacyDualCheckEnd;
+
     @Column(name = "lottery_cooldown_seconds", nullable = false)
     private Long lotteryCooldownSeconds = 300L;
 
@@ -88,4 +103,11 @@ public class SystemConfiguration {
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
+
+    @PostLoad
+    void normalizeUzcardRailDefault() {
+        if (uzcardRail == null) {
+            uzcardRail = UzcardRail.OSON;
+        }
+    }
 }
