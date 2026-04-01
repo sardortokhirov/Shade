@@ -923,7 +923,7 @@ public class WalletService {
             long availableLimitSafe = availableLimit != null ? availableLimit : 0L;
             String dateStr = LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
             String adminLog = String.format(
-                    "✅ *Hamyondan kontoraga o'tkazma*\n\n🆔: `%d`\n👤: `%d`\n🌐 Kontora: %s\n📋 Kontora ID: `%s`\n💸 Summa: `%,d UZS`\n🔰 Yechib olish kvotasi: `+%,d UZS`\n🎟️ Chiptalar: %d (+ %d)\n📈 Limit oshdi: %,d so'm\n📊 Limit: %,d / %,d so'm\n🏧 Qoldi: `%,d UZS`\n\n🏦: %,d UZS\n\n📅 %s",
+                    "✅ *Hamyondan kontoraga o'tkazma*\n\n🆔: `%d`\n👤: `%d`\n🌐 #%s: %s\n💸 Summa: `%,d UZS`\n🔰 Yechib olish kvotasi: `+%,d UZS`\n🎟️ Chiptalar: %d (+ %d)\n📈 Limit oshdi: %,d so'm\n📊 Limit: %,d / %,d so'm\n🏧 Qoldi: `%,d UZS`\n\n🏦: %,d UZS\n\n📅 %s",
                     request.getId(), chatId, escapeMarkdown(platformStr), escapeMarkdown(platformUserId), amount, earned, ticketsTotal, ticketsAwarded, limitIncrease, totalLimitSafe, availableLimitSafe, walletLeft, platformBalanceUzs, dateStr);
             adminLogBotService.sendLog(adminLog);
         } else {
