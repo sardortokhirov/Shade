@@ -64,9 +64,10 @@ public class SystemConfiguration {
 
     /**
      * Verification path for {@link PaymentSystem#UZCARD} cards (same PAN pool).
+     * Nullable in DB so Hibernate can add the column to existing rows (null = treat as OSON in code).
      */
     @Enumerated(EnumType.STRING)
-    @Column(name = "uzcard_rail", nullable = false, length = 32)
+    @Column(name = "uzcard_rail", length = 32)
     private UzcardRail uzcardRail = UzcardRail.OSON;
 
     /**
