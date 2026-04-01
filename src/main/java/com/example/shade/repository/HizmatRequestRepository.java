@@ -66,12 +66,12 @@ public interface HizmatRequestRepository
       """)
   List<HizmatRequest> findLatestUniqueCardNumbersByChatId(@Param("chatId") Long chatId);
 
-  @Query("SELECT h FROM HizmatRequest h WHERE h.chatId = :chatId AND h.status = :status ORDER BY h.createdAt DESC limit 1")
-  Optional<HizmatRequest> findByChatIdAndStatus(Long chatId, RequestStatus status);
+  Optional<HizmatRequest> findFirstByChatIdAndStatusOrderByCreatedAtDesc(Long chatId, RequestStatus status);
 
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("SELECT h FROM HizmatRequest h WHERE h.chatId = :chatId AND h.status = :status ORDER BY h.createdAt DESC limit 1")
-  Optional<HizmatRequest> findByChatIdAndStatusForUpdate(Long chatId, RequestStatus status);
+  Optional<HizmatRequest> findFirstByChatIdAndStatusForUpdate(@Param("chatId") Long chatId,
+      @Param("status") RequestStatus status);
 
   @Query("SELECT h FROM HizmatRequest h WHERE h.chatId = :chatId AND h.status = :status ")
   List<HizmatRequest> findByChatsIdAndStatus(Long chatId, RequestStatus status);

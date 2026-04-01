@@ -47,13 +47,15 @@ public class PaymentInstructionBlurService {
         for (PendingPaymentMessage pending : pendingList) {
             try {
                 String blurredText = maskCardNumberInText(pending.getOriginalText());
-                messageSender.editMessageText(pending.getChatId(), pending.getMessageId(), blurredText);
-                try {
-                    topUpService.enterScreenshotFlowAfterPaymentTimeout(
+                var markup = topUpService.buildPaymentInstructionKeyboard(
+                        pending.getChatId(), pending.getHizmatRequestId());
+                if (markup != null) {
+                    messageSender.editMessageText(
+                            pending.getChatId(), pending.getMessageId(), blurredText, markup);
+                } else {
+                    logger.warn("No keyboard for blurred payment message chatId {} requestId {}; text-only edit",
                             pending.getChatId(), pending.getHizmatRequestId());
-                } catch (Exception ex) {
-                    logger.error("Failed screenshot flow after blur for chatId {}: {}",
-                            pending.getChatId(), ex.getMessage());
+                    messageSender.editMessageText(pending.getChatId(), pending.getMessageId(), blurredText);
                 }
             } catch (Exception e) {
                 logger.error("Failed to blur payment instruction for chatId {}, messageId {}: {}",

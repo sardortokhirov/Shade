@@ -260,6 +260,14 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                 handleTextMessage(update.getMessage().getText(), chatId);
             } else if (update.hasMessage() && update.getMessage().hasPhoto()) {
                 String state = sessionService.getUserState(chatId);
+                if (TopUpService.STATE_TOPUP_SCREENSHOT_PENDING_ADMIN.equals(state)) {
+                    if (update.getMessage().getMediaGroupId() != null) {
+                        return;
+                    }
+                    messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId,
+                            "topup.message.screenshot_already_sent"));
+                    return;
+                }
                 if (!"TOPUP_AWAITING_SCREENSHOT".equals(state)) {
                     logger.warn("Photo received in wrong state for chatId {}: {}", chatId, state);
                     if (update.getMessage().getMediaGroupId() != null) {
@@ -297,15 +305,14 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                     // AdminLogBotService.sendScreenshotRequest()
                     // using the actual request ID to prevent approval mismatches
                     adminLogBotService.sendScreenshotRequest(sendPhoto, chatId);
-                    // Send confirmation message to user
+                    sessionService.setUserState(chatId, TopUpService.STATE_TOPUP_SCREENSHOT_PENDING_ADMIN);
+                    sessionService.setUserData(chatId, TopUpService.SESSION_TOPUP_SCREENSHOT_SUBMITTED, "1");
                     messageSender.sendMessage(chatId,
                             languageSessionService.getTranslation(chatId, "message.photo_sent_confirmation"));
-                    // Clear state and show main menu after screenshot is sent
-                    sendMainMenu(chatId, true);
+                    sendMainMenu(chatId, false);
                 } catch (TelegramApiException e) {
                     logger.error("Failed to process photo for chatId {}: {}", chatId, e.getMessage());
-                    // Clear state and show main menu even on error to prevent user being stuck
-                    sendMainMenu(chatId, true);
+                    sendMainMenu(chatId, false);
                 } finally {
                     if (downloadedFile != null && downloadedFile.exists()) {
                         if (downloadedFile.delete()) {
@@ -500,7 +507,7 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                                     languageSessionService.getTranslation(chatId, "message.feature_unavailable"));
                             return;
                         }
-                        if (callback.equals("TOPUP_PAYMENT_CONFIRM")) {
+                        if ("TOPUP_PAYMENT_CONFIRM".equals(callback) || "TOPUP_SEND_SCREENSHOT".equals(callback)) {
                             List<Integer> messageIds = sessionService.getMessageIds(chatId);
                             if (!messageIds.isEmpty()) {
                                 messageSender.editMessageToRemoveButtons(chatId, messageIds.get(messageIds.size() - 1));

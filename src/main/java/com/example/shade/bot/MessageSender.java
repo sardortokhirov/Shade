@@ -19,6 +19,7 @@ import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageTe
 import org.telegram.telegrambots.meta.api.objects.File;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.Message;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboard;
 import org.telegram.telegrambots.meta.bots.AbsSender;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
@@ -289,11 +290,21 @@ public class MessageSender {
     }
 
     public void editMessageText(Long chatId, Integer messageId, String newText) {
+        editMessageText(chatId, messageId, newText, null);
+    }
+
+    /**
+     * Edits message text; pass non-null {@code replyMarkup} to keep inline buttons after edit (e.g. payment blur).
+     */
+    public void editMessageText(Long chatId, Integer messageId, String newText, InlineKeyboardMarkup replyMarkup) {
         EditMessageText edit = new EditMessageText();
         edit.setChatId(chatId.toString());
         edit.setMessageId(messageId);
         edit.setText(newText);
         edit.setParseMode("Markdown");
+        if (replyMarkup != null) {
+            edit.setReplyMarkup(replyMarkup);
+        }
         try {
             bot.execute(edit);
             logger.info("Edited text of message {} in chat {}", messageId, chatId);

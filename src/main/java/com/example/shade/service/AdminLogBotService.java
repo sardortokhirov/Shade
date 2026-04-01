@@ -43,7 +43,8 @@ public class AdminLogBotService {
         }
 
         // Fetch the latest pending screenshot request for the user
-        HizmatRequest request = requestRepository.findByChatIdAndStatus(userChatId, RequestStatus.PENDING_SCREENSHOT)
+        HizmatRequest request = requestRepository
+                .findFirstByChatIdAndStatusOrderByCreatedAtDesc(userChatId, RequestStatus.PENDING_SCREENSHOT)
                 .orElse(null);
         if (request == null) {
             logger.error("No pending screenshot request found for userChatId {}", userChatId);

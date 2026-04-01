@@ -55,6 +55,10 @@ public class TopUpService {
     private final RestTemplate restTemplate = new RestTemplate();
     private static final String PAYMENT_MESSAGE_KEY = "payment_message_id";
     private static final String PAYMENT_ATTEMPTS_KEY = "payment_attempts";
+    /** Session: user already sent a screenshot; waiting for admin (second photo gets a short wait message). */
+    public static final String SESSION_TOPUP_SCREENSHOT_SUBMITTED = "topup_screenshot_submitted";
+    /** User state after screenshot was forwarded to admins. */
+    public static final String STATE_TOPUP_SCREENSHOT_PENDING_ADMIN = "TOPUP_SCREENSHOT_PENDING_ADMIN";
     private final BlockedUserRepository blockedUserRepository;
     private final HumoService humoService;
     private final LanguageSessionService languageSessionService;
@@ -73,6 +77,7 @@ public class TopUpService {
 
     public void startTopUp(Long chatId) {
         logger.info("Starting top-up for chatId: {}", chatId);
+        sessionService.removeUserData(chatId, SESSION_TOPUP_SCREENSHOT_SUBMITTED);
         sessionService.setUserState(chatId, "TOPUP_PLATFORM_SELECTION");
         sessionService.addNavigationState(chatId, "MAIN_MENU");
         sessionService.setUserData(chatId, PAYMENT_ATTEMPTS_KEY, "0");
@@ -121,6 +126,8 @@ public class TopUpService {
             case "TOPUP_CARD_INPUT" -> handleCardInput(chatId, text);
             case "TOPUP_AMOUNT_INPUT" -> handleAmountInput(chatId, text);
             case "TOPUP_PAYMENT_CONFIRM" -> handlePaymentConfirmation(chatId, text);
+            case STATE_TOPUP_SCREENSHOT_PENDING_ADMIN -> backMenuMessage(chatId,
+                    languageSessionService.getTranslation(chatId, "topup.message.screenshot_already_sent"));
             default -> backMenuMessage(chatId,
                     languageSessionService.getTranslation(chatId, "topup.message.select_from_menu"));
         }
@@ -136,7 +143,7 @@ public class TopUpService {
 
     public void handleCallback(Long chatId, String callback) throws Exception {
         logger.info("Callback received for chatId {}: {}", chatId, callback);
-        if (callback.equals("TOPUP_PAYMENT_CONFIRM")) {
+        if ("TOPUP_PAYMENT_CONFIRM".equals(callback) || "TOPUP_SEND_SCREENSHOT".equals(callback)) {
             List<Integer> messageIds = sessionService.getMessageIds(chatId);
             if (!messageIds.isEmpty()) {
                 messageSender.editMessageToRemoveButtons(chatId, messageIds.get(messageIds.size() - 1));
@@ -269,7 +276,7 @@ public class TopUpService {
                 sessionService.setUserState(chatId, "TOPUP_PAYMENT_CONFIRM");
                 sendPaymentInstruction(chatId);
             }
-            case "TOPUP_AWAITING_SCREENSHOT" -> {
+            case "TOPUP_AWAITING_SCREENSHOT", STATE_TOPUP_SCREENSHOT_PENDING_ADMIN -> {
                 sessionService.setUserState(chatId, "TOPUP_PAYMENT_CONFIRM");
                 sendPaymentInstruction(chatId);
             }
@@ -673,52 +680,11 @@ public class TopUpService {
         request.setPaymentAttempts(0);
         requestRepository.save(request);
 
+        sessionService.removeUserData(chatId, SESSION_TOPUP_SCREENSHOT_SUBMITTED);
+
         sessionService.setUserState(chatId, "TOPUP_PAYMENT_CONFIRM");
         sessionService.addNavigationState(chatId, "TOPUP_CONFIRMATION");
         sendPaymentInstruction(chatId);
-    }
-
-    /**
-     * Called when payment instruction message is blurred after 8 minutes. If the linked request is still
-     * {@link RequestStatus#PENDING_PAYMENT}, moves the user into the screenshot flow. Uses request id so we
-     * do not send a second screenshot after the user already reached {@link RequestStatus#PENDING_SCREENSHOT}
-     * (e.g. two Confirm attempts).
-     */
-    @Transactional
-    public void enterScreenshotFlowAfterPaymentTimeout(Long chatId, Long hizmatRequestId) {
-        if (hizmatRequestId == null) {
-            logger.debug("enterScreenshotFlowAfterPaymentTimeout: skip (no hizmatRequestId) for chatId {}", chatId);
-            return;
-        }
-        HizmatRequest request = requestRepository.findByIdWithLock(hizmatRequestId).orElse(null);
-        if (request == null) {
-            return;
-        }
-        if (!chatId.equals(request.getChatId())) {
-            logger.warn("enterScreenshotFlowAfterPaymentTimeout: chatId mismatch for request {}", hizmatRequestId);
-            return;
-        }
-        if (request.getStatus() != RequestStatus.PENDING_PAYMENT) {
-            return;
-        }
-        AdminCard adminCard = adminCardRepository.findById(request.getAdminCardId()).orElse(null);
-        if (adminCard == null) {
-            logger.error("enterScreenshotFlowAfterPaymentTimeout: admin card not found for request {}", request.getId());
-            return;
-        }
-        long rubAmount = 0L;
-        try {
-            ExchangeRate latest = exchangeRateRepository.findLatest()
-                    .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
-            rubAmount = BigDecimal.valueOf(request.getUniqueAmount())
-                    .multiply(latest.getUzsToRub())
-                    .divide(BigDecimal.valueOf(1000), 0, RoundingMode.HALF_UP)
-                    .longValue();
-        } catch (Exception e) {
-            logger.warn("enterScreenshotFlowAfterPaymentTimeout: could not compute rubAmount for chatId {}: {}", chatId,
-                    e.getMessage());
-        }
-        sendTopupScreenshotFlow(chatId, request, adminCard, rubAmount, null);
     }
 
     private void sendTopupScreenshotFlow(Long chatId, HizmatRequest request, AdminCard adminCard, long rubAmount,
@@ -762,10 +728,25 @@ public class TopUpService {
         }
     }
 
+    /**
+     * Rebuilds the payment instruction inline keyboard after the message text is edited (e.g. card blur).
+     */
+    public InlineKeyboardMarkup buildPaymentInstructionKeyboard(Long chatId, Long hizmatRequestId) {
+        if (hizmatRequestId == null) {
+            return null;
+        }
+        HizmatRequest request = requestRepository.findById(hizmatRequestId).orElse(null);
+        if (request == null || !chatId.equals(request.getChatId())) {
+            return null;
+        }
+        int attempts = request.getPaymentAttempts() != null ? request.getPaymentAttempts() : 0;
+        return createPaymentConfirmKeyboard(attempts, chatId);
+    }
+
     @Transactional
     public void verifyPayment(Long chatId) throws Exception {
         // Pessimistic lock prevents double processing when user double-clicks Confirm
-        HizmatRequest request = requestRepository.findByChatIdAndStatusForUpdate(chatId, RequestStatus.PENDING_PAYMENT)
+        HizmatRequest request = requestRepository.findFirstByChatIdAndStatusForUpdate(chatId, RequestStatus.PENDING_PAYMENT)
                 .orElse(null);
         if (request == null) {
             logger.error("No pending payment request found for chatId {}", chatId);
@@ -1982,7 +1963,8 @@ public class TopUpService {
     }
 
     private void sendPaymentInstruction(Long chatId) {
-        HizmatRequest request = requestRepository.findByChatIdAndStatus(chatId, RequestStatus.PENDING_PAYMENT)
+        HizmatRequest request = requestRepository
+                .findFirstByChatIdAndStatusOrderByCreatedAtDesc(chatId, RequestStatus.PENDING_PAYMENT)
                 .orElseThrow(
                         () -> new IllegalStateException("Pending payment request not found for chatId: " + chatId));
         AdminCard adminCard = adminCardRepository.findById(request.getAdminCardId())
