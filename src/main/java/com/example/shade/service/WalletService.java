@@ -226,7 +226,7 @@ public class WalletService {
 
     private void sendDepositAmountInput(Long chatId) {
         String platformUserId = sessionService.getUserData(chatId, "walletPlatformUserId");
-        String fullName = sessionService.getUserData(chatId, "fullName");
+        String fullName = sessionService.getUserData(chatId, "walletFullName");
         String fullNameDisplay = fullName != null && !fullName.isEmpty() ? fullName : "—";
         SendMessage message = new SendMessage();
         message.setChatId(chatId.toString());
