@@ -2,6 +2,7 @@ package com.example.shade.config;
 
 import com.example.shade.model.RequestStatus;
 import com.example.shade.model.RequestType;
+import com.example.shade.model.UzcardRail;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -32,6 +33,8 @@ public class DatabaseConstraintFixer {
     public void fixConstraints() {
         fixEnumConstraint("hizmat_request", "type", "hizmat_request_type_check", RequestType.class);
         fixEnumConstraint("hizmat_request", "status", "hizmat_request_status_check", RequestStatus.class);
+        fixNullableEnumConstraint("system_configuration", "uzcard_rail", "system_configuration_uzcard_rail_check",
+                UzcardRail.class);
         fixBotTipConfigurationColumns();
     }
 
@@ -66,6 +69,29 @@ public class DatabaseConstraintFixer {
                             " CHECK (" + column + "::text = ANY (ARRAY[" + values + "]))");
 
             logger.info("Updated constraint {} with values: [{}]", constraintName, values);
+        } catch (Exception e) {
+            logger.warn("Could not update constraint {}: {}", constraintName, e.getMessage());
+        }
+    }
+
+    /**
+     * Same as {@link #fixEnumConstraint} but allows NULL (e.g. {@code system_configuration.uzcard_rail}).
+     */
+    private <E extends Enum<E>> void fixNullableEnumConstraint(String table, String column, String constraintName,
+            Class<E> enumClass) {
+        try {
+            String values = Arrays.stream(enumClass.getEnumConstants())
+                    .map(e -> "'" + e.name() + "'")
+                    .collect(Collectors.joining(","));
+
+            jdbcTemplate.execute(
+                    "ALTER TABLE " + table + " DROP CONSTRAINT IF EXISTS " + constraintName);
+
+            jdbcTemplate.execute(
+                    "ALTER TABLE " + table + " ADD CONSTRAINT " + constraintName +
+                            " CHECK (" + column + " IS NULL OR " + column + "::text = ANY (ARRAY[" + values + "]))");
+
+            logger.info("Updated nullable enum constraint {} with values: [{}]", constraintName, values);
         } catch (Exception e) {
             logger.warn("Could not update constraint {}: {}", constraintName, e.getMessage());
         }
