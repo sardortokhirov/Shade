@@ -226,10 +226,13 @@ public class WalletService {
 
     private void sendDepositAmountInput(Long chatId) {
         String platformUserId = sessionService.getUserData(chatId, "walletPlatformUserId");
+        String fullName = sessionService.getUserData(chatId, "fullName");
+        String fullNameDisplay = fullName != null && !fullName.isEmpty() ? fullName : "—";
         SendMessage message = new SendMessage();
         message.setChatId(chatId.toString());
         message.setText(String.format(
                 languageSessionService.getTranslation(chatId, "wallet.message.enter_amount"),
+                escapeMarkdown(fullNameDisplay),
                 escapeMarkdown(platformUserId != null ? platformUserId : "")));
 
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
