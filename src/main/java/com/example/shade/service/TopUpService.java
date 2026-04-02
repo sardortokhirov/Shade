@@ -2241,6 +2241,8 @@ public class TopUpService {
     private void sendAmountInput(Long chatId) {
         String platformUserId = sessionService.getUserData(chatId, "platformUserId");
         String userIdDisplay = platformUserId != null && !platformUserId.isEmpty() ? platformUserId : "—";
+        String fullName = sessionService.getUserData(chatId, "fullName");
+        String fullNameDisplay = fullName != null && !fullName.isEmpty() ? fullName : "—";
 
         SendMessage message = new SendMessage();
         message.setChatId(chatId);
@@ -2258,7 +2260,7 @@ public class TopUpService {
                 minRub = 1;
             String messageText = String.format(
                     languageSessionService.getTranslation(chatId, "topup.message.enter_amount_rub"),
-                    userIdDisplay);
+                    fullNameDisplay, userIdDisplay);
             message.setText(messageText);
             message.setReplyMarkup(createAmountKeyboard(chatId));
         } else {
@@ -2266,7 +2268,7 @@ public class TopUpService {
             long maxAmount = configurationService.getTopUpMaxAmount();
             String messageText = String.format(
                     languageSessionService.getTranslation(chatId, "topup.message.enter_amount"),
-                    userIdDisplay);
+                    fullNameDisplay, userIdDisplay);
             message.setText(messageText);
             message.setReplyMarkup(createAmountKeyboard(chatId));
         }
