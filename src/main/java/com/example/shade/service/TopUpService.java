@@ -185,7 +185,7 @@ public class TopUpService {
                 }
                 sessionService.setUserState(chatId, "TOPUP_CONFIRMATION");
                 sessionService.addNavigationState(chatId, "TOPUP_AMOUNT_INPUT");
-                initiateTopUpRequest(chatId);
+                initiateTopUpRequest(chatId, true);
             }
             case "TOPUP_AMOUNT_MAX" -> {
                 if (isRubTopUp(chatId)) {
@@ -203,9 +203,9 @@ public class TopUpService {
                 }
                 sessionService.setUserState(chatId, "TOPUP_CONFIRMATION");
                 sessionService.addNavigationState(chatId, "TOPUP_AMOUNT_INPUT");
-                initiateTopUpRequest(chatId);
+                initiateTopUpRequest(chatId, true);
             }
-            case "TOPUP_CONFIRM" -> initiateTopUpRequest(chatId);
+            case "TOPUP_CONFIRM" -> initiateTopUpRequest(chatId, false);
             case "TOPUP_PAYMENT_CONFIRM" -> self.verifyPayment(chatId);
             case "TOPUP_SEND_SCREENSHOT" -> {
                 sessionService.setUserState(chatId, "TOPUP_AWAITING_SCREENSHOT");
@@ -595,7 +595,7 @@ public class TopUpService {
             }
             sessionService.setUserState(chatId, "TOPUP_CONFIRMATION");
             sessionService.addNavigationState(chatId, "TOPUP_AMOUNT_INPUT");
-            initiateTopUpRequest(chatId);
+            initiateTopUpRequest(chatId, true);
         } catch (NumberFormatException e) {
             logger.warn("Invalid amount format for chatId {}: {}", chatId, amountText);
             sendMessageWithNavigation(chatId,
@@ -608,7 +608,11 @@ public class TopUpService {
                 languageSessionService.getTranslation(chatId, "topup.message.confirm_payment"));
     }
 
-    private void initiateTopUpRequest(Long chatId) {
+    /**
+     * @param clearPinnedAdminCard when true, forget any card already pinned on this request so LRU runs again
+     *                             (amount/min/max changed). When false (e.g. TOPUP_CONFIRM), reuse pinned card.
+     */
+    private void initiateTopUpRequest(Long chatId, boolean clearPinnedAdminCard) {
         if (sessionService.getUserData(chatId, "platformUserId") == null) {
             logger.error("No validated user ID for chatId {}", chatId);
             messageSender.sendMessage(chatId,
@@ -629,6 +633,10 @@ public class TopUpService {
                     languageSessionService.getTranslation(chatId, "topup.message.request_not_found"));
             sendMainMenu(chatId);
             return;
+        }
+
+        if (clearPinnedAdminCard) {
+            request.setAdminCardId(null);
         }
 
         // Use amountCurrency from session - matches what we showed the user (RUB or UZS
@@ -652,7 +660,7 @@ public class TopUpService {
         }
         long uniqueAmount = generateUniqueAmount(amount);
 
-        // Only get a new admin card if the request doesn't have one already
+        // Re-pick admin card when none pinned, or after clearPinnedAdminCard (amount flow).
         AdminCard adminCard;
         if (request.getAdminCardId() != null) {
             adminCard = adminCardRepository.findById(request.getAdminCardId())
@@ -2115,6 +2123,8 @@ public class TopUpService {
     /**
      * Primary Oson pool cards eligible under {@code humoEnabled} and global {@link UzcardRail}
      * ({@link UzcardRail#OFF} excludes all UZCARD from rotation).
+     * UZCARD matches global mode, {@code null} rail, or (when global is {@link UzcardRail#OSON}) legacy
+     * {@link UzcardRail#CARDXABAR} rows so rotation is not reduced to a single OSON-tagged card after a global switch.
      * Among eligible cards, choose the least recently used by {@link AdminCard#getLastUsed},
      * treating {@code null} as "never used" (older than any timestamp).
      * When several cards tie for the same minimum (e.g. all {@code null} or same timestamp),
@@ -2131,7 +2141,15 @@ public class TopUpService {
                         return humoEnabled;
                     }
                     if (a.getPaymentSystem() == PaymentSystem.UZCARD) {
-                        return uzOn && uzMode.equals(a.getUzcardRail());
+                        if (!uzOn) {
+                            return false;
+                        }
+                        UzcardRail rail = a.getUzcardRail();
+                        if (rail == null || uzMode.equals(rail)) {
+                            return true;
+                        }
+                        // DB may still say CARDXABAR after switching global to Oson API; verification uses global Oson.
+                        return uzMode == UzcardRail.OSON && rail == UzcardRail.CARDXABAR;
                     }
                     return false;
                 })
