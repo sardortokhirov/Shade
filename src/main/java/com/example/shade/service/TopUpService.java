@@ -35,6 +35,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 @Service
@@ -2116,6 +2117,8 @@ public class TopUpService {
      * ({@link UzcardRail#OFF} excludes all UZCARD from rotation).
      * Among eligible cards, choose the least recently used by {@link AdminCard#getLastUsed},
      * treating {@code null} as "never used" (older than any timestamp).
+     * When several cards tie for the same minimum (e.g. all {@code null} or same timestamp),
+     * {@code stream().min} would always return the same list position; we pick uniformly at random among ties.
      */
     private Optional<AdminCard> pickLeastRecentlyUsedTopUpAdminCard() {
         boolean humoEnabled = configurationService.getHumoEnabled();
@@ -2138,7 +2141,13 @@ public class TopUpService {
         }
         Comparator<AdminCard> lruComparator =
                 Comparator.comparing(AdminCard::getLastUsed, Comparator.nullsFirst(Comparator.naturalOrder()));
-        return eligible.stream().min(lruComparator);
+        AdminCard minCard = eligible.stream().min(lruComparator).orElseThrow();
+        LocalDateTime minTime = minCard.getLastUsed();
+        List<AdminCard> tiedForLru = eligible.stream()
+                .filter(a -> Objects.equals(a.getLastUsed(), minTime))
+                .collect(Collectors.toList());
+        Collections.shuffle(tiedForLru, ThreadLocalRandom.current());
+        return Optional.of(tiedForLru.get(0));
     }
 
     private void sendPlatformSelection(Long chatId) {
