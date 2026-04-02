@@ -2113,8 +2113,9 @@ public class TopUpService {
 
     /**
      * Primary Oson pool cards eligible under {@code humoEnabled} and global {@link UzcardRail}
-     * ({@link UzcardRail#OFF} excludes all UZCARD from rotation). LRU matches legacy
-     * {@code findLeastRecentlyUsed} semantics.
+     * ({@link UzcardRail#OFF} excludes all UZCARD from rotation).
+     * Among eligible cards, choose the least recently used by {@link AdminCard#getLastUsed},
+     * treating {@code null} as "never used" (older than any timestamp).
      */
     private Optional<AdminCard> pickLeastRecentlyUsedTopUpAdminCard() {
         boolean humoEnabled = configurationService.getHumoEnabled();
@@ -2135,24 +2136,9 @@ public class TopUpService {
         if (eligible.isEmpty()) {
             return Optional.empty();
         }
-        Optional<LocalDateTime> minNonNull = eligible.stream()
-                .map(AdminCard::getLastUsed)
-                .filter(Objects::nonNull)
-                .min(Comparator.naturalOrder());
-        List<AdminCard> tiedForMin;
-        if (minNonNull.isEmpty()) {
-            tiedForMin = eligible.stream()
-                    .filter(a -> a.getLastUsed() == null)
-                    .collect(Collectors.toList());
-        } else {
-            LocalDateTime m = minNonNull.get();
-            tiedForMin = eligible.stream()
-                    .filter(a -> m.equals(a.getLastUsed()))
-                    .collect(Collectors.toList());
-        }
-        List<AdminCard> candidates = tiedForMin.isEmpty() ? eligible : tiedForMin;
-        return candidates.stream()
-                .max(Comparator.comparing(AdminCard::getLastUsed, Comparator.nullsFirst(Comparator.naturalOrder())));
+        Comparator<AdminCard> lruComparator =
+                Comparator.comparing(AdminCard::getLastUsed, Comparator.nullsFirst(Comparator.naturalOrder()));
+        return eligible.stream().min(lruComparator);
     }
 
     private void sendPlatformSelection(Long chatId) {
