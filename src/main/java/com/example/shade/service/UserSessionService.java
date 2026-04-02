@@ -3,7 +3,6 @@ package com.example.shade.service;
 import com.example.shade.model.UserSession;
 import org.springframework.stereotype.Service;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -28,7 +27,7 @@ public class UserSessionService {
     }
 
     public void setUserData(Long chatId, String key, String value) {
-        Map<String, String> data = sessionDataStore.computeIfAbsent(chatId, k -> new HashMap<>());
+        Map<String, String> data = sessionDataStore.computeIfAbsent(chatId, k -> new ConcurrentHashMap<>());
         data.put(key, value);
         sessionDataStore.put(chatId, data);
     }

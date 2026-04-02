@@ -22,6 +22,11 @@ public class SystemConfigurationService {
     private static final Logger logger = LoggerFactory.getLogger(SystemConfigurationService.class);
     private final SystemConfigurationRepository configurationRepository;
 
+    // In-memory cache to avoid hitting DB on every getter call
+    private volatile SystemConfiguration cachedConfig;
+    private volatile long cacheTimestamp = 0;
+    private static final long CACHE_TTL_MS = 30_000L; // 30 seconds
+
     // Default values
     private static final Long DEFAULT_TOP_UP_MIN = 5_000L;
     private static final Long DEFAULT_TOP_UP_MAX = 10_000_000L;
@@ -45,7 +50,12 @@ public class SystemConfigurationService {
 
     @Transactional
     public SystemConfiguration getConfiguration() {
-        return configurationRepository.findFirstByOrderByCreatedAtDesc()
+        long now = System.currentTimeMillis();
+        SystemConfiguration cached = cachedConfig;
+        if (cached != null && (now - cacheTimestamp) < CACHE_TTL_MS) {
+            return cached;
+        }
+        cached = configurationRepository.findFirstByOrderByCreatedAtDesc()
                 .orElseGet(() -> {
                     SystemConfiguration config = new SystemConfiguration();
                     config.setTopUpMinAmount(DEFAULT_TOP_UP_MIN);
@@ -70,6 +80,14 @@ public class SystemConfigurationService {
                     config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
                     return configurationRepository.save(config);
                 });
+        cachedConfig = cached;
+        cacheTimestamp = now;
+        return cached;
+    }
+
+    private void invalidateConfigCache() {
+        cacheTimestamp = 0;
+        cachedConfig = null;
     }
 
     @Transactional
@@ -87,6 +105,7 @@ public class SystemConfigurationService {
         config.setHumoLegacyDualCheckEnd(null);
         config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
         SystemConfiguration saved = configurationRepository.save(config);
+        invalidateConfigCache();
         logger.info("System configuration updated: {}", saved.getId());
         return saved;
     }
@@ -215,6 +234,7 @@ public class SystemConfigurationService {
         config.setHumoEnabled(enabled);
         config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
         configurationRepository.save(config);
+        invalidateConfigCache();
         logger.info("HUMO enabled set to {}", enabled);
     }
 
@@ -231,6 +251,7 @@ public class SystemConfigurationService {
         config.setUzcardRail(rail);
         config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
         configurationRepository.save(config);
+        invalidateConfigCache();
         logger.info("UZCARD rail set to {}", rail);
     }
 
@@ -245,6 +266,7 @@ public class SystemConfigurationService {
         config.setWalletWithdrawRatio(ratio);
         config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
         SystemConfiguration saved = configurationRepository.save(config);
+        invalidateConfigCache();
         logger.info("Wallet withdraw ratio updated to {}", ratio);
         return saved;
     }
@@ -260,6 +282,7 @@ public class SystemConfigurationService {
         config.setWalletMinWithdrawAmount(amount);
         config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
         SystemConfiguration saved = configurationRepository.save(config);
+        invalidateConfigCache();
         logger.info("Wallet min withdraw amount updated to {}", amount);
         return saved;
     }
@@ -271,6 +294,7 @@ public class SystemConfigurationService {
         config.setWalletTransferMinAmount(amount);
         config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
         SystemConfiguration saved = configurationRepository.save(config);
+        invalidateConfigCache();
         logger.info("Wallet transfer min amount updated to {}", amount);
         return saved;
     }
@@ -282,6 +306,7 @@ public class SystemConfigurationService {
         config.setWalletTransferMaxAmount(amount);
         config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
         SystemConfiguration saved = configurationRepository.save(config);
+        invalidateConfigCache();
         logger.info("Wallet transfer max amount updated to {}", amount);
         return saved;
     }

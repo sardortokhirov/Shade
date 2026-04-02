@@ -31,6 +31,8 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 @Component
 @RequiredArgsConstructor
@@ -53,6 +55,7 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
     private final ShadeAdminUpdateHandler adminUpdateHandler;
     private final AdminBotService adminBotService;
     private final CallbackDeduplicationService callbackDeduplicationService;
+    private final ExecutorService updateExecutor = Executors.newFixedThreadPool(10);
 
     @Value("${telegram.bot.token}")
     private String botToken;
@@ -92,11 +95,15 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
 
     @Override
     public void onUpdateReceived(Update update) {
+        if (update == null) {
+            logger.warn("Received null update");
+            return;
+        }
+        updateExecutor.submit(() -> processUpdate(update));
+    }
+
+    private void processUpdate(Update update) {
         try {
-            if (update == null) {
-                logger.warn("Received null update");
-                return;
-            }
             Long chatId = null;
             if (update.hasMessage()) {
                 chatId = update.getMessage().getChatId();

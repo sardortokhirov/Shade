@@ -713,7 +713,7 @@ public class TopUpService {
 
         sessionService.setUserState(chatId, "TOPUP_AWAITING_SCREENSHOT");
 
-        String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
+        String number = blockedUserRepository.findByChatId(request.getChatId()).map(BlockedUser::getPhoneNumber).orElse("N/A");
         String cardBlock = optionalCardLineBackticks(request.getCardNumber()) + optionalAdminCardLine(adminCard.getCardNumber());
         String logMessage = String.format(
                 "🆔: `%d`\n" +
@@ -931,7 +931,7 @@ public class TopUpService {
                     logger.info("Quota earned for chatId {} (card-to-platform): +{} UZS (ratio={})", chatId, quotaEarned, ratio);
                 }
 
-                String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
+                String number = blockedUserRepository.findByChatId(request.getChatId()).map(BlockedUser::getPhoneNumber).orElse("N/A");
                 String cardBlock = optionalCardLineBackticks(request.getCardNumber()) + optionalAdminCardLine(adminCard.getCardNumber());
                 String logMessage = String.format(
                         "🆔: `%d` To'lov yakunlandi ✅\n" +
@@ -1068,7 +1068,7 @@ public class TopUpService {
                 .multiply(latest.getUzsToRub())
                 .divide(BigDecimal.valueOf(1000), 0, RoundingMode.HALF_UP)
                 .longValue();
-        String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
+        String number = blockedUserRepository.findByChatId(request.getChatId()).map(BlockedUser::getPhoneNumber).orElse("N/A");
         String cardBlockErr = optionalCardLineBackticks(request.getCardNumber()) + optionalAdminCardLine(adminCard.getCardNumber());
         String errorLogMessage = String.format(
                 " 🆔: `%d` Transfer xatosi ❌\n" +
@@ -1254,7 +1254,7 @@ public class TopUpService {
                     }
 
                     // Get limit information (cache to avoid multiple calls)
-                    String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
+                    String number = blockedUserRepository.findByChatId(request.getChatId()).map(BlockedUser::getPhoneNumber).orElse("N/A");
                     Long totalLimit = dailyStatsService.getEffectiveDailyLimit(request.getChatId());
                     Long availableLimit = dailyStatsService.getAvailableLimit(request.getChatId());
                     String cardBlockUser = optionalCardLineBackticks(request.getCardNumber()) + optionalAdminCardLine(adminCard.getCardNumber());
@@ -1400,7 +1400,7 @@ public class TopUpService {
             requestRepository.save(request);
 
             Long userChatId = request.getChatId();
-            String number = blockedUserRepository.findByChatId(userChatId).get().getPhoneNumber();
+            String number = blockedUserRepository.findByChatId(userChatId).map(BlockedUser::getPhoneNumber).orElse("N/A");
             String cardForRejectMsg = (request.getCardNumber() != null && !request.getCardNumber().trim().isEmpty()) ? request.getCardNumber() : "";
             String adminCardForRejectMsg = (adminCard != null && adminCard.getCardNumber() != null && !adminCard.getCardNumber().trim().isEmpty()) ? adminCard.getCardNumber() : "";
             String logMessage = String.format(
@@ -1514,17 +1514,17 @@ public class TopUpService {
                 }
                 requestRepository.save(request);
 
-                Optional<UserBalance> balanceOpt = userBalanceRepository.findById(requestId);
+                Optional<UserBalance> balanceOpt = userBalanceRepository.findById(request.getChatId());
                 UserBalance balance;
                 if (balanceOpt.isPresent()) {
                     balance = balanceOpt.get();
                 } else {
                     // Double-check it doesn't exist (prevent race condition)
-                    if (userBalanceRepository.existsById(requestId)) {
+                    if (userBalanceRepository.existsById(request.getChatId())) {
                         // Entity exists but findById returned empty - fetch again
-                        balance = userBalanceRepository.findById(requestId)
+                        balance = userBalanceRepository.findById(request.getChatId())
                                 .orElseThrow(() -> new IllegalStateException(
-                                        "UserBalance exists but not accessible for chatId: " + requestId));
+                                        "UserBalance exists but not accessible for chatId: " + request.getChatId()));
                     } else {
                         // Truly doesn't exist - safe to create
                         balance = UserBalance.builder()
@@ -1533,7 +1533,7 @@ public class TopUpService {
                                 .balance(BigDecimal.ZERO)
                                 .build();
                         balance = userBalanceRepository.save(balance);
-                        logger.info("Created new UserBalance for chatId {}", requestId);
+                        logger.info("Created new UserBalance for chatId {}", request.getChatId());
                     }
                 }
                 long tickets = 0;
@@ -1542,7 +1542,7 @@ public class TopUpService {
                     long ticketCalculationAmount = configurationService.getTicketCalculationAmount();
                     tickets = request.getAmount() / ticketCalculationAmount;
                     if (tickets > 0) {
-                        lotteryService.awardTickets(requestId, tickets);
+                        lotteryService.awardTickets(request.getChatId(), tickets);
                     }
 
                     bonusService.creditReferral(request.getChatId(), request.getAmount());
@@ -1574,7 +1574,7 @@ public class TopUpService {
                 }
 
                 // Get limit information (cache to avoid multiple calls)
-                String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
+                String number = blockedUserRepository.findByChatId(request.getChatId()).map(BlockedUser::getPhoneNumber).orElse("N/A");
                 Long totalLimit = dailyStatsService.getEffectiveDailyLimit(request.getChatId());
                 Long availableLimit = dailyStatsService.getAvailableLimit(request.getChatId());
                 String cardBlockUser = optionalCardLineBackticks(request.getCardNumber()) + optionalAdminCardLine(adminCard.getCardNumber());
@@ -1701,7 +1701,7 @@ public class TopUpService {
             requestRepository.save(request);
 
             Long userChatId = request.getChatId();
-            String number = blockedUserRepository.findByChatId(userChatId).get().getPhoneNumber();
+            String number = blockedUserRepository.findByChatId(userChatId).map(BlockedUser::getPhoneNumber).orElse("N/A");
             String cardForRejectMsg = (request.getCardNumber() != null && !request.getCardNumber().trim().isEmpty()) ? request.getCardNumber() : "";
             String adminCardForRejectMsg = (adminCard != null && adminCard.getCardNumber() != null && !adminCard.getCardNumber().trim().isEmpty()) ? adminCard.getCardNumber() : "";
             String logMessage = String.format(
