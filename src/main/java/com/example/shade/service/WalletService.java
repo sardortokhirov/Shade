@@ -599,6 +599,14 @@ public class WalletService {
 
     private void handleDepositAmount(Long chatId, String amountStr) {
         try {
+            // Guard: ensure required session data still exists (stale inline button protection)
+            String platform = sessionService.getUserData(chatId, "walletPlatform");
+            String platformUserId = sessionService.getUserData(chatId, "walletPlatformUserId");
+            if (platform == null || platform.isEmpty() || platformUserId == null || platformUserId.isEmpty()) {
+                sendWalletMenu(chatId);
+                return;
+            }
+
             Long amount = Long.parseLong(amountStr.replaceAll("\\s+", ""));
             UserBalance balance = getOrCreateUserBalance(chatId);
 
