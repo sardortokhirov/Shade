@@ -34,9 +34,7 @@ public class LottoBotService {
             return;
         }
 
-        String maskedUserId = userId.toString().length() >= 7
-                ? userId.toString().substring(0, 3).concat("***").concat(userId.toString().substring(6))
-                : userId.toString();
+        String maskedUserId = maskUserId(userId);
         String date = LocalDateTime.now(ZoneId.of("GMT+5"))
                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         String amountStr = formatWholeNumber(amount);
@@ -45,9 +43,9 @@ public class LottoBotService {
                 numberOfTickets, amountStr, maskedUserId, date, getRandomCongratulationsUz()
         );
 
-        List<AdminChat> adminChats = adminChatRepository.findByReceiveNotificationsTrue();
+        List<AdminChat> adminChats = adminChatRepository.findAll();
         if (adminChats.isEmpty()) {
-            logger.warn("No admin channels with notifications enabled for userId {} and amount {}", userId, amount);
+            logger.warn("No registered lotto log chats for userId {} and amount {}", userId, amount);
             return;
         }
 
@@ -59,17 +57,15 @@ public class LottoBotService {
 
     public void logBonusTopUpWin(Long chatId, Long amount, String platform, LocalDateTime timestamp) {
         String date = timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-        String maskedChatId = chatId.toString().length() >= 7
-                ? chatId.toString().substring(0, 3).concat("***").concat(chatId.toString().substring(6))
-                : chatId.toString();
+        String maskedChatId = maskUserId(chatId);
         String logMessage = String.format(
                 languageSessionService.getTranslationUz("lotto.message.bonus_topup_win"),
                 amount, amount, platform, date, maskedChatId
         );
 
-        List<AdminChat> adminChats = adminChatRepository.findByReceiveNotificationsTrue();
+        List<AdminChat> adminChats = adminChatRepository.findAll();
         if (adminChats.isEmpty()) {
-            logger.warn("No admin channels with notifications enabled for bonus top-up: chatId {}, amount {}", chatId, amount);
+            logger.warn("No registered lotto log chats for bonus top-up: chatId {}, amount {}", chatId, amount);
             return;
         }
 
@@ -90,15 +86,42 @@ public class LottoBotService {
                 "🎁 Akkaunt rivoji uchun\n💸 Summa: %,d UZS\n👤 User Id: %s\n🎟️ Bonus chiptalar: %d\n📈 Doimiy limit: +%s so'm\n📅 Sana: %s",
                 amount, maskedUserId, bonusTickets, (limitIncreaseStr != null ? limitIncreaseStr : "0.00000"), date);
 
-        List<AdminChat> adminChats = adminChatRepository.findByReceiveNotificationsTrue();
+        List<AdminChat> adminChats = adminChatRepository.findAll();
         if (adminChats.isEmpty()) {
-            logger.warn("No admin channels with notifications enabled for tip log: chatId {}, amount {}", chatId, amount);
+            logger.warn("No registered lotto log chats for tip log: chatId {}, amount {}", chatId, amount);
             return;
         }
 
         for (AdminChat adminChat : adminChats) {
             messageSender.sendMessage(adminChat.getChatId(), logMessage);
             logger.info("Sent tip log to lotto channel {}: {}", adminChat.getChatId(), logMessage);
+        }
+    }
+
+    /**
+     * Daily lottery bonus winner — same masking and inline buttons as other lotto log messages.
+     * Sent to every registered chat (all groups that use the lotto log bot), not only “main” / notification-enabled chats.
+     */
+    public void logDailyBonusWinner(long amount, long balanceAfter, Long chatId, String phoneNumber) {
+        String maskedUserId = maskUserId(chatId);
+        String maskedPhone = maskPhone(phoneNumber);
+        String date = LocalDateTime.now(ZoneId.of("GMT+5"))
+                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        String logMessage = "#Кунлик бонусда голиб болганлар\n\n" +
+                "Kunlik bonus: " + amount + " \n" +
+                "Balans: " + balanceAfter + "\n" +
+                "User ID: " + maskedUserId + "\n" +
+                "Telefon nomer: " + maskedPhone + "\n\n" +
+                "\uD83D\uDCC5 " + date;
+
+        List<AdminChat> adminChats = adminChatRepository.findAll();
+        if (adminChats.isEmpty()) {
+            logger.warn("No registered lotto log chats for daily bonus winner: chatId {}", chatId);
+            return;
+        }
+        for (AdminChat adminChat : adminChats) {
+            messageSender.sendMessage(adminChat.getChatId(), logMessage);
+            logger.info("Sent daily bonus winner log to channel {}", adminChat.getChatId());
         }
     }
 
@@ -124,5 +147,17 @@ public class LottoBotService {
             return s.substring(0, 3) + "***" + s.substring(s.length() - 4);
         }
         return "***";
+    }
+
+    private String maskPhone(String phone) {
+        if (phone == null || phone.isBlank() || "N/A".equalsIgnoreCase(phone.trim())) {
+            return "***";
+        }
+        String t = phone.trim();
+        if (t.length() < 8) {
+            return "***";
+        }
+        int prefixLen = Math.min(5, t.length() - 4);
+        return t.substring(0, prefixLen) + "***" + t.substring(t.length() - 4);
     }
 }

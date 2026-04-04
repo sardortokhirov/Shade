@@ -58,7 +58,6 @@ public class LotteryService {
     private final LottoBotService lottoBotService;
     private final BlockedUserRepository blockedUserRepository;
     private final MessageSender messageSender;
-    private final AdminLogBotService adminLogBotService;
     private final LanguageSessionService languageSessionService;
     private final Random random = new Random();
     private final SystemConfigurationService configurationService;
@@ -360,13 +359,11 @@ public class LotteryService {
         Optional<BlockedUser> blockedUserOpt = blockedUserRepository.findByChatId(chatId);
         String number = blockedUserOpt.map(BlockedUser::getPhoneNumber).orElse("N/A");
 
-        adminLogBotService.sendToAdmins("#Кунлик бонусда голиб болганлар\n\n" +
-                "Kunlik bonus: " + amount + " \n" +
-                "Balans: " + balance.getBalance().longValue() + "\n" +
-                "User ID: " + chatId + "\n" +
-                "Telefon nomer: " + number + "\n\n" +
-                "\uD83D\uDCC5 " + LocalDateTime.now(ZoneId.of("GMT+5"))
-                        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        lottoBotService.logDailyBonusWinner(
+                amount,
+                balance.getBalance().longValue(),
+                chatId,
+                number);
         logger.info("Awarded {} UZS to chatId {}", amount, chatId);
     }
 
