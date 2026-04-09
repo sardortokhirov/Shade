@@ -20,12 +20,15 @@ public class LottoBotService {
     private final AdminChatRepository adminChatRepository;
     private final LottoMessageSender messageSender;
     private final LanguageSessionService languageSessionService;
+    private final AdminLogBotService adminLogBotService;
     private static final Random RANDOM = new Random();
 
-    public LottoBotService(AdminChatRepository adminChatRepository, LottoMessageSender messageSender, LanguageSessionService languageSessionService) {
+    public LottoBotService(AdminChatRepository adminChatRepository, LottoMessageSender messageSender,
+            LanguageSessionService languageSessionService, AdminLogBotService adminLogBotService) {
         this.adminChatRepository = adminChatRepository;
         this.messageSender = messageSender;
         this.languageSessionService = languageSessionService;
+        this.adminLogBotService = adminLogBotService;
     }
 
     public void logWin(long numberOfTickets, Long userId, BigDecimal amount) {
@@ -99,8 +102,7 @@ public class LottoBotService {
     }
 
     /**
-     * Daily lottery bonus winner — same masking and inline buttons as other lotto log messages.
-     * Sent to every registered chat (all groups that use the lotto log bot), not only “main” / notification-enabled chats.
+     * Daily lottery bonus winner — masked message to all lotto log chats; full User ID and phone on admin log bot only.
      */
     public void logDailyBonusWinner(long amount, long balanceAfter, Long chatId, String phoneNumber) {
         String maskedUserId = maskUserId(chatId);
@@ -114,15 +116,25 @@ public class LottoBotService {
                 "Telefon nomer: " + maskedPhone + "\n\n" +
                 "\uD83D\uDCC5 " + date;
 
+        String rawUserId = chatId == null ? "N/A" : chatId.toString();
+        String rawPhone = (phoneNumber == null || phoneNumber.isBlank()) ? "N/A" : phoneNumber.trim();
+        String adminLogMessage = "#Кунлик бонусда голиб болганлар (admin)\n\n" +
+                "Kunlik bonus: " + amount + " \n" +
+                "Balans: " + balanceAfter + "\n" +
+                "User ID: " + rawUserId + "\n" +
+                "Telefon nomer: " + rawPhone + "\n\n" +
+                "\uD83D\uDCC5 " + date;
+
         List<AdminChat> adminChats = adminChatRepository.findAll();
         if (adminChats.isEmpty()) {
             logger.warn("No registered lotto log chats for daily bonus winner: chatId {}", chatId);
-            return;
+        } else {
+            for (AdminChat adminChat : adminChats) {
+                messageSender.sendMessage(adminChat.getChatId(), logMessage);
+                logger.info("Sent daily bonus winner log to channel {}", adminChat.getChatId());
+            }
         }
-        for (AdminChat adminChat : adminChats) {
-            messageSender.sendMessage(adminChat.getChatId(), logMessage);
-            logger.info("Sent daily bonus winner log to channel {}", adminChat.getChatId());
-        }
+        adminLogBotService.sendLog(adminLogMessage);
     }
 
     /** Random congratulations text always in Uzbek (for lotto log bot). */
