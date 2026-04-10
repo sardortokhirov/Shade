@@ -90,6 +90,15 @@ public interface HizmatRequestRepository
       @Param("platformUserId") String platformUserId,
       @Param("status") RequestStatus status);
 
+  /** Serializes bonus top-up confirmation so duplicate callback taps cannot submit the same PENDING row twice. */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT h FROM HizmatRequest h WHERE h.chatId = :chatId AND h.platform = :platform AND h.platformUserId = :platformUserId AND h.status = :status ORDER BY h.createdAt DESC LIMIT 1")
+  Optional<HizmatRequest> findTopByChatIdAndPlatformAndPlatformUserIdAndStatusForUpdate(
+      @Param("chatId") Long chatId,
+      @Param("platform") String platform,
+      @Param("platformUserId") String platformUserId,
+      @Param("status") RequestStatus status);
+
   @Query("SELECT DISTINCT h.chatId FROM HizmatRequest h WHERE h.status = 'APPROVED'")
   List<Long> findDistinctChatIdsByStatusApproved();
 

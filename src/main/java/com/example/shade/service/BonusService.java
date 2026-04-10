@@ -110,7 +110,7 @@ public class BonusService {
             return;
         }
         if ("BONUS_TOPUP_CONFIRM_YES".equals(callback)) {
-            initiateTopUpRequest(chatId);
+            bonusServiceProxy.initiateTopUpRequest(chatId);
             return;
         }
         if ("BONUS_TOPUP_CONFIRM_NO".equals(callback)) {
@@ -816,30 +816,32 @@ public class BonusService {
         sendTopUpConfirmation(chatId, platform, amount);
     }
 
-    private void initiateTopUpRequest(Long chatId) {
+    /**
+     * Submits bonus top-up for admin approval. Must run through Spring proxy ({@link #bonusServiceProxy}) so
+     * {@link Transactional} applies and pessimistic locks serialize duplicate inline-button taps.
+     */
+    @Transactional
+    public void initiateTopUpRequest(Long chatId) {
         String platform = sessionService.getUserData(chatId, "platform");
         String userId = sessionService.getUserData(chatId, "platformUserId");
         String amountStr = sessionService.getUserData(chatId, "amount");
         String fullName = sessionService.getUserData(chatId, "fullName");
 
         BigDecimal amount = new BigDecimal(amountStr);
-        Optional<UserBalance> balanceOpt = userBalanceRepository.findById(chatId);
+        Optional<UserBalance> balanceOpt = userBalanceRepository.findByIdWithLock(chatId);
         UserBalance balance;
         if (balanceOpt.isPresent()) {
             balance = balanceOpt.get();
         } else {
-            // Double-check it doesn't exist (prevent race condition)
             if (userBalanceRepository.existsById(chatId)) {
-                // Entity exists but findById returned empty - fetch again
-                balance = userBalanceRepository.findById(chatId)
+                balance = userBalanceRepository.findByIdWithLock(chatId)
                     .orElseThrow(() -> new IllegalStateException("UserBalance exists but not accessible for chatId: " + chatId));
             } else {
-                // Truly doesn't exist - safe to create
                 balance = UserBalance.builder()
                     .chatId(chatId)
                     .tickets(0L)
                     .balance(BigDecimal.ZERO)
-                    .build();
+                        .build();
                 balance = userBalanceRepository.save(balance);
                 logger.info("Created new UserBalance for chatId {}", chatId);
             }
@@ -855,11 +857,12 @@ public class BonusService {
             return;
         }
         HizmatRequest request = requestRepository
-                .findTopByChatIdAndPlatformAndPlatformUserIdAndStatusOrderByCreatedAtDesc(
+                .findTopByChatIdAndPlatformAndPlatformUserIdAndStatusForUpdate(
                         chatId, platform, userId, RequestStatus.PENDING)
                 .orElse(null);
         if (request == null) {
-            logger.error("No pending request found for chatId {}, platform: {}, userId: {}", chatId, platform, userId);
+            logger.warn("No PENDING bonus request for chatId {}, platform: {}, userId: {} (duplicate confirm or wrong state)",
+                    chatId, platform, userId);
             messageSender.sendMessage(chatId,
                     languageSessionService.getTranslation(chatId, "message.request_not_found"));
             sendMainMenu(chatId);
@@ -880,10 +883,9 @@ public class BonusService {
         messageSender.sendMessage(chatId, userMessage);
 
         sendAdminApprovalRequest(chatId, request);
-        
-        // Clear transfer-specific session data immediately after request creation
+
         clearTransferSessionData(chatId);
-        
+
         sessionService.setUserState(chatId, "BONUS_MENU");
         sendBonusMenu(chatId);
     }
