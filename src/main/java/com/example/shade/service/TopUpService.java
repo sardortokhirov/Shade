@@ -48,6 +48,8 @@ public class TopUpService {
     private final RestTemplate restTemplate = new RestTemplate();
     private static final String PAYMENT_MESSAGE_KEY = "payment_message_id";
     private static final String PAYMENT_ATTEMPTS_KEY = "payment_attempts";
+    /** Session: {@link HizmatRequest} id for the payment row expecting a manual screenshot (see {@code TOPUP_AWAITING_SCREENSHOT}). */
+    public static final String PENDING_TOPUP_REQUEST_ID_KEY = "pending_topup_request_id";
     private final BlockedUserRepository blockedUserRepository;
     private final HumoService humoService;
     private final LanguageSessionService languageSessionService;
@@ -58,6 +60,7 @@ public class TopUpService {
         sessionService.setUserState(chatId, "TOPUP_PLATFORM_SELECTION");
         sessionService.addNavigationState(chatId, "MAIN_MENU");
         sessionService.setUserData(chatId, PAYMENT_ATTEMPTS_KEY, "0");
+        clearPendingScreenshotRequestBinding(chatId);
         sendPlatformSelection(chatId);
     }
 
@@ -124,8 +127,21 @@ public class TopUpService {
             case "TOPUP_CONFIRM" -> initiateTopUpRequest(chatId);
             case "TOPUP_PAYMENT_CONFIRM" -> verifyPayment(chatId);
             case "TOPUP_SEND_SCREENSHOT" -> {
-                sessionService.setUserState(chatId, "TOPUP_AWAITING_SCREENSHOT");
-                messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "topup.message.send_screenshot"));
+                HizmatRequest pendingPay = requestRepository
+                        .findByChatIdAndStatus(chatId, RequestStatus.PENDING_PAYMENT)
+                        .orElse(null);
+                if (pendingPay == null) {
+                    messageSender.sendMessage(chatId,
+                            languageSessionService.getTranslation(chatId, "topup.message.request_not_found"));
+                    sendMainMenu(chatId);
+                } else {
+                    pendingPay.setStatus(RequestStatus.PENDING_SCREENSHOT);
+                    requestRepository.save(pendingPay);
+                    bindPendingScreenshotRequest(chatId, pendingPay);
+                    sessionService.setUserState(chatId, "TOPUP_AWAITING_SCREENSHOT");
+                    messageSender.sendMessage(chatId,
+                            languageSessionService.getTranslation(chatId, "topup.message.send_screenshot"));
+                }
             }
             default -> {
                 if (callback.startsWith("TOPUP_PLATFORM:")) {
@@ -428,6 +444,7 @@ public class TopUpService {
         request.setTransactionId(UUID.randomUUID().toString());
         request.setPaymentAttempts(0);
         requestRepository.save(request);
+        clearPendingScreenshotRequestBinding(chatId);
 
         sessionService.setUserState(chatId, "TOPUP_PAYMENT_CONFIRM");
         sessionService.addNavigationState(chatId, "TOPUP_CONFIRMATION");
@@ -491,6 +508,7 @@ public class TopUpService {
             messageSender.sendMessage(message, chatId);
 
             sessionService.setUserState(chatId, "TOPUP_AWAITING_SCREENSHOT");
+            bindPendingScreenshotRequest(chatId, request);
 
             String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
             String logMessage = String.format(
@@ -605,6 +623,7 @@ public class TopUpService {
 //                messageSender.animateAndDeleteMessages(chatId, sessionService.getMessageIds(chatId), "OPEN");
                 sessionService.clearMessageIds(chatId);
                 sessionService.setUserData(chatId, PAYMENT_ATTEMPTS_KEY, "0");
+                clearPendingScreenshotRequestBinding(chatId);
                 messageSender.sendMessage(chatId, logMessage +
                         (tickets > 0 ? String.format(languageSessionService.getTranslation(chatId, "topup.message.tickets_received"), tickets) : ""));
                 sendMainMenu(chatId);
@@ -630,11 +649,22 @@ public class TopUpService {
                 messageSender.sendMessage(message, chatId);
 
                 sessionService.setUserState(chatId, "TOPUP_AWAITING_SCREENSHOT");
+                bindPendingScreenshotRequest(chatId, request);
             } else {
                 messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "topup.message.payment_not_received"));
                 sendPaymentInstruction(chatId);
             }
         }
+    }
+
+    private void bindPendingScreenshotRequest(Long chatId, HizmatRequest request) {
+        if (request != null && request.getId() != null) {
+            sessionService.setUserData(chatId, PENDING_TOPUP_REQUEST_ID_KEY, String.valueOf(request.getId()));
+        }
+    }
+
+    private void clearPendingScreenshotRequestBinding(Long chatId) {
+        sessionService.removeUserData(chatId, PENDING_TOPUP_REQUEST_ID_KEY);
     }
 
     private void handleTransferFailure(Long chatId, HizmatRequest request, AdminCard adminCard) {
@@ -708,6 +738,13 @@ public class TopUpService {
             adminLogBotService.sendLog("❌ Xatolik: So‘rov topilmadi. ID: " + requestId);
             return;
         }
+        if (!RequestStatus.PENDING_SCREENSHOT.equals(request.getStatus())) {
+            logger.warn("Screenshot approval ignored for request {} status {}", requestId, request.getStatus());
+            adminLogBotService.sendLog("Skrinshot: so'rov " + requestId + " holati " + request.getStatus()
+                    + " — allaqachon yopilgan yoki noto'g'ri.");
+            return;
+        }
+
 
         AdminCard adminCard = adminCardRepository.findById(request.getAdminCardId())
                 .orElseThrow(() -> new IllegalStateException("Admin card not found: " + request.getAdminCardId()));
@@ -744,7 +781,7 @@ public class TopUpService {
                         });
                 long tickets = ticketsFromPaymentAmount(request.getAmount());
                 if (tickets > 0) {
-                    lotteryService.awardTickets(requestId, tickets);
+                    lotteryService.awardTickets(request.getChatId(), tickets);
                 }
 
                 bonusService.creditReferral(request.getChatId(), request.getAmount());
@@ -798,10 +835,10 @@ public class TopUpService {
                 );
 
                 adminLogBotService.sendLog(adminLogMessage);
-                messageSender.sendMessage(requestId, logMessage +
-                        (tickets > 0 ? String.format(languageSessionService.getTranslation(requestId, "topup.message.tickets_received"), tickets) : ""));
+                messageSender.sendMessage(request.getChatId(), logMessage +
+                        (tickets > 0 ? String.format(languageSessionService.getTranslation(request.getChatId(), "topup.message.tickets_received"), tickets) : ""));
             } else {
-                handleTransferFailure(requestId, request, adminCard);
+                handleTransferFailure(request.getChatId(), request, adminCard);
             }
         } else {
             request.setStatus(RequestStatus.CANCELED);
@@ -809,7 +846,7 @@ public class TopUpService {
 
             String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
             String logMessage = String.format(
-                    languageSessionService.getTranslation(requestId, "topup.message.screenshot_rejected"),
+                    languageSessionService.getTranslation(request.getChatId(), "topup.message.screenshot_rejected"),
                     request.getId(),
                     request.getPlatform(),
                     request.getPlatformUserId(),
@@ -840,164 +877,29 @@ public class TopUpService {
             );
 
             adminLogBotService.sendLog(adminMessage);
-            messageSender.sendMessage(requestId, logMessage);
+            messageSender.sendMessage(request.getChatId(), logMessage);
         }
 
-        sessionService.clearMessageIds(requestId);
-        sessionService.setUserData(requestId, PAYMENT_ATTEMPTS_KEY, "0");
-        sendMainMenu(requestId);
+        sessionService.clearMessageIds(request.getChatId());
+        sessionService.setUserData(request.getChatId(), PAYMENT_ATTEMPTS_KEY, "0");
+        clearPendingScreenshotRequestBinding(request.getChatId());
+        sendMainMenu(request.getChatId());
     }
 
-    public void handleScreenshotApprovalChat(Long chatId, Long requestId, boolean approve) {
-        HizmatRequest request = requestRepository.findByChatIdAndStatus(requestId, RequestStatus.PENDING_SCREENSHOT)
-                .orElse(null);
-        if (request == null) {
-            logger.error("No request found for ID {}", requestId);
-            adminLogBotService.sendLog("❌ Xatolik: So‘rov topilmadi. ID: " + requestId);
+    public void handleScreenshotApprovalChat(Long adminChatId, Long userChatId, boolean approve) throws Exception {
+        List<HizmatRequest> pendings = requestRepository.findByChatsIdAndStatus(userChatId, RequestStatus.PENDING_SCREENSHOT);
+        if (pendings.isEmpty()) {
+            logger.error("No PENDING_SCREENSHOT for userChatId {}", userChatId);
+            adminLogBotService.sendLog("Xatolik: skrinshot kutilayotgan so'rov topilmadi. User: " + userChatId);
             return;
         }
-
-        AdminCard adminCard = adminCardRepository.findById(request.getAdminCardId())
-                .orElseThrow(() -> new IllegalStateException("Admin card not found: " + request.getAdminCardId()));
-
-        ExchangeRate latest = exchangeRateRepository.findLatest()
-                .orElseThrow(() -> new RuntimeException("No exchange rate found in the database"));
-        long rubAmount =
-                BigDecimal.valueOf(request.getUniqueAmount())
-                        .multiply(latest.getUzsToRub())
-                        .longValue() / 1000;
-
-        if (approve) {
-            request.setStatus(RequestStatus.APPROVED);
-            requestRepository.save(request);
-
-            String platformName = request.getPlatform();
-            Platform platform = platformRepository.findByName(platformName)
-                    .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
-            BalanceLimit transferSuccessful =null;
-            if (platform.getType().equals("mostbet")){
-                try {
-                    transferSuccessful=mostbetService.transferToPlatform(request);
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
-            }else {
-                transferSuccessful= transferToPlatform(request, adminCard);
-            }
-            if (transferSuccessful != null) {
-                UserBalance balance = userBalanceRepository.findById(requestId)
-                        .orElseGet(() -> {
-                            UserBalance newBalance = UserBalance.builder()
-                                    .chatId(request.getChatId())
-                                    .tickets(0L)
-                                    .balance(BigDecimal.ZERO)
-                                    .build();
-                            return userBalanceRepository.save(newBalance);
-                        });
-                long tickets = ticketsFromPaymentAmount(request.getAmount());
-                if (tickets > 0) {
-                    lotteryService.awardTickets(requestId, tickets);
-                }
-
-                bonusService.creditReferral(request.getChatId(), request.getAmount());
-
-                String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
-                String logMessage = String.format(
-                        " 🆔: %d To‘lov skrinshoti tasdiqlandi ✅\n" +
-                                "👤ID [%s] %s\n" +
-                                "🌐 #%s: " + "%s\n" +
-                                "💸 Miqdor: %,d UZS\n" +
-                                "💸 Miqdor: %,d RUB\n" +
-                                "💳 Karta: `%s`\n" +
-                                "🔐 Admin kartasi: `%s`\n" +
-                                "🎟️ Chiptalar: %d (+ %d )\n\n" +
-                                "📅 [%s] ",
-                        request.getId(),
-                        request.getChatId(), number,
-                        request.getPlatform(),
-                        request.getPlatformUserId(),
-                        request.getUniqueAmount(),
-                        rubAmount,
-                        request.getCardNumber(),
-                        adminCard.getCardNumber(),
-                        balance.getTickets(),
-                        tickets,
-                        LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-                );
-                String adminLogMessage = String.format(
-                        " 🆔: %d To‘lov skrinshoti tasdiqlandi ✅\n" +
-                                "👤ID [%s] %s\n" +
-                                "🌐 #%s: " + "%s\n" +
-                                "💸 Miqdor: %,d UZS\n" +
-                                "💸 Miqdor: %,d RUB\n" +
-                                "💳 Karta: `%s`\n" +
-                                "🔐 Admin kartasi: `%s`\n" +
-                                "🎟️ Chiptalar: %d\n\n" +
-                                "\uD83C\uDFE6: %,d %s\n\n" +
-                                "📅 [%s] ",
-                        request.getId(),
-                        request.getChatId(), number,
-                        request.getPlatform(),
-                        request.getPlatformUserId(),
-                        request.getUniqueAmount(),
-                        rubAmount,
-                        request.getCardNumber(),
-                        adminCard.getCardNumber(),
-                        tickets,
-                        transferSuccessful.getLimit().longValue(),
-                        request.getCurrency().toString(),
-                        LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-                );
-
-                adminLogBotService.sendLog(adminLogMessage);
-                messageSender.sendMessage(requestId, logMessage +
-                        (tickets > 0 ? String.format(languageSessionService.getTranslation(requestId, "topup.message.tickets_received"), tickets) : ""));
-            } else {
-                handleTransferFailure(requestId, request, adminCard);
-            }
-        } else {
-            request.setStatus(RequestStatus.CANCELED);
-            requestRepository.save(request);
-
-            String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
-            String logMessage = String.format(
-                    languageSessionService.getTranslation(requestId, "topup.message.screenshot_rejected"),
-                    request.getId(),
-                    request.getPlatform(),
-                    request.getPlatformUserId(),
-                    request.getUniqueAmount(),
-                    rubAmount,
-                    request.getCardNumber(),
-                    adminCard.getCardNumber(),
-                    LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-            );
-            String adminMessage = String.format(
-                    "🆔: %d To‘lov skrinshoti rad etildi ❌\n" +
-                            "👤ID [%s] %s\n" +
-                            "🌐 #%s: " + "%s\n" +
-                            "💸 Miqdor: %,d UZS\n" +
-                            "💸 Miqdor: %,d RUB\n" +
-                            "💳 Karta: `%s`\n" +
-                            "💳 Bizniki: `%s`\n" +
-                            "📅 [%s] ",
-                    request.getId(),
-                    request.getChatId(), number,
-                    request.getPlatform(),
-                    request.getPlatformUserId(),
-                    request.getUniqueAmount(),
-                    rubAmount,
-                    request.getCardNumber(),
-                    adminCard.getCardNumber(),
-                    LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-            );
-
-            adminLogBotService.sendLog(adminMessage);
-            messageSender.sendMessage(requestId, logMessage);
+        if (pendings.size() > 1) {
+            logger.warn("Multiple PENDING_SCREENSHOT for userChatId {}", userChatId);
+            adminLogBotService.sendLog("Bir nechta skrinshot so'rovi: " + userChatId
+                    + ". Yangi xabarlardagi tugmalardan foydalaning (har birida ID ko'rsatilgan).");
+            return;
         }
-
-        sessionService.clearMessageIds(requestId);
-        sessionService.setUserData(requestId, PAYMENT_ATTEMPTS_KEY, "0");
-        sendMainMenu(requestId);
+        handleScreenshotApproval(adminChatId, pendings.get(0).getId(), approve);
     }
 
     public BalanceLimit getCashdeskBalance(String hash, String cashierPass, String cashdeskId) {

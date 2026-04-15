@@ -249,6 +249,22 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                     messageSender.sendMessage(message, chatId);
                     return;
                 }
+                String pendingRequestIdStr = sessionService.getUserData(chatId, TopUpService.PENDING_TOPUP_REQUEST_ID_KEY);
+                if (pendingRequestIdStr == null || pendingRequestIdStr.isBlank()) {
+                    logger.warn("TOPUP_AWAITING_SCREENSHOT but no pending_topup_request_id for chatId {}", chatId);
+                    messageSender.sendMessage(chatId,
+                            languageSessionService.getTranslation(chatId, "message.please_confirm_payment_transaction"));
+                    return;
+                }
+                final long pendingRequestId;
+                try {
+                    pendingRequestId = Long.parseLong(pendingRequestIdStr.trim());
+                } catch (NumberFormatException e) {
+                    logger.error("Invalid pending_topup_request_id for chatId {}: {}", chatId, pendingRequestIdStr);
+                    messageSender.sendMessage(chatId,
+                            languageSessionService.getTranslation(chatId, "message.please_confirm_payment_transaction"));
+                    return;
+                }
                 GetFile getFile = new GetFile();
                 getFile.setFileId(photo.getFileId());
                 File downloadedFile = null;
@@ -257,9 +273,8 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                     downloadedFile = downloadFile(file);
                     SendPhoto sendPhoto = new SendPhoto();
                     sendPhoto.setPhoto(new InputFile(downloadedFile));
-                    sendPhoto.setCaption("Screenshot from user: " + chatId); // Admin message, not translated
-                    sendPhoto.setReplyMarkup(createScreenshotMarkup(chatId));
-                    adminLogBotService.sendScreenshotRequest(sendPhoto, chatId);
+                    sendPhoto.setReplyMarkup(createScreenshotMarkup(pendingRequestId));
+                    adminLogBotService.sendScreenshotRequest(sendPhoto, chatId, pendingRequestId);
                     // Send confirmation message to user
                     messageSender.sendMessage(chatId,
                             languageSessionService.getTranslation(chatId, "message.photo_sent_confirmation"));
@@ -309,12 +324,13 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
         return markup;
     }
 
-    private InlineKeyboardMarkup createScreenshotMarkup(Long chatId) {
+    /** Approve/reject by concrete HizmatRequest id (avoids crediting the wrong amount when several flows exist). */
+    private InlineKeyboardMarkup createScreenshotMarkup(long hizmatRequestId) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         rows.add(List.of(
-                createButton("✅ Approve", "SCREENSHOT_APPROVE_CHAT:" + chatId),
-                createButton("❌ Reject", "SCREENSHOT_REJECT_CHAT:" + chatId)));
+                createButton("Approve", "SCREENSHOT_APPROVE:" + hizmatRequestId),
+                createButton("Reject", "SCREENSHOT_REJECT:" + hizmatRequestId)));
         markup.setKeyboard(rows);
         return markup;
     }

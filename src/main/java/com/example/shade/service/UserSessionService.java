@@ -32,6 +32,13 @@ public class UserSessionService {
         data.put(key, value);
         sessionDataStore.put(chatId, data);
     }
+
+    public void removeUserData(Long chatId, String key) {
+        Map<String, String> data = sessionDataStore.get(chatId);
+        if (data != null) {
+            data.remove(key);
+        }
+    }
     public String getUserData(Long chatId, String key, String defaultValue) {
         return Optional.ofNullable(sessionDataStore.get(chatId))
                 .map(data -> data.getOrDefault(key, defaultValue))

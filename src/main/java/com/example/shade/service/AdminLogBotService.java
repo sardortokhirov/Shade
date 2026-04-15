@@ -30,7 +30,11 @@ public class AdminLogBotService {
     private final AdminCardRepository adminCardRepository;
     private final BlockedUserRepository blockedUserRepository;
 
-    public void sendScreenshotRequest(SendPhoto sendPhoto, Long userChatId) {
+    /**
+     * Forwards a user payment screenshot to admins. {@code requestId} must be the exact top-up row in
+     * {@link RequestStatus#PENDING_SCREENSHOT} for {@code userChatId}.
+     */
+    public void sendScreenshotRequest(SendPhoto sendPhoto, Long userChatId, long requestId) {
         if (sendPhoto == null || sendPhoto.getPhoto() == null) {
             logger.error("Invalid SendPhoto object or file for userChatId {}", userChatId);
             return;
@@ -41,12 +45,15 @@ public class AdminLogBotService {
             return;
         }
 
-        // Fetch the latest pending screenshot request for the user
-        HizmatRequest request = requestRepository.findByChatIdAndStatus(userChatId, RequestStatus.PENDING_SCREENSHOT)
-                .orElse(null);
-        if (request == null) {
-            logger.error("No pending screenshot request found for userChatId {}", userChatId);
-            sendToAdmins("❌ No pending screenshot request found for userChatId: " + userChatId);
+        HizmatRequest request = requestRepository.findById(requestId).orElse(null);
+        if (request == null || !userChatId.equals(request.getChatId())
+                || request.getStatus() != RequestStatus.PENDING_SCREENSHOT) {
+            logger.error("Invalid screenshot request id {} for userChatId {} (found={}, status={})",
+                    requestId, userChatId,
+                    request != null,
+                    request != null ? request.getStatus() : null);
+            sendToAdmins("Skrinshot rad etildi: so'rov " + requestId + " foydalanuvchi " + userChatId
+                    + " uchun PENDING_SCREENSHOT emas yoki topilmadi.");
             return;
         }
 
