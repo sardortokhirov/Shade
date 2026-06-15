@@ -22,7 +22,7 @@ import org.slf4j.LoggerFactory;
 @RestController
 @RequestMapping("/api/config")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+@CrossOrigin(originPatterns = "*", allowCredentials = "true")
 public class SystemConfigurationController {
 
     private static final Logger logger = LoggerFactory.getLogger(SystemConfigurationController.class);

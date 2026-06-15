@@ -13,7 +13,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+@CrossOrigin(originPatterns = "*", allowCredentials = "true")
 public class AdminController {
     private final AdminLogBotService adminLogBotService;
     private final com.example.shade.repository.AllowedPromoUserRepository allowedPromoUserRepository;

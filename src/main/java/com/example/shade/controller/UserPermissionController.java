@@ -16,7 +16,7 @@ import java.util.Base64;
 @RestController
 @RequestMapping("/api/admin/user-permissions")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+@CrossOrigin(originPatterns = "*", allowCredentials = "true")
 public class UserPermissionController {
 
     private final UserPlatformPermissionRepository permissionRepository;

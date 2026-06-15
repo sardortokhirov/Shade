@@ -34,7 +34,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+@CrossOrigin(originPatterns = "*", allowCredentials = "true")
 public class LotteryController {
     private final LotteryService lotteryService;
     private final LotteryPrizeRepository lotteryPrizeRepository;

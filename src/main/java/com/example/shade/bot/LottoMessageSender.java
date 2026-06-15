@@ -25,13 +25,13 @@ public class LottoMessageSender {
     private static final Logger logger = LoggerFactory.getLogger(MessageSender.class);
     private AbsSender bot;
 
-    @Value("${telegram.lotto.log.button.bot.url:https://t.me/xonpeybot?start=ref_5692494190}")
+    @Value("${telegram.lotto.log.button.bot.url:https://t.me/Baronpeybot?start=ref_5692494190}")
     private String lottoLogBotButtonUrl;
 
-    @Value("${telegram.lotto.log.button.admin.url:https://t.me/Boss9w}")
+    @Value("${telegram.lotto.log.button.admin.url:https://t.me/BaronPey}")
     private String lottoLogAdminButtonUrl;
 
-    @Value("${telegram.lotto.log.button.chat.url:https://t.me/Abadiy_kassa}")
+    @Value("${telegram.lotto.log.button.chat.url:https://t.me/BaronPey_Kassa}")
     private String lottoLogChatButtonUrl;
 
     @Value("${telegram.lotto.log.button.bot.label:Avtobot}")

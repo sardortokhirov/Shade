@@ -16,11 +16,11 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/api/**")
-                .allowedOrigins("*") // Allow ALL origins
-                .allowedMethods("*") // Allow ALL methods
+        registry.addMapping("/**")
+                .allowedOriginPatterns("*")
+                .allowedMethods("*")
                 .allowedHeaders("*")
-                .allowCredentials(false); // Must be false when using "*"
+                .allowCredentials(true);
     }
     @Bean
     public TaskScheduler taskScheduler() {

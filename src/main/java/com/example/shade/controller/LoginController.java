@@ -17,7 +17,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+@CrossOrigin(originPatterns = "*", allowCredentials = "true")
 public class LoginController {
     private static final Logger logger = LoggerFactory.getLogger(LoginController.class);
     private final LoginEventRepository loginEventRepository;

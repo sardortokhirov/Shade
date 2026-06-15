@@ -15,7 +15,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/oson/config")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+@CrossOrigin(originPatterns = "*", allowCredentials = "true")
 public class OsonConfigController {
     private static final Logger logger = LoggerFactory.getLogger(OsonConfigController.class);
     private final OsonConfigRepository osonConfigRepository;

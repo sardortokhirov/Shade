@@ -496,7 +496,7 @@ public class BonusService {
     }
 
     private void sendReferralLink(Long chatId) {
-        String referralLink = String.format("https://t.me/xonpeybot?start=ref_%d", chatId);
+        String referralLink = String.format("https://t.me/Baronpeybot?start=ref_%d", chatId);
         SendMessage message = new SendMessage();
         message.setChatId(chatId);
         message.enableMarkdown(true);
@@ -1631,7 +1631,7 @@ public class BonusService {
         rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.contact"), "CONTACT")));
         InlineKeyboardButton instructionButton = new InlineKeyboardButton();
         instructionButton.setText(languageSessionService.getTranslation(chatId, "button.instruction"));
-        instructionButton.setUrl("https://t.me/xonpey");
+        instructionButton.setUrl("https://t.me/BaronPeyInfo");
         rows.add(List.of(instructionButton));
         markup.setKeyboard(rows);
         return markup;

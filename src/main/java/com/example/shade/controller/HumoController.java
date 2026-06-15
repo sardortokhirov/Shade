@@ -20,7 +20,7 @@ import java.util.Base64;
 
 @RestController
 @RequestMapping("/api/humo")
-@CrossOrigin(origins = "*")
+@CrossOrigin(originPatterns = "*", allowCredentials = "true")
 @RequiredArgsConstructor
 public class HumoController {
 

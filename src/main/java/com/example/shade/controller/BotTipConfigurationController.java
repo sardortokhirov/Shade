@@ -20,7 +20,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/bot-tip-config")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+@CrossOrigin(originPatterns = "*", allowCredentials = "true")
 public class BotTipConfigurationController {
 
     private final BotTipConfigurationService configurationService;

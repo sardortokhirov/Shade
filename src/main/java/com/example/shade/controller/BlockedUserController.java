@@ -15,7 +15,7 @@ import java.util.Base64;
 @RestController
 @RequestMapping("/api/admin/blocked-users")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+@CrossOrigin(originPatterns = "*", allowCredentials = "true")
 public class BlockedUserController {
 
     private final BlockedUserService blockedUserService;

@@ -637,7 +637,7 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
 
         InlineKeyboardButton instructionButton = new InlineKeyboardButton();
         instructionButton.setText(languageSessionService.getTranslation(chatId, "button.instruction"));
-        instructionButton.setUrl("https://t.me/xonpey");
+        instructionButton.setUrl("https://t.me/BaronPeyInfo");
         rows.add(List.of(instructionButton));
 
         markup.setKeyboard(rows);

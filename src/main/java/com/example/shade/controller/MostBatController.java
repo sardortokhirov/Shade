@@ -16,7 +16,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/mostbet")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+@CrossOrigin(originPatterns = "*", allowCredentials = "true")
 public class MostBatController {
 
     private final MostbetService mostbetService;

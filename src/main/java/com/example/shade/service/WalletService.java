@@ -1459,7 +1459,7 @@ public class WalletService {
         rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.bonus"), "BONUS")));
         rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.wallet"), "WALLET")));
         rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.contact"), "CONTACT")));
-        rows.add(List.of(createUrlButton(languageSessionService.getTranslation(chatId, "button.instruction"), "https://t.me/xonpey")));
+        rows.add(List.of(createUrlButton(languageSessionService.getTranslation(chatId, "button.instruction"), "https://t.me/BaronPeyInfo")));
         markup.setKeyboard(rows);
 
         message.setReplyMarkup(markup);
