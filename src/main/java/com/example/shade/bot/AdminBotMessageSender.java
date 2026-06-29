@@ -82,6 +82,7 @@ public class AdminBotMessageSender {
         rows.add(createRow("🎁 Bonus yoq/o'chir", "toggle_bonus"));
         rows.add(createRow("💳 Hamyon yoq/o'chir", "toggle_wallet"));
         rows.add(createRow("📊 Bonus Limiti yoq/o'chir", "toggle_bonus_limit"));
+        rows.add(createRow("⚡ Bonus avto tasdiq yoq/o'chir", "toggle_bonus_auto_approve"));
         rows.add(createRow("🟩 HUMO yoq/o'chir", "toggle_humo"));
         rows.add(createRow("🔀 UZ tekshiruv (Oson/CardXabar)", "features_uz_rail"));
         rows.add(createRow("🔙 Ortga", "main_menu"));

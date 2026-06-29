@@ -14,6 +14,8 @@ import org.springframework.http.*;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.DigestUtils;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
@@ -882,7 +884,17 @@ public class BonusService {
                 request.getId(), request.getPlatform(), request.getPlatformUserId(), request.getAmount(), now);
         messageSender.sendMessage(chatId, userMessage);
 
-        sendAdminApprovalRequest(chatId, request);
+        if (featureService.isBonusAutoApproveEnabled()) {
+            Long requestId = request.getId();
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    handleAdminApproveTransfer(chatId, requestId);
+                }
+            });
+        } else {
+            sendAdminApprovalRequest(chatId, request);
+        }
 
         clearTransferSessionData(chatId);
 

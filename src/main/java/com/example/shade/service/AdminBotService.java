@@ -149,6 +149,21 @@ public class AdminBotService {
         }
     }
 
+    @Transactional
+    public void toggleBonusAutoApprove(Long chatId) {
+        try {
+            boolean currentStatus = featureService.isBonusAutoApproveEnabled();
+            featureService.toggleBonusAutoApprove(!currentStatus);
+            boolean newStatus = !currentStatus;
+            String status = newStatus ? "Yoqildi ✅" : "O'chirildi ❌";
+            messageSender.sendTextMessage(chatId, "Bonus avto tasdiq " + status);
+            sendFeaturesMenu(chatId);
+        } catch (Exception e) {
+            log.error("Error toggling bonus auto-approve", e);
+            messageSender.sendTextMessage(chatId, "❌ Xatolik yuz berdi: " + e.getMessage());
+        }
+    }
+
     public void openUzRailConfigMenu(Long chatId) {
         UzcardRail r = systemConfigurationService.getUzcardRail();
         String label = switch (r) {

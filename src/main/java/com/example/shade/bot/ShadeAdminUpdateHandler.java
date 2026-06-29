@@ -122,6 +122,7 @@ public class ShadeAdminUpdateHandler {
             case "toggle_bonus" -> adminBotService.toggleBonus(chatId);
             case "toggle_wallet" -> adminBotService.toggleWallet(chatId);
             case "toggle_bonus_limit" -> adminBotService.toggleBonusLimit(chatId);
+            case "toggle_bonus_auto_approve" -> adminBotService.toggleBonusAutoApprove(chatId);
             case "toggle_humo" -> adminBotService.toggleHumo(chatId);
             case "features_uz_rail" -> adminBotService.openUzRailConfigMenu(chatId);
             case "config_set_uz_rail_OSON" -> adminBotService.setGlobalUzcardRail(chatId, UzcardRail.OSON);

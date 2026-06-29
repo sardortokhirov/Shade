@@ -35,23 +35,31 @@ public class FeatureService {
                     settings.setPromoEnabled(false);
                     settings.setBonusLimitEnabled(true);
                     settings.setPayToggleEnabled(false);
+                    settings.setBonusAutoApproveEnabled(false);
                     settings.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
                     return featureSettingsRepository.save(settings);
                 });
     }
 
-    @Transactional
-    public void toggleTopUp(boolean enabled) {
-        FeatureSettings current = getGlobalSettings();
+    private FeatureSettings copyFromCurrent(FeatureSettings current) {
         FeatureSettings settings = new FeatureSettings();
-        settings.setTopUpEnabled(enabled);
+        settings.setTopUpEnabled(current.getTopUpEnabled());
         settings.setWithdrawEnabled(current.getWithdrawEnabled());
         settings.setBonusEnabled(current.getBonusEnabled());
         settings.setWalletEnabled(current.getWalletEnabled());
         settings.setPromoEnabled(current.getPromoEnabled());
         settings.setBonusLimitEnabled(current.getBonusLimitEnabled());
         settings.setPayToggleEnabled(current.getPayToggleEnabled());
+        settings.setBonusAutoApproveEnabled(current.getBonusAutoApproveEnabled());
         settings.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
+        return settings;
+    }
+
+    @Transactional
+    public void toggleTopUp(boolean enabled) {
+        FeatureSettings current = getGlobalSettings();
+        FeatureSettings settings = copyFromCurrent(current);
+        settings.setTopUpEnabled(enabled);
         featureSettingsRepository.save(settings);
         logger.info("Top-up {} globally", enabled ? "enabled" : "disabled");
     }
@@ -59,15 +67,8 @@ public class FeatureService {
     @Transactional
     public void toggleWithdraw(boolean enabled) {
         FeatureSettings current = getGlobalSettings();
-        FeatureSettings settings = new FeatureSettings();
-        settings.setTopUpEnabled(current.getTopUpEnabled());
+        FeatureSettings settings = copyFromCurrent(current);
         settings.setWithdrawEnabled(enabled);
-        settings.setBonusEnabled(current.getBonusEnabled());
-        settings.setWalletEnabled(current.getWalletEnabled());
-        settings.setPromoEnabled(current.getPromoEnabled());
-        settings.setBonusLimitEnabled(current.getBonusLimitEnabled());
-        settings.setPayToggleEnabled(current.getPayToggleEnabled());
-        settings.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
         featureSettingsRepository.save(settings);
         logger.info("Withdraw {} globally", enabled ? "enabled" : "disabled");
     }
@@ -75,15 +76,8 @@ public class FeatureService {
     @Transactional
     public void toggleBonus(boolean enabled) {
         FeatureSettings current = getGlobalSettings();
-        FeatureSettings settings = new FeatureSettings();
-        settings.setTopUpEnabled(current.getTopUpEnabled());
-        settings.setWithdrawEnabled(current.getWithdrawEnabled());
+        FeatureSettings settings = copyFromCurrent(current);
         settings.setBonusEnabled(enabled);
-        settings.setWalletEnabled(current.getWalletEnabled());
-        settings.setPromoEnabled(current.getPromoEnabled());
-        settings.setBonusLimitEnabled(current.getBonusLimitEnabled());
-        settings.setPayToggleEnabled(current.getPayToggleEnabled());
-        settings.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
         featureSettingsRepository.save(settings);
         logger.info("Bonus {} globally", enabled ? "enabled" : "disabled");
     }
@@ -103,15 +97,8 @@ public class FeatureService {
     @Transactional
     public void toggleWallet(boolean enabled) {
         FeatureSettings current = getGlobalSettings();
-        FeatureSettings settings = new FeatureSettings();
-        settings.setTopUpEnabled(current.getTopUpEnabled());
-        settings.setWithdrawEnabled(current.getWithdrawEnabled());
-        settings.setBonusEnabled(current.getBonusEnabled());
+        FeatureSettings settings = copyFromCurrent(current);
         settings.setWalletEnabled(enabled);
-        settings.setPromoEnabled(current.getPromoEnabled());
-        settings.setBonusLimitEnabled(current.getBonusLimitEnabled());
-        settings.setPayToggleEnabled(current.getPayToggleEnabled());
-        settings.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
         featureSettingsRepository.save(settings);
         logger.info("Wallet {} globally", enabled ? "enabled" : "disabled");
     }
@@ -124,15 +111,8 @@ public class FeatureService {
     @Transactional
     public void togglePromo(boolean enabled) {
         FeatureSettings current = getGlobalSettings();
-        FeatureSettings settings = new FeatureSettings();
-        settings.setTopUpEnabled(current.getTopUpEnabled());
-        settings.setWithdrawEnabled(current.getWithdrawEnabled());
-        settings.setBonusEnabled(current.getBonusEnabled());
-        settings.setWalletEnabled(current.getWalletEnabled());
+        FeatureSettings settings = copyFromCurrent(current);
         settings.setPromoEnabled(enabled);
-        settings.setBonusLimitEnabled(current.getBonusLimitEnabled());
-        settings.setPayToggleEnabled(current.getPayToggleEnabled());
-        settings.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
         featureSettingsRepository.save(settings);
         logger.info("Promo {} globally", enabled ? "enabled" : "disabled");
     }
@@ -144,15 +124,8 @@ public class FeatureService {
     @Transactional
     public void toggleBonusLimit(boolean enabled) {
         FeatureSettings current = getGlobalSettings();
-        FeatureSettings settings = new FeatureSettings();
-        settings.setTopUpEnabled(current.getTopUpEnabled());
-        settings.setWithdrawEnabled(current.getWithdrawEnabled());
-        settings.setBonusEnabled(current.getBonusEnabled());
-        settings.setWalletEnabled(current.getWalletEnabled());
-        settings.setPromoEnabled(current.getPromoEnabled());
+        FeatureSettings settings = copyFromCurrent(current);
         settings.setBonusLimitEnabled(enabled);
-        settings.setPayToggleEnabled(current.getPayToggleEnabled());
-        settings.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
         featureSettingsRepository.save(settings);
         logger.info("Bonus limit {} globally", enabled ? "enabled" : "disabled");
     }
@@ -165,20 +138,27 @@ public class FeatureService {
     @Transactional
     public void togglePayToggle(boolean enabled) {
         FeatureSettings current = getGlobalSettings();
-        FeatureSettings settings = new FeatureSettings();
-        settings.setTopUpEnabled(current.getTopUpEnabled());
-        settings.setWithdrawEnabled(current.getWithdrawEnabled());
-        settings.setBonusEnabled(current.getBonusEnabled());
-        settings.setWalletEnabled(current.getWalletEnabled());
-        settings.setPromoEnabled(current.getPromoEnabled());
-        settings.setBonusLimitEnabled(current.getBonusLimitEnabled());
+        FeatureSettings settings = copyFromCurrent(current);
         settings.setPayToggleEnabled(enabled);
-        settings.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
         featureSettingsRepository.save(settings);
         logger.info("Pay toggle {} globally", enabled ? "enabled" : "disabled");
     }
 
     public boolean isPayToggleEnabled() {
         return getGlobalSettings().getPayToggleEnabled();
+    }
+
+    @Transactional
+    public void toggleBonusAutoApprove(boolean enabled) {
+        FeatureSettings current = getGlobalSettings();
+        FeatureSettings settings = copyFromCurrent(current);
+        settings.setBonusAutoApproveEnabled(enabled);
+        featureSettingsRepository.save(settings);
+        logger.info("Bonus auto-approve {} globally", enabled ? "enabled" : "disabled");
+    }
+
+    public boolean isBonusAutoApproveEnabled() {
+        Boolean enabled = getGlobalSettings().getBonusAutoApproveEnabled();
+        return enabled != null && enabled;
     }
 }

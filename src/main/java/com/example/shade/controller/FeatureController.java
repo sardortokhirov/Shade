@@ -109,6 +109,16 @@ public class FeatureController {
         return ResponseEntity.ok("Bonus limiti " + (enabled ? "yoqildi" : "o'chirildi"));
     }
 
+    @PostMapping("/toggle/bonus-auto-approve")
+    public ResponseEntity<String> toggleBonusAutoApprove(@RequestParam boolean enabled, HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        featureService.toggleBonusAutoApprove(enabled);
+        logger.info("Bonus auto-approve set to {}", enabled);
+        return ResponseEntity.ok("Bonus avto tasdiq " + (enabled ? "yoqildi" : "o'chirildi"));
+    }
+
     @PostMapping("/toggle/pay")
     public ResponseEntity<String> togglePay(@RequestParam boolean enabled, HttpServletRequest request) {
         if (!authenticate(request)) {
