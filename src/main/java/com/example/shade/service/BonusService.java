@@ -52,7 +52,7 @@ public class BonusService {
     private final BlockedUserService blockedUserService;
     private final AdminChatRepository adminChatRepository;
     private final ExchangeRateRepository exchangeRateRepository;
-    private final AllowedPromoUserRepository allowedPromoUserRepository;
+    private final PromoWhitelistService promoWhitelistService;
     private final LotteryService lotteryService;
     private final MessageSender messageSender;
     private final AdminLogBotService adminLogBotService;
@@ -138,6 +138,11 @@ public class BonusService {
         if (callback.startsWith("ADMIN_DECLINE_TRANSFER:")) {
             Long requestId = Long.valueOf(callback.split(":")[1]);
             handleAdminDeclineTransfer(chatId, requestId);
+            return;
+        }
+        if (callback.startsWith("ADMIN_DECLINE_REFUND_TRANSFER:")) {
+            Long requestId = Long.valueOf(callback.split(":")[1]);
+            handleAdminDeclineTransferWithRefund(chatId, requestId);
             return;
         }
         if (callback.startsWith("ADMIN_REMOVE_TICKETS:")) {
@@ -619,10 +624,10 @@ public class BonusService {
 
         // --- NEW PROMO LOGIC START ---
         if (featureService.isPromoEnabled()) {
-            boolean isChatIdAllowed = allowedPromoUserRepository.existsByChatId(chatId);
-            boolean isUserIdAllowed = allowedPromoUserRepository.existsByUserId(trimmedUserId);
-            
-            if (!isChatIdAllowed || !isUserIdAllowed) {
+            boolean allowed = promoWhitelistService.isPromoChatAllowed(chatId)
+                    && promoWhitelistService.isPromoLinkAllowed(chatId, trimmedUserId);
+
+            if (!allowed) {
                 messageSender.sendMessage(chatId,
                         languageSessionService.getTranslation(chatId, "message.promo_restriction"));
                 sessionService.setUserState(chatId, "BONUS_TOPUP_USER_ID");
@@ -1234,14 +1239,7 @@ public class BonusService {
                 cardDisplay,
                 LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
-        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-        rows.add(List.of(
-                createButton(languageSessionService.getTranslation(request.getChatId(), "button.approve_transfer"),
-                        "ADMIN_APPROVE_TRANSFER:" + request.getId()),
-                createButton(languageSessionService.getTranslation(request.getChatId(), "button.decline_transfer"),
-                        "ADMIN_DECLINE_TRANSFER:" + request.getId())));
-        markup.setKeyboard(rows);
+        InlineKeyboardMarkup markup = createAdminBonusActionKeyboard(request.getChatId(), request.getId());
 
         adminLogBotService.sendToAdmins(errorLogMessage, markup);
         messageSender.sendMessage(request.getChatId(),
@@ -1249,33 +1247,45 @@ public class BonusService {
     }
 
     public void handleAdminDeclineTransfer(Long chatId, Long requestId) {
-        HizmatRequest request = requestRepository.findById(requestId)
-                .orElseThrow(() -> new IllegalStateException("Request not found: " + requestId));
-        request.setStatus(RequestStatus.CANCELED);
-        requestRepository.save(request);
-
-        // Refund balance and daily limit
-        Optional<UserBalance> balanceOpt = userBalanceRepository.findById(request.getChatId());
-        UserBalance balance;
-        if (balanceOpt.isPresent()) {
-            balance = balanceOpt.get();
-        } else {
-            // Double-check it doesn't exist (prevent race condition)
-            if (userBalanceRepository.existsById(request.getChatId())) {
-                // Entity exists but findById returned empty - fetch again
-                balance = userBalanceRepository.findById(request.getChatId())
-                    .orElseThrow(() -> new IllegalStateException("UserBalance exists but not accessible for chatId: " + request.getChatId()));
-            } else {
-                // Truly doesn't exist - safe to create
-                balance = UserBalance.builder()
-                    .chatId(request.getChatId())
-                    .tickets(0L)
-                    .balance(BigDecimal.ZERO)
-                    .build();
-                balance = userBalanceRepository.save(balance);
-                logger.info("Created new UserBalance for chatId {}", request.getChatId());
-            }
+        HizmatRequest request = cancelBonusRequestIfPending(requestId);
+        if (request == null) {
+            return;
         }
+
+        UserBalance balance = getOrCreateUserBalance(request.getChatId());
+
+        String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
+        String errorLogMessage = String.format(
+                "🆔: `%d`\nBonus rad etildi (pul qaytarilmadi) ❌\n" +
+                        "👤 User ID: `%s` %s\n" +
+                        "🌐 %s: " + "`%s`\n" +
+                        "💸 Bonus: %s \n" +
+                        "💰 Balans: %s so‘m\n" +
+                        "📅 [%s] ",
+                request.getId(),
+                request.getChatId(), number, request.getPlatform(), request.getPlatformUserId(),
+                request.getUniqueAmount(), balance.getBalance().longValue(),
+                LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        String userErrorLogMessage = String.format(
+                languageSessionService.getTranslation(request.getChatId(), "message.bonus_declined_no_refund"),
+                request.getId(), request.getPlatform(), request.getPlatformUserId(), request.getUniqueAmount(),
+                balance.getBalance().longValue(),
+                LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        SendMessage message = new SendMessage();
+        message.setChatId(request.getChatId().toString());
+        message.setText(userErrorLogMessage);
+        message.setReplyMarkup(backButtonKeyboard(request.getChatId()));
+        messageSender.sendMessage(message, request.getChatId());
+        adminLogBotService.sendToAdmins(errorLogMessage);
+    }
+
+    public void handleAdminDeclineTransferWithRefund(Long chatId, Long requestId) {
+        HizmatRequest request = cancelBonusRequestIfPending(requestId);
+        if (request == null) {
+            return;
+        }
+
+        UserBalance balance = getOrCreateUserBalance(request.getChatId());
         balance.setBalance(balance.getBalance().add(BigDecimal.valueOf(request.getAmount())));
         userBalanceRepository.save(balance);
 
@@ -1299,11 +1309,43 @@ public class BonusService {
                 balance.getBalance().longValue(),
                 LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         SendMessage message = new SendMessage();
-        message.setChatId(chatId);
+        message.setChatId(request.getChatId().toString());
         message.setText(userErrorLogMessage);
-        message.setReplyMarkup(backButtonKeyboard(chatId));
+        message.setReplyMarkup(backButtonKeyboard(request.getChatId()));
         messageSender.sendMessage(message, request.getChatId());
         adminLogBotService.sendToAdmins(errorLogMessage);
+    }
+
+    private HizmatRequest cancelBonusRequestIfPending(Long requestId) {
+        HizmatRequest request = requestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalStateException("Request not found: " + requestId));
+        if (request.getStatus() != RequestStatus.PENDING_ADMIN) {
+            logger.warn("Bonus decline ignored for request {}: status is {}", requestId, request.getStatus());
+            return null;
+        }
+        request.setStatus(RequestStatus.CANCELED);
+        requestRepository.save(request);
+        return request;
+    }
+
+    private UserBalance getOrCreateUserBalance(Long userChatId) {
+        Optional<UserBalance> balanceOpt = userBalanceRepository.findById(userChatId);
+        if (balanceOpt.isPresent()) {
+            return balanceOpt.get();
+        }
+        if (userBalanceRepository.existsById(userChatId)) {
+            return userBalanceRepository.findById(userChatId)
+                    .orElseThrow(() -> new IllegalStateException(
+                            "UserBalance exists but not accessible for chatId: " + userChatId));
+        }
+        UserBalance balance = UserBalance.builder()
+                .chatId(userChatId)
+                .tickets(0L)
+                .balance(BigDecimal.ZERO)
+                .build();
+        balance = userBalanceRepository.save(balance);
+        logger.info("Created new UserBalance for chatId {}", userChatId);
+        return balance;
     }
 
     public void handleAdminRemoveTickets(Long chatId, Long userChatId) {
@@ -1789,13 +1831,20 @@ public class BonusService {
     }
 
     private InlineKeyboardMarkup createAdminApprovalKeyboard(Long chatId, Long requestId, Long userChatId) {
+        return createAdminBonusActionKeyboard(chatId, requestId);
+    }
+
+    private InlineKeyboardMarkup createAdminBonusActionKeyboard(Long labelChatId, Long requestId) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         rows.add(List.of(
-                createButton(languageSessionService.getTranslation(chatId, "button.approve_transfer"),
+                createButton(languageSessionService.getTranslation(labelChatId, "button.approve_transfer"),
                         "ADMIN_APPROVE_TRANSFER:" + requestId),
-                createButton(languageSessionService.getTranslation(chatId, "button.decline_transfer"),
+                createButton(languageSessionService.getTranslation(labelChatId, "button.decline_transfer"),
                         "ADMIN_DECLINE_TRANSFER:" + requestId)));
+        rows.add(List.of(
+                createButton(languageSessionService.getTranslation(labelChatId, "button.decline_transfer_refund"),
+                        "ADMIN_DECLINE_REFUND_TRANSFER:" + requestId)));
         markup.setKeyboard(rows);
         return markup;
     }

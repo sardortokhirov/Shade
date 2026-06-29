@@ -1,8 +1,8 @@
 package com.example.shade.service;
 
 import com.example.shade.model.DailyUserStats;
-import com.example.shade.repository.AllowedPromoUserRepository;
 import com.example.shade.repository.DailyUserStatsRepository;
+import com.example.shade.repository.PromoAllowedChatRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -25,7 +25,7 @@ public class DailyStatsService {
     private final SystemConfigurationService configurationService;
     private final UserLimitIncreaseService userLimitIncreaseService;
     private final FeatureService featureService;
-    private final AllowedPromoUserRepository allowedPromoUserRepository;
+    private final PromoAllowedChatRepository promoAllowedChatRepository;
     private static final ZoneId GMT_PLUS_5 = ZoneId.of("GMT+5");
 
     /**
@@ -71,7 +71,7 @@ public class DailyStatsService {
         // Check if user qualifies for deposit-free limit (pay toggle + promo + registered)
         boolean payToggleEnabled = featureService.isPayToggleEnabled();
         boolean promoEnabled = featureService.isPromoEnabled();
-        boolean isPromoUser = allowedPromoUserRepository.existsByChatId(chatId);
+        boolean isPromoUser = promoAllowedChatRepository.existsByChatId(chatId);
         
         Long availableLimitBeforeTransfers;
         if (payToggleEnabled && promoEnabled && isPromoUser) {
@@ -204,7 +204,7 @@ public class DailyStatsService {
         // If transfer was made while promo was on, track it so we don't count it after promo is turned off
         boolean payToggleEnabled = featureService.isPayToggleEnabled();
         boolean promoEnabled = featureService.isPromoEnabled();
-        boolean isPromoUser = allowedPromoUserRepository.existsByChatId(chatId);
+        boolean isPromoUser = promoAllowedChatRepository.existsByChatId(chatId);
         if (payToggleEnabled && promoEnabled && isPromoUser) {
             long currentPromo = stats.getDailyPromoTransferAmount() != null ? stats.getDailyPromoTransferAmount() : 0L;
             stats.setDailyPromoTransferAmount(currentPromo + amount);
@@ -293,7 +293,7 @@ public class DailyStatsService {
         // Check if user qualifies for deposit-free limit (pay toggle + promo + registered)
         boolean payToggleEnabled = featureService.isPayToggleEnabled();
         boolean promoEnabled = featureService.isPromoEnabled();
-        boolean isPromoUser = allowedPromoUserRepository.existsByChatId(chatId);
+        boolean isPromoUser = promoAllowedChatRepository.existsByChatId(chatId);
         
         Long dailyPromoTransferAmount = stats.getDailyPromoTransferAmount() != null ? stats.getDailyPromoTransferAmount() : 0L;
         Long available;
@@ -335,7 +335,7 @@ public class DailyStatsService {
         // Check if user qualifies for deposit-free limit (pay toggle + promo + registered)
         boolean payToggleEnabled = featureService.isPayToggleEnabled();
         boolean promoEnabled = featureService.isPromoEnabled();
-        boolean isPromoUser = allowedPromoUserRepository.existsByChatId(chatId);
+        boolean isPromoUser = promoAllowedChatRepository.existsByChatId(chatId);
         
         Long dailyPromoTransferAmount = (stats != null && stats.getDailyPromoTransferAmount() != null) ? stats.getDailyPromoTransferAmount() : 0L;
         Long available;

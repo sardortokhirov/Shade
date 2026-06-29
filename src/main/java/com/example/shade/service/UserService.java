@@ -42,7 +42,7 @@ public class UserService {
     private final UserPlatformPermissionRepository userPlatformPermissionRepository;
     private final LotteryTicketPurchaseRepository lotteryTicketPurchaseRepository;
     private final SessionDataRepository sessionDataRepository;
-    private final AllowedPromoUserRepository allowedPromoUserRepository;
+    private final PromoWhitelistService promoWhitelistService;
     private final ApkLinkUserPreferenceRepository apkLinkUserPreferenceRepository;
     private final ApkLinkUserCooldownRepository apkLinkUserCooldownRepository;
     private final UserWalletQuotaRepository userWalletQuotaRepository;
@@ -654,7 +654,9 @@ public class UserService {
             referralRepository.deleteByReferredChatId(chatId);
             referralRepository.deleteByReferrerChatId(chatId);
             userPlatformPermissionRepository.deleteByUserId(chatId.toString());
-            allowedPromoUserRepository.deleteByChatId(chatId);
+            if (promoWhitelistService.isPromoChatAllowed(chatId)) {
+                promoWhitelistService.deleteChat(chatId);
+            }
             apkLinkUserPreferenceRepository.deleteById(chatId);
             apkLinkUserCooldownRepository.deleteById(chatId);
 
