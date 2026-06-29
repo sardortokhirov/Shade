@@ -41,7 +41,8 @@ public class FeatureSettings {
     @Column(name = "pay_toggle_enabled", nullable = false)
     private Boolean payToggleEnabled = false;
 
-    @Column(name = "bonus_auto_approve_enabled", nullable = false)
+    /** Nullable so Hibernate DDL does not add NOT NULL (existing rows would get null). Null treated as disabled in isBonusAutoApproveEnabled(). */
+    @Column(name = "bonus_auto_approve_enabled")
     private Boolean bonusAutoApproveEnabled = false;
 
     @Column(name = "created_at", nullable = false)
