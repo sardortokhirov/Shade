@@ -148,7 +148,7 @@ public interface HizmatRequestRepository
             AND (:startDate IS NULL OR COALESCE(h.approvedAt, h.createdAt) >= :startDate)
             AND (:endDate IS NULL OR COALESCE(h.approvedAt, h.createdAt) <= :endDate)
           """)
-  Double sumApprovedBonusAmount(
+  Long sumApprovedBonusAmount(
       @Param("cardId") Long cardId,
       @Param("platformId") Long platformId,
       @Param("startDate") LocalDateTime startDate,
