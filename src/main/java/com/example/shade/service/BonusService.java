@@ -23,6 +23,8 @@ import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import javax.xml.bind.DatatypeConverter;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -73,6 +75,9 @@ public class BonusService {
     @Lazy
     @Autowired
     private BonusService bonusServiceProxy;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public void startBonus(Long chatId) {
         logger.info("Starting bonus section for chatId: {}", chatId);
@@ -951,11 +956,29 @@ public class BonusService {
                 .replace("[", "\\[");
     }
 
-    private void markBonusApproved(HizmatRequest request) {
+    /**
+     * Persists BONUS_APPROVED in its own transaction so dashboard counting is not lost
+     * when later notify/messaging code fails and rolls back the outer transfer transaction.
+     * Must be invoked through {@link #bonusServiceProxy}.
+     */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public HizmatRequest markBonusApproved(Long requestId) {
+        HizmatRequest request = requestRepository.findByIdWithLock(requestId)
+                .orElseThrow(() -> new IllegalStateException("Request not found: " + requestId));
+        if (request.getStatus() == RequestStatus.BONUS_APPROVED) {
+            return request;
+        }
         request.setStatus(RequestStatus.BONUS_APPROVED);
-        request.setTransactionId(UUID.randomUUID().toString());
+        if (request.getTransactionId() == null || request.getTransactionId().isBlank()) {
+            request.setTransactionId(UUID.randomUUID().toString());
+        }
         request.setApprovedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
-        requestRepository.save(request);
+        if (request.getUniqueAmount() == null || request.getUniqueAmount() <= 0) {
+            if (request.getAmount() != null && request.getAmount() > 0) {
+                request.setUniqueAmount(request.getAmount());
+            }
+        }
+        return requestRepository.saveAndFlush(request);
     }
 
     @Transactional
@@ -981,7 +1004,9 @@ public class BonusService {
         if (platformData.getType().equals("mostbet")) {
             try {
                 BalanceLimit transferSuccessful = mostbetService.transferToPlatform(request);
-                markBonusApproved(request);
+                // Detach stale PENDING_ADMIN instance so outer tx cannot overwrite BONUS_APPROVED.
+                entityManager.detach(request);
+                request = bonusServiceProxy.markBonusApproved(requestId);
                 // messageSender.animateAndDeleteMessages(request.getChatId(),
                 // sessionService.getMessageIds(request.getChatId()), "OPEN");
                 sessionService.clearMessageIds(request.getChatId());
@@ -1131,7 +1156,9 @@ public class BonusService {
                     successObj = responseBody.get("Success");
 
                 if (Boolean.TRUE.equals(successObj)) {
-                    markBonusApproved(request);
+                    // Detach stale PENDING_ADMIN instance so outer tx cannot overwrite BONUS_APPROVED.
+                    entityManager.detach(request);
+                    request = bonusServiceProxy.markBonusApproved(requestId);
                     logger.info("✅ Platform transfer completed: chatId={}, userId={}, amount={}", request.getChatId(),
                             userId, amount);
                     // messageSender.animateAndDeleteMessages(request.getChatId(),

@@ -164,12 +164,12 @@ public class DashboardService {
         }
 
         public double getTotalApprovedBonusAmount(RequestFilter filter) {
-                List<HizmatRequest> requests = requestRepository.findByFilters(
-                                filter.getCardId(), filter.getPlatformId(), RequestStatus.BONUS_APPROVED, null);
-                return requests.stream()
-                                .filter(r -> withinDateRange(r, filter.getStartDate(), filter.getEndDate()))
-                                .mapToDouble(DashboardService::requestAmount)
-                                .sum();
+                Double total = requestRepository.sumApprovedBonusAmount(
+                                filter.getCardId(),
+                                filter.getPlatformId(),
+                                filter.getStartDate(),
+                                filter.getEndDate());
+                return total != null ? total : 0.0;
         }
 
         public double getTotalApprovedTipAmount(RequestFilter filter) {
