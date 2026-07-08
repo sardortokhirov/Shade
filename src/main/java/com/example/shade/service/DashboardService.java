@@ -23,6 +23,31 @@ import java.util.stream.Collectors;
 @Service
 public class DashboardService {
 
+        private static double requestAmount(HizmatRequest request) {
+                if (request.getUniqueAmount() != null && request.getUniqueAmount() > 0) {
+                        return request.getUniqueAmount();
+                }
+                if (request.getAmount() != null && request.getAmount() > 0) {
+                        return request.getAmount();
+                }
+                return 0.0;
+        }
+
+        private static LocalDateTime requestEventTime(HizmatRequest request) {
+                return request.getApprovedAt() != null ? request.getApprovedAt() : request.getCreatedAt();
+        }
+
+        private static boolean withinDateRange(HizmatRequest request, LocalDateTime startDate, LocalDateTime endDate) {
+                LocalDateTime eventTime = requestEventTime(request);
+                if (startDate != null && eventTime.isBefore(startDate)) {
+                        return false;
+                }
+                if (endDate != null && eventTime.isAfter(endDate)) {
+                        return false;
+                }
+                return true;
+        }
+
         @Autowired
         private HizmatRequestRepository requestRepository;
 
@@ -141,18 +166,9 @@ public class DashboardService {
         public double getTotalApprovedBonusAmount(RequestFilter filter) {
                 List<HizmatRequest> requests = requestRepository.findByFilters(
                                 filter.getCardId(), filter.getPlatformId(), RequestStatus.BONUS_APPROVED, null);
-                if (filter.getStartDate() != null) {
-                        requests = requests.stream()
-                                        .filter(r -> !r.getCreatedAt().isBefore(filter.getStartDate()))
-                                        .collect(Collectors.toList());
-                }
-                if (filter.getEndDate() != null) {
-                        requests = requests.stream()
-                                        .filter(r -> !r.getCreatedAt().isAfter(filter.getEndDate()))
-                                        .collect(Collectors.toList());
-                }
                 return requests.stream()
-                                .mapToDouble(r -> r.getUniqueAmount() != null ? r.getUniqueAmount() : 0.0)
+                                .filter(r -> withinDateRange(r, filter.getStartDate(), filter.getEndDate()))
+                                .mapToDouble(DashboardService::requestAmount)
                                 .sum();
         }
 

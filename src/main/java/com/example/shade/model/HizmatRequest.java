@@ -58,6 +58,10 @@ public class HizmatRequest {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+    /** Set when bonus transfer is approved (manual or auto). Used for dashboard date filters. */
+    @Column(name = "approved_at")
+    private LocalDateTime approvedAt;
+
     @Column(name = "transaction_id", length = 36)
     private String transactionId;
 

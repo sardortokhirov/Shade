@@ -132,7 +132,7 @@ public class BonusService {
         }
         if (callback.startsWith("ADMIN_APPROVE_TRANSFER:")) {
             Long requestId = Long.valueOf(callback.split(":")[1]);
-            handleAdminApproveTransfer(chatId, requestId);
+            bonusServiceProxy.handleAdminApproveTransfer(chatId, requestId);
             return;
         }
         if (callback.startsWith("ADMIN_DECLINE_TRANSFER:")) {
@@ -894,7 +894,7 @@ public class BonusService {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    handleAdminApproveTransfer(chatId, requestId);
+                    bonusServiceProxy.handleAdminApproveTransfer(chatId, requestId);
                 }
             });
         } else {
@@ -951,9 +951,26 @@ public class BonusService {
                 .replace("[", "\\[");
     }
 
+    private void markBonusApproved(HizmatRequest request) {
+        request.setStatus(RequestStatus.BONUS_APPROVED);
+        request.setTransactionId(UUID.randomUUID().toString());
+        request.setApprovedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
+        requestRepository.save(request);
+    }
+
+    @Transactional
     public void handleAdminApproveTransfer(Long chatId, Long requestId) {
         HizmatRequest request = requestRepository.findById(requestId)
                 .orElseThrow(() -> new IllegalStateException("Request not found: " + requestId));
+
+        if (request.getStatus() == RequestStatus.BONUS_APPROVED) {
+            logger.debug("Bonus request {} already approved, skipping duplicate approval", requestId);
+            return;
+        }
+        if (request.getStatus() != RequestStatus.PENDING_ADMIN) {
+            logger.warn("Cannot approve bonus request {} in status {}", requestId, request.getStatus());
+            return;
+        }
 
         // creditReferral(request.getChatId(), request.getAmount());
 
@@ -964,9 +981,7 @@ public class BonusService {
         if (platformData.getType().equals("mostbet")) {
             try {
                 BalanceLimit transferSuccessful = mostbetService.transferToPlatform(request);
-                request.setStatus(RequestStatus.BONUS_APPROVED);
-                request.setTransactionId(UUID.randomUUID().toString());
-                requestRepository.save(request);
+                markBonusApproved(request);
                 // messageSender.animateAndDeleteMessages(request.getChatId(),
                 // sessionService.getMessageIds(request.getChatId()), "OPEN");
                 sessionService.clearMessageIds(request.getChatId());
@@ -1116,9 +1131,7 @@ public class BonusService {
                     successObj = responseBody.get("Success");
 
                 if (Boolean.TRUE.equals(successObj)) {
-                    request.setStatus(RequestStatus.BONUS_APPROVED);
-                    request.setTransactionId(UUID.randomUUID().toString());
-                    requestRepository.save(request);
+                    markBonusApproved(request);
                     logger.info("✅ Platform transfer completed: chatId={}, userId={}, amount={}", request.getChatId(),
                             userId, amount);
                     // messageSender.animateAndDeleteMessages(request.getChatId(),
