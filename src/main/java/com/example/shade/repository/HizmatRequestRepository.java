@@ -133,27 +133,6 @@ public interface HizmatRequestRepository
   @Query("SELECT COALESCE(SUM(h.amount), 0) FROM HizmatRequest h WHERE h.chatId = :chatId AND h.type = 'TIP' AND h.status = 'APPROVED'")
   Long sumTipAmountByChatId(@Param("chatId") Long chatId);
 
-  @Query("""
-          SELECT COALESCE(SUM(
-              CASE
-                  WHEN h.uniqueAmount IS NOT NULL AND h.uniqueAmount > 0 THEN h.uniqueAmount
-                  WHEN h.amount IS NOT NULL AND h.amount > 0 THEN h.amount
-                  ELSE 0
-              END
-          ), 0)
-          FROM HizmatRequest h
-          WHERE h.status = com.example.shade.model.RequestStatus.BONUS_APPROVED
-            AND (:cardId IS NULL OR h.adminCardId = :cardId)
-            AND (:platformId IS NULL OR h.platform IN (SELECT p.name FROM Platform p WHERE p.id = :platformId))
-            AND (:startDate IS NULL OR COALESCE(h.approvedAt, h.createdAt) >= :startDate)
-            AND (:endDate IS NULL OR COALESCE(h.approvedAt, h.createdAt) <= :endDate)
-          """)
-  Long sumApprovedBonusAmount(
-      @Param("cardId") Long cardId,
-      @Param("platformId") Long platformId,
-      @Param("startDate") LocalDateTime startDate,
-      @Param("endDate") LocalDateTime endDate);
-
   @Query("SELECT COUNT(h) FROM HizmatRequest h WHERE h.chatId = :chatId AND h.status = :status")
   Long countByChatIdAndStatus(@Param("chatId") Long chatId, @Param("status") RequestStatus status);
 

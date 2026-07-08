@@ -12,6 +12,7 @@ import com.example.shade.repository.UserBalanceRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
@@ -20,6 +21,34 @@ import java.util.stream.Collectors;
 
 @Service
 public class DashboardService {
+
+        private static double requestAmount(HizmatRequest request) {
+                if (request.getUniqueAmount() != null && request.getUniqueAmount() > 0) {
+                        return request.getUniqueAmount();
+                }
+                if (request.getAmount() != null && request.getAmount() > 0) {
+                        return request.getAmount();
+                }
+                return 0.0;
+        }
+
+        private static LocalDateTime approvalEventTime(HizmatRequest request) {
+                return request.getApprovedAt() != null ? request.getApprovedAt() : request.getCreatedAt();
+        }
+
+        private static boolean isWithinApprovalRange(HizmatRequest request, LocalDateTime startDate, LocalDateTime endDate) {
+                LocalDateTime eventTime = approvalEventTime(request);
+                if (eventTime == null) {
+                        return false;
+                }
+                if (startDate != null && eventTime.isBefore(startDate)) {
+                        return false;
+                }
+                if (endDate != null && eventTime.isAfter(endDate)) {
+                        return false;
+                }
+                return true;
+        }
 
         @Autowired
         private HizmatRequestRepository requestRepository;
@@ -137,12 +166,12 @@ public class DashboardService {
         }
 
         public double getTotalApprovedBonusAmount(RequestFilter filter) {
-                Long total = requestRepository.sumApprovedBonusAmount(
-                                filter.getCardId(),
-                                filter.getPlatformId(),
-                                filter.getStartDate(),
-                                filter.getEndDate());
-                return total != null ? total.doubleValue() : 0.0;
+                List<HizmatRequest> requests = requestRepository.findByFilters(
+                                filter.getCardId(), filter.getPlatformId(), RequestStatus.BONUS_APPROVED, null);
+                return requests.stream()
+                                .filter(r -> isWithinApprovalRange(r, filter.getStartDate(), filter.getEndDate()))
+                                .mapToDouble(DashboardService::requestAmount)
+                                .sum();
         }
 
         public double getTotalApprovedTipAmount(RequestFilter filter) {
