@@ -56,6 +56,7 @@ public class TopUpService {
     private final HumoService humoService;
     private final LanguageSessionService languageSessionService;
     private final MostbetService mostbetService;
+    private final UserWalletQuotaRepository walletQuotaRepository;
 
     @org.springframework.beans.factory.annotation.Autowired
     @org.springframework.context.annotation.Lazy
@@ -678,6 +679,12 @@ public class TopUpService {
                 }
 
                 bonusService.creditReferral(request.getChatId(), request.getAmount());
+                try {
+                    self.addWalletQuotaForDirectTopUp(request);
+                } catch (Exception e) {
+                    logger.error("Direct top-up {} approved, but wallet quota update failed for chatId {}: {}",
+                            request.getId(), request.getChatId(), e.getMessage(), e);
+                }
                 String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
                 String logMessage = String.format(
                         "🆔: %d  To‘lov yakunlandi ✅\n" +
@@ -906,6 +913,12 @@ public class TopUpService {
                 }
 
                 bonusService.creditReferral(request.getChatId(), request.getAmount());
+                try {
+                    self.addWalletQuotaForDirectTopUp(request);
+                } catch (Exception e) {
+                    logger.error("Screenshot top-up {} approved, but wallet quota update failed for chatId {}: {}",
+                            request.getId(), request.getChatId(), e.getMessage(), e);
+                }
 
                 String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
                 String logMessage = String.format(
@@ -1088,6 +1101,45 @@ public class TopUpService {
         logger.info("Wallet balance credited for chatId {}: +{} UZS, new balance: {}",
                 request.getChatId(), request.getUniqueAmount(), balance.getWalletBalance());
         return new BalanceLimit(BigDecimal.ZERO, BigDecimal.ZERO);
+    }
+
+    /**
+     * Direct bot top-ups to a platform also earn wallet withdrawal quota.
+     * Card-to-wallet top-ups are intentionally excluded because they only fund the wallet.
+     */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public long addWalletQuotaForDirectTopUp(HizmatRequest request) {
+        if (request == null || request.getChatId() == null || "Wallet".equals(request.getPlatform())) {
+            return 0L;
+        }
+        Long baseAmount = request.getAmount() != null ? request.getAmount() : request.getUniqueAmount();
+        if (baseAmount == null || baseAmount <= 0) {
+            return 0L;
+        }
+
+        Long ratio = systemConfigurationService.getWalletWithdrawRatio();
+        long effectiveRatio = ratio != null ? ratio : 1L;
+        long earned = baseAmount * effectiveRatio;
+
+        UserWalletQuota quota = walletQuotaRepository.findByIdWithLock(request.getChatId())
+                .orElse(UserWalletQuota.builder()
+                        .chatId(request.getChatId())
+                        .earnedQuota(0L)
+                        .usedQuota(0L)
+                        .bonusQuota(0L)
+                        .build());
+        long currentEarned = quota.getEarnedQuota() != null ? quota.getEarnedQuota() : 0L;
+        long currentUsed = quota.getUsedQuota() != null ? quota.getUsedQuota() : 0L;
+        quota.setEarnedQuota(currentEarned + earned);
+        quota.setUsedQuota(currentUsed);
+        if (quota.getBonusQuota() == null) {
+            quota.setBonusQuota(0L);
+        }
+        walletQuotaRepository.save(quota);
+
+        logger.info("Wallet quota earned from direct top-up request {} for chatId {}: +{} (ratio={}), total earned={}, remaining={}",
+                request.getId(), request.getChatId(), earned, effectiveRatio, quota.getEarnedQuota(), quota.getRemainingQuota());
+        return earned;
     }
 
     /** User confirmation + admin log + menu return for a successful card→wallet top-up. */
