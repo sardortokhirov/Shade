@@ -1,6 +1,5 @@
 package com.example.shade.service;
 
-import com.example.shade.bot.AdminTelegramMessageSender;
 import com.example.shade.bot.MessageSender;
 import com.example.shade.model.*;
 import com.example.shade.repository.BlockedUserRepository;
@@ -49,8 +48,12 @@ public class LotteryService {
                         .tickets(0L)
                         .balance(BigDecimal.ZERO)
                         .build());
-        Long tickets = amount;
-        balance.setTickets(balance.getTickets() + tickets);
+        Long tickets = amount != null ? amount : 0L;
+        Long currentTickets = balance.getTickets() != null ? balance.getTickets() : 0L;
+        if (balance.getBalance() == null) {
+            balance.setBalance(BigDecimal.ZERO);
+        }
+        balance.setTickets(currentTickets + tickets);
         userBalanceRepository.save(balance);
         logger.info("Awarded {} tickets to chatId {}", tickets, chatId);
     }

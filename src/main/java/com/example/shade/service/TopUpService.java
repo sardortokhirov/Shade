@@ -1182,7 +1182,14 @@ public class TopUpService {
                 logger.info("✅ Transfer successful for chatId {}, userId: {}, amount: {}, platform: {}",
                         request.getChatId(), userId, amount, platformName);
 
-                return getCashdeskBalance(hash, cashierPass, cashdeskId);
+                try {
+                    BalanceLimit balanceLimit = getCashdeskBalance(hash, cashierPass, cashdeskId);
+                    return balanceLimit != null ? balanceLimit : new BalanceLimit(BigDecimal.ZERO, BigDecimal.ZERO);
+                } catch (Exception e) {
+                    logger.warn("Transfer succeeded, but cashdesk balance lookup failed for chatId {}, platform {}: {}",
+                            request.getChatId(), platformName, e.getMessage());
+                    return new BalanceLimit(BigDecimal.ZERO, BigDecimal.ZERO);
+                }
             }
 
             String errorMsg = responseBody != null && responseBody.get("Message") != null

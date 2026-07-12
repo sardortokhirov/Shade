@@ -892,7 +892,11 @@ public class BonusService {
                 .setScale(2, RoundingMode.DOWN);
         UserBalance referrerBalance = userBalanceRepository.findById(referrerChatId)
                 .orElse(UserBalance.builder().chatId(referrerChatId).tickets(0L).balance(BigDecimal.ZERO).build());
-        referrerBalance.setBalance(referrerBalance.getBalance().add(commission));
+        BigDecimal currentBalance = referrerBalance.getBalance() != null ? referrerBalance.getBalance() : BigDecimal.ZERO;
+        if (referrerBalance.getTickets() == null) {
+            referrerBalance.setTickets(0L);
+        }
+        referrerBalance.setBalance(currentBalance.add(commission));
         userBalanceRepository.save(referrerBalance);
         logger.info("Credited {} UZS to referrer {} for referredChatId {}", commission, referrerChatId, referredChatId);
     }

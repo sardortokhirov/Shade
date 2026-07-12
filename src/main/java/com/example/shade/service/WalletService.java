@@ -808,26 +808,33 @@ public class WalletService {
             m.setReplyMarkup(createMainMenuOnlyMarkup(chatId));
             messageSender.sendMessage(m, chatId);
 
-            // Same as card-to-platform: award tickets, credit referral
+            // Same as card-to-platform: award tickets, credit referral. These are secondary
+            // benefits and must never break the money transfer finalization.
             long ticketsAwarded = 0L;
-            long ticketCalculationAmount = configurationService.getTicketCalculationAmount();
-            if (ticketCalculationAmount > 0) {
-                ticketsAwarded = amount / ticketCalculationAmount;
-                if (ticketsAwarded > 0) {
-                    lotteryService.awardTickets(chatId, ticketsAwarded);
-                }
+            try {
+                ticketsAwarded = self.awardWalletTransferTickets(chatId, amount);
+            } catch (Exception e) {
+                logger.error("Wallet transfer {} approved, but ticket award failed for chatId {}: {}",
+                        requestId, chatId, e.getMessage(), e);
+                ticketsAwarded = 0L;
             }
-            bonusService.creditReferral(chatId, amount);
+
+            try {
+                self.creditWalletTransferReferral(chatId, amount);
+            } catch (Exception e) {
+                logger.error("Wallet transfer {} approved, but referral credit failed for chatId {}: {}",
+                        requestId, chatId, e.getMessage(), e);
+            }
 
             // Quota earned only for wallet-to-platform; never for card-to-wallet top-ups.
-            Long ratio = configurationService.getWalletWithdrawRatio();
-            long earned = amount * ratio;
-            UserWalletQuota quota = walletQuotaRepository.findByIdWithLock(chatId)
-                    .orElse(UserWalletQuota.builder().chatId(chatId).earnedQuota(0L).usedQuota(0L).build());
-            quota.setEarnedQuota(quota.getEarnedQuota() + earned);
-            walletQuotaRepository.save(quota);
-            logger.info("Quota earned for chatId {}: +{} (ratio={}), total earned={}, remaining={}",
-                    chatId, earned, ratio, quota.getEarnedQuota(), quota.getRemainingQuota());
+            long earned = 0L;
+            try {
+                earned = self.addWalletTransferQuota(chatId, amount);
+            } catch (Exception e) {
+                logger.error("Wallet transfer {} approved, but quota update failed for chatId {}: {}",
+                        requestId, chatId, e.getMessage(), e);
+                earned = 0L;
+            }
 
             var balanceOpt = userBalanceRepository.findById(chatId);
             long walletLeft = balanceOpt
@@ -843,10 +850,14 @@ public class WalletService {
             }
             long ticketsTotal = balanceOpt.map(ub -> ub.getTickets() != null ? ub.getTickets() : 0L).orElse(0L);
             String dateStr = LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-            String adminLog = String.format(
-                    "✅ *Hamyondan kontoraga o'tkazma*\n\n🆔: `%d`\n👤: `%d`\n🌐 #%s: %s\n💸 Summa: `%,d UZS`\n🔰 Yechib olish kvotasi: `+%,d UZS`\n🎟️ Chiptalar: %d (+ %d)\n🏧 Qoldi: `%,d UZS`\n\n🏦: %,d UZS\n\n📅 %s",
-                    request.getId(), chatId, escapeMarkdown(platformStr), escapeMarkdown(platformUserId), amount, earned, ticketsTotal, ticketsAwarded, walletLeft, platformBalanceUzs, dateStr);
-            adminLogBotService.sendLog(adminLog);
+            try {
+                String adminLog = String.format(
+                        "✅ *Hamyondan kontoraga o'tkazma*\n\n🆔: `%d`\n👤: `%d`\n🌐 #%s: %s\n💸 Summa: `%,d UZS`\n🔰 Yechib olish kvotasi: `+%,d UZS`\n🎟️ Chiptalar: %d (+ %d)\n🏧 Qoldi: `%,d UZS`\n\n🏦: %,d UZS\n\n📅 %s",
+                        request.getId(), chatId, escapeMarkdown(platformStr), escapeMarkdown(platformUserId), amount, earned, ticketsTotal, ticketsAwarded, walletLeft, platformBalanceUzs, dateStr);
+                adminLogBotService.sendLog(adminLog);
+            } catch (Exception e) {
+                logger.error("Wallet transfer {} approved, but admin log failed: {}", requestId, e.getMessage(), e);
+            }
         } else {
             // Transfer reported as failed - do NOT refund. Platform may process with delay;
             // auto-refund would cause double-credit if user receives on platform later.
@@ -870,13 +881,55 @@ public class WalletService {
             detailMsg.setReplyMarkup(createMainMenuOnlyMarkup(chatId));
             messageSender.sendMessage(detailMsg, chatId);
 
-            String adminLog = String.format(
-                    "❌ Wallet to Platform transfer FAILED (choose Refund or No refund):\n🆔 ID: `%d`\n👤 User: `%d`\n🌐 Platform: %s\n📋 Platform ID: `%s`\n💸 Amount: %,d UZS",
-                    request.getId(), chatId, escapeMarkdown(platformStr), escapeMarkdown(platformUserId), amount);
-            adminLogBotService.sendToAdmins(adminLog, adminLogBotService.createWalletFailRefundKeyboard(request.getId()));
+            try {
+                String adminLog = String.format(
+                        "❌ Wallet to Platform transfer FAILED (choose Refund or No refund):\n🆔 ID: `%d`\n👤 User: `%d`\n🌐 Platform: %s\n📋 Platform ID: `%s`\n💸 Amount: %,d UZS",
+                        request.getId(), chatId, escapeMarkdown(platformStr), escapeMarkdown(platformUserId), amount);
+                adminLogBotService.sendToAdmins(adminLog, adminLogBotService.createWalletFailRefundKeyboard(request.getId()));
+            } catch (Exception e) {
+                logger.error("Wallet transfer {} failed, but admin failure log failed: {}", requestId, e.getMessage(), e);
+            }
         }
 
         sendPaymentMainMenu(chatId, true);
+    }
+
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public long awardWalletTransferTickets(Long chatId, Long amount) {
+        long ticketCalculationAmount = configurationService.getTicketCalculationAmount();
+        if (ticketCalculationAmount <= 0) {
+            return 0L;
+        }
+        long ticketsAwarded = amount / ticketCalculationAmount;
+        if (ticketsAwarded > 0) {
+            lotteryService.awardTickets(chatId, ticketsAwarded);
+        }
+        return ticketsAwarded;
+    }
+
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public void creditWalletTransferReferral(Long chatId, Long amount) {
+        bonusService.creditReferral(chatId, amount != null ? amount : 0L);
+    }
+
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public long addWalletTransferQuota(Long chatId, Long amount) {
+        Long ratio = configurationService.getWalletWithdrawRatio();
+        long effectiveRatio = ratio != null ? ratio : 1L;
+        long earned = (amount != null ? amount : 0L) * effectiveRatio;
+        UserWalletQuota quota = walletQuotaRepository.findByIdWithLock(chatId)
+                .orElse(UserWalletQuota.builder().chatId(chatId).earnedQuota(0L).usedQuota(0L).bonusQuota(0L).build());
+        long currentEarned = quota.getEarnedQuota() != null ? quota.getEarnedQuota() : 0L;
+        long currentUsed = quota.getUsedQuota() != null ? quota.getUsedQuota() : 0L;
+        quota.setEarnedQuota(currentEarned + earned);
+        quota.setUsedQuota(currentUsed);
+        if (quota.getBonusQuota() == null) {
+            quota.setBonusQuota(0L);
+        }
+        walletQuotaRepository.save(quota);
+        logger.info("Quota earned for chatId {}: +{} (ratio={}), total earned={}, remaining={}",
+                chatId, earned, effectiveRatio, quota.getEarnedQuota(), quota.getRemainingQuota());
+        return earned;
     }
 
     public void processWalletCashout(Long chatId) {
