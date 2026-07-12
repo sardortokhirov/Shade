@@ -753,19 +753,20 @@ public class WalletService {
         UserBalance balance = userBalanceRepository.findByIdWithLock(chatId)
                 .orElseThrow(() -> new IllegalStateException("Balance not found"));
 
-        if (balance.getWalletBalance() < amount) {
+        long current = balance.getWalletBalance() != null ? balance.getWalletBalance() : 0L;
+        if (current < amount) {
             SendMessage m = new SendMessage();
             m.setChatId(chatId.toString());
             m.setText(String.format(
                     languageSessionService.getTranslation(chatId, "wallet.message.insufficient_funds"),
-                    balance.getWalletBalance()));
+                    current));
             m.enableMarkdown(true);
             m.setReplyMarkup(createMainMenuOnlyMarkup(chatId));
             messageSender.sendMessage(m, chatId);
             return null;
         }
 
-        balance.setWalletBalance(balance.getWalletBalance() - amount);
+        balance.setWalletBalance(current - amount);
         userBalanceRepository.save(balance);
 
         HizmatRequest request = new HizmatRequest();
@@ -936,19 +937,20 @@ public class WalletService {
         UserBalance balance = userBalanceRepository.findByIdWithLock(chatId)
                 .orElseThrow(() -> new IllegalStateException("Balance not found"));
 
-        if (balance.getWalletBalance() < amount) {
+        long current = balance.getWalletBalance() != null ? balance.getWalletBalance() : 0L;
+        if (current < amount) {
             SendMessage m = new SendMessage();
             m.setChatId(chatId.toString());
             m.setText(String.format(
                     languageSessionService.getTranslation(chatId, "wallet.message.insufficient_funds"),
-                    balance.getWalletBalance()));
+                    current));
             m.enableMarkdown(true);
             m.setReplyMarkup(createMainMenuOnlyMarkup(chatId));
             messageSender.sendMessage(m, chatId);
             return null;
         }
 
-        balance.setWalletBalance(balance.getWalletBalance() - amount);
+        balance.setWalletBalance(current - amount);
         userBalanceRepository.save(balance);
 
         HizmatRequest request = new HizmatRequest();
@@ -1150,13 +1152,31 @@ public class WalletService {
 
     /**
      * Admin chose "No refund" for a failed wallet-to-platform transfer (platform likely received).
+     * Marks the request APPROVED so the wallet is NOT credited and the "Refund" action can no
+     * longer be applied afterwards (prevents a double-credit / money loss).
      */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public void handleAdminNoRefundWalletFail(Long requestId, Long adminChatId) {
-        HizmatRequest request = requestRepository.findById(requestId).orElse(null);
-        if (request == null) {
-            adminLogBotService.sendToSingleAdmin(adminChatId, "❌ So'rov topilmadi: 🆔 " + requestId);
+        HizmatRequest request = requestRepository.findByIdWithLock(requestId).orElse(null);
+        if (request == null || request.getType() != RequestType.WALLET_TO_PLATFORM) {
+            adminLogBotService.sendToSingleAdmin(adminChatId,
+                    "❌ So'rov topilmadi yoki bu hamyon→kontora o'tkazmasi emas: 🆔 " + requestId);
             return;
         }
+        if (request.getStatus() == RequestStatus.FAILED_REFUNDED) {
+            adminLogBotService.sendToSingleAdmin(adminChatId,
+                    "⚠️ Bu so'rov uchun hamyon allaqachon qaytarilgan — 'qaytarilmasin' amal qilmaydi: 🆔 " + requestId);
+            return;
+        }
+        if (request.getStatus() != RequestStatus.FAILED) {
+            adminLogBotService.sendToSingleAdmin(adminChatId,
+                    "⚠️ Bu so'rov allaqachon ko'rib chiqilgan: 🆔 " + requestId);
+            return;
+        }
+        // Treat as completed on the platform: mark APPROVED so no refund can be issued later.
+        request.setStatus(RequestStatus.APPROVED);
+        requestRepository.save(request);
+
         String msg = String.format(
                 "✔️ *No refund* — kontorada pul tushgan deb qabul qilindi.\n🆔 ID: `%d`\n👤 User: `%d`\n💸 Summa: %,d UZS",
                 requestId, request.getChatId(), request.getAmount() != null ? request.getAmount() : 0L);
@@ -1225,7 +1245,7 @@ public class WalletService {
     // ----- UTILS -----
 
     private UserBalance getOrCreateUserBalance(Long chatId) {
-        return userBalanceRepository.findById(chatId).orElseGet(() -> {
+        UserBalance balance = userBalanceRepository.findById(chatId).orElseGet(() -> {
             UserBalance b = UserBalance.builder()
                     .chatId(chatId)
                     .tickets(0L)
@@ -1234,6 +1254,12 @@ public class WalletService {
                     .build();
             return userBalanceRepository.save(b);
         });
+        // Legacy rows created before the wallet_balance column may have NULL; normalize to 0
+        // so all downstream comparisons are NPE-safe.
+        if (balance.getWalletBalance() == null) {
+            balance.setWalletBalance(0L);
+        }
+        return balance;
     }
 
     private InlineKeyboardButton createButton(String text, String callback) {
