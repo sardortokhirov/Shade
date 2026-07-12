@@ -602,7 +602,12 @@ public class WithdrawService {
         request.setCardNumber(cardNumber);
         requestRepository.save(request);
 
-        BigDecimal paidAmount = processPayout(chatId, platform, userId, code, request.getId(), cardNumber).setScale(2, RoundingMode.DOWN);
+        BigDecimal payout = processPayout(chatId, platform, userId, code, request.getId(), cardNumber);
+        if (payout == null) {
+            // processPayout has already sent a platform-specific failure message.
+            return;
+        }
+        BigDecimal paidAmount = payout.setScale(2, RoundingMode.DOWN);
         if (paidAmount != null) {
             if (paidAmount.longValue() < 0) {
                 paidAmount = paidAmount.multiply(BigDecimal.valueOf(-1));
@@ -700,7 +705,9 @@ public class WithdrawService {
         if (!recentRequests.isEmpty()) {
             HizmatRequest latestRequest = recentRequests.get(0);
             sessionService.setUserData(chatId, "platformUserId", latestRequest.getPlatformUserId());
-            message.setText(languageSessionService.getTranslation(chatId, "withdraw.message.user_id_with_recent"));
+            message.setText(String.format(
+                    languageSessionService.getTranslation(chatId, "withdraw.message.user_id_with_recent"),
+                    platform));
             message.setReplyMarkup(createSavedIdKeyboard(chatId, recentRequests));
         } else {
             message.setText(String.format(languageSessionService.getTranslation(chatId, "withdraw.message.user_id_input"), platform));
@@ -712,7 +719,9 @@ public class WithdrawService {
     private void sendUserApproval(Long chatId, String fullName, String userId) {
         SendMessage message = new SendMessage();
         message.setChatId(chatId.toString());
-        message.setText(String.format(languageSessionService.getTranslation(chatId, "withdraw.message.user_approval"), fullName, userId));
+        message.setText(String.format(
+                languageSessionService.getTranslation(chatId, "withdraw.message.user_approval"),
+                sessionService.getUserData(chatId, "platform"), fullName, userId));
         message.setReplyMarkup(createApprovalKeyboard(chatId));
         messageSender.sendMessage(message, chatId);
     }
@@ -728,10 +737,14 @@ public class WithdrawService {
         if (!recentRequests.isEmpty() && recentRequests.get(0).getCardNumber() != null) {
             HizmatRequest latestRequest = recentRequests.get(0);
             sessionService.setUserData(chatId, "cardNumber", latestRequest.getCardNumber());
-            message.setText(languageSessionService.getTranslation(chatId, "withdraw.message.card_input_with_recent"));
+            message.setText(String.format(
+                    languageSessionService.getTranslation(chatId, "withdraw.message.card_input_with_recent"),
+                    sessionService.getUserData(chatId, "platform")));
             message.setReplyMarkup(createSavedCardKeyboard(chatId, recentRequests));
         } else {
-            message.setText(String.format(languageSessionService.getTranslation(chatId, "withdraw.message.card_input"), fullName));
+            message.setText(String.format(
+                    languageSessionService.getTranslation(chatId, "withdraw.message.card_input"),
+                    sessionService.getUserData(chatId, "platform"), fullName));
             message.setReplyMarkup(createNavigationKeyboard(chatId));
         }
         messageSender.sendMessage(message, chatId);
@@ -740,7 +753,9 @@ public class WithdrawService {
     private void sendCodeInput(Long chatId) {
         SendMessage message = new SendMessage();
         message.setChatId(chatId.toString());
-        message.setText(languageSessionService.getTranslation(chatId, "withdraw.message.code_input"));
+        message.setText(String.format(
+                languageSessionService.getTranslation(chatId, "withdraw.message.code_input"),
+                sessionService.getUserData(chatId, "platform")));
         message.setReplyMarkup(createNavigationKeyboard(chatId));
         messageSender.sendMessage(message, chatId);
     }
