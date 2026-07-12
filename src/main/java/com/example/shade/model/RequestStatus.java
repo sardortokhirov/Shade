@@ -14,5 +14,9 @@ public enum RequestStatus {
     CANCELED,
     PENDING_PAYMENT,
     FAILED,
-    PENDING_SCREENSHOT
+    /** Wallet-to-platform transfer failed; admin chose to refund user's wallet. */
+    FAILED_REFUNDED,
+    USER_CANCELED,
+    PENDING_SCREENSHOT,
+    PROCESSING
 }

@@ -2,11 +2,13 @@ package com.example.shade.service;
 
 import com.example.shade.bot.MessageSender;
 import com.example.shade.dto.BalanceLimit;
+import com.example.shade.dto.WalletUserIdValidationResult;
 import com.example.shade.model.*;
 import com.example.shade.model.Currency;
 import com.example.shade.repository.*;
 import jakarta.xml.bind.DatatypeConverter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.*;
@@ -54,6 +56,10 @@ public class TopUpService {
     private final HumoService humoService;
     private final LanguageSessionService languageSessionService;
     private final MostbetService mostbetService;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    @org.springframework.context.annotation.Lazy
+    private TopUpService self;
 
     public void startTopUp(Long chatId) {
         logger.info("Starting top-up for chatId: {}", chatId);
@@ -226,6 +232,95 @@ public class TopUpService {
             return;
         }
         validateUserId(chatId, userId);
+    }
+
+    @Transactional
+    public void startWalletTopUp(Long chatId) {
+        logger.info("Starting wallet top-up for chatId: {}", chatId);
+
+        HizmatRequest request = HizmatRequest.builder()
+                .chatId(chatId)
+                .platform("Wallet")
+                .platformUserId(String.valueOf(chatId))
+                .fullName("WALLET")
+                .status(RequestStatus.PENDING)
+                .createdAt(LocalDateTime.now(ZoneId.of("GMT+5")))
+                .currency(Currency.UZS)
+                .amount(0L)
+                .type(RequestType.TOP_UP)
+                .build();
+        requestRepository.save(request);
+
+        sessionService.setUserData(chatId, "platform", "Wallet");
+        sessionService.setUserData(chatId, "platformUserId", String.valueOf(chatId));
+        sessionService.setUserData(chatId, "fullName", "WALLET");
+        sessionService.setUserData(chatId, PAYMENT_ATTEMPTS_KEY, "0");
+
+        sessionService.setUserState(chatId, "TOPUP_AMOUNT_INPUT");
+        sessionService.addNavigationState(chatId, "WALLET_MENU");
+        sendAmountInput(chatId);
+    }
+
+    /**
+     * Validates a platform user id for a wallet→platform transfer, returning a
+     * result rather than driving the top-up conversation. Mostbet platforms are
+     * trusted without a live player lookup (parity with the top-up flow on this branch).
+     */
+    public WalletUserIdValidationResult validatePlatformUserIdForWallet(Long chatId, String platformName, String platformUserId) {
+        String trimmed = platformUserId != null ? platformUserId.trim() : "";
+        if (trimmed.isEmpty()) {
+            return WalletUserIdValidationResult.invalid("wallet.message.invalid_id");
+        }
+        String name = platformName != null ? platformName.replace("_", "") : "";
+        Platform platform = platformRepository.findByName(name).orElse(null);
+        if (platform == null) {
+            return WalletUserIdValidationResult.invalid("topup.message.api_error");
+        }
+        if ("mostbet".equals(platform.getType())) {
+            return WalletUserIdValidationResult.valid("MOSTBET");
+        }
+        String hash = platform.getApiKey();
+        String cashierPass = platform.getPassword();
+        String cashdeskId = platform.getWorkplaceId();
+        if (hash == null || cashierPass == null || cashdeskId == null || hash.isEmpty() || cashierPass.isEmpty() || cashdeskId.isEmpty()) {
+            return WalletUserIdValidationResult.invalid("topup.message.platform_credentials_error");
+        }
+        String confirmInput = trimmed + ":" + hash;
+        String confirm = DigestUtils.md5DigestAsHex(confirmInput.getBytes(StandardCharsets.UTF_8));
+        String sha256Input1 = "hash=" + hash + "&userid=" + trimmed + "&cashdeskid=" + cashdeskId;
+        String sha256Result1 = sha256Hex(sha256Input1);
+        String md5Input = "userid=" + trimmed + "&cashierpass=" + cashierPass + "&hash=" + hash;
+        String md5Result = DigestUtils.md5DigestAsHex(md5Input.getBytes(StandardCharsets.UTF_8));
+        String finalSignature = sha256Hex(sha256Result1 + md5Result);
+        String apiUrl = String.format(
+                "https://partners.servcul.com/CashdeskBotAPI/Users/%s?confirm=%s&cashdeskId=%s",
+                trimmed, confirm, cashdeskId);
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("sign", finalSignature);
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+            ResponseEntity<UserProfile> response = restTemplate.exchange(apiUrl, HttpMethod.GET, entity, UserProfile.class);
+            UserProfile profile = response.getBody();
+            if (response.getStatusCode().is2xxSuccessful() && profile != null && profile.getUserId() != null && profile.getName() != null) {
+                Currency profileCurrency = (profile.getCurrencyId() != null && profile.getCurrencyId().intValue() == 1)
+                        ? Currency.RUB : Currency.UZS;
+                if (!platform.getCurrency().equals(profileCurrency)) {
+                    return WalletUserIdValidationResult.invalid("wallet.message.platform_user_currency_mismatch");
+                }
+                return WalletUserIdValidationResult.valid(profile.getName());
+            }
+            return WalletUserIdValidationResult.invalid("topup.message.no_user_found");
+        } catch (HttpClientErrorException.NotFound e) {
+            return WalletUserIdValidationResult.invalid("topup.message.no_user_found");
+        } catch (HttpClientErrorException e) {
+            String key = e.getStatusCode().value() == 401 ? "topup.message.auth_failed"
+                    : e.getStatusCode().value() == 403 ? "topup.message.invalid_confirm"
+                    : "topup.message.generic_api_error";
+            return WalletUserIdValidationResult.invalid(key);
+        } catch (Exception e) {
+            logger.error("Error validating user ID {} for platform {}: {}", trimmed, name, e.getMessage());
+            return WalletUserIdValidationResult.invalid("topup.message.api_error");
+        }
     }
 
     private void validateUserId(Long chatId, String userId) {
@@ -546,13 +641,26 @@ public class TopUpService {
             request.setStatus(RequestStatus.APPROVED);
             requestRepository.save(request);
             String platformName = request.getPlatform();
-            Platform platform = platformRepository.findByName(platformName)
-                    .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
-            BalanceLimit transferSuccessful =null;
-            if (platform.getType().equals("mostbet")){
-                transferSuccessful=mostbetService.transferToPlatform(request);
-            }else {
-                transferSuccessful=transferToPlatform(request, adminCard);
+            BalanceLimit transferSuccessful = null;
+            if ("Wallet".equals(platformName)) {
+                transferSuccessful = self.creditWalletBalance(request);
+                Long w = userBalanceRepository.findById(chatId)
+                        .map(ub -> ub.getWalletBalance() != null ? ub.getWalletBalance() : 0L)
+                        .orElse(0L);
+                request.setWalletBalanceAtTime(w);
+                requestRepository.save(request);
+            } else {
+                Platform platform = platformRepository.findByName(platformName)
+                        .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
+                if (platform.getType().equals("mostbet")) {
+                    transferSuccessful = mostbetService.transferToPlatform(request);
+                } else {
+                    transferSuccessful = transferToPlatform(request, adminCard);
+                }
+            }
+            if ("Wallet".equals(platformName) && transferSuccessful != null) {
+                handleWalletTopUpSuccess(chatId, request, adminCard.getCardNumber());
+                return;
             }
             if (transferSuccessful != null) {
                 UserBalance balance = userBalanceRepository.findById(chatId)
@@ -761,13 +869,26 @@ public class TopUpService {
             requestRepository.save(request);
 
             String platformName = request.getPlatform();
-            Platform platform = platformRepository.findByName(platformName)
-                    .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
-            BalanceLimit transferSuccessful =null;
-            if (platform.getType().equals("mostbet")){
-                transferSuccessful=mostbetService.transferToPlatform(request);
-            }else {
-                transferSuccessful=transferToPlatform(request, adminCard);
+            BalanceLimit transferSuccessful = null;
+            if ("Wallet".equals(platformName)) {
+                transferSuccessful = self.creditWalletBalance(request);
+                Long w = userBalanceRepository.findById(request.getChatId())
+                        .map(ub -> ub.getWalletBalance() != null ? ub.getWalletBalance() : 0L)
+                        .orElse(0L);
+                request.setWalletBalanceAtTime(w);
+                requestRepository.save(request);
+            } else {
+                Platform platform = platformRepository.findByName(platformName)
+                        .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
+                if (platform.getType().equals("mostbet")) {
+                    transferSuccessful = mostbetService.transferToPlatform(request);
+                } else {
+                    transferSuccessful = transferToPlatform(request, adminCard);
+                }
+            }
+            if ("Wallet".equals(platformName) && transferSuccessful != null) {
+                handleWalletTopUpSuccess(request.getChatId(), request, adminCard.getCardNumber());
+                return;
             }
             if (transferSuccessful != null) {
                 UserBalance balance = userBalanceRepository.findById(request.getChatId())
@@ -935,6 +1056,72 @@ public class TopUpService {
     }
 
     private BalanceLimit transferToPlatform(HizmatRequest request, AdminCard adminCard) {
+        return transferToPlatformInternal(request, adminCard.getCardNumber());
+    }
+
+    /** Wallet→platform transfer overload: identifies the source as the internal wallet. */
+    public BalanceLimit transferToPlatform(HizmatRequest request, String cardNumber) {
+        return transferToPlatformInternal(request, cardNumber);
+    }
+
+    /**
+     * Credits a card→wallet top-up to the user's internal wallet balance.
+     * Returns a non-null {@link BalanceLimit} to signal success (compatible with the
+     * platform transfer flow). Must NOT award withdraw quota; quota is earned only on
+     * wallet→platform transfers.
+     */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public BalanceLimit creditWalletBalance(HizmatRequest request) {
+        UserBalance balance = userBalanceRepository.findByIdWithLock(request.getChatId())
+                .orElseGet(() -> {
+                    UserBalance newBalance = UserBalance.builder()
+                            .chatId(request.getChatId())
+                            .tickets(0L)
+                            .balance(BigDecimal.ZERO)
+                            .walletBalance(0L)
+                            .build();
+                    return userBalanceRepository.save(newBalance);
+                });
+        long current = balance.getWalletBalance() != null ? balance.getWalletBalance() : 0L;
+        balance.setWalletBalance(current + request.getUniqueAmount());
+        userBalanceRepository.save(balance);
+        logger.info("Wallet balance credited for chatId {}: +{} UZS, new balance: {}",
+                request.getChatId(), request.getUniqueAmount(), balance.getWalletBalance());
+        return new BalanceLimit(BigDecimal.ZERO, BigDecimal.ZERO);
+    }
+
+    /** User confirmation + admin log + menu return for a successful card→wallet top-up. */
+    private void handleWalletTopUpSuccess(Long chatId, HizmatRequest request, String adminCardNumber) {
+        long walletLeft = userBalanceRepository.findById(chatId)
+                .map(ub -> ub.getWalletBalance() != null ? ub.getWalletBalance() : 0L)
+                .orElse(0L);
+        String number = blockedUserRepository.findByChatId(chatId)
+                .map(BlockedUser::getPhoneNumber).orElse("N/A");
+        String date = LocalDateTime.now(ZoneId.of("GMT+5"))
+                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+
+        sessionService.clearMessageIds(chatId);
+        sessionService.setUserData(chatId, PAYMENT_ATTEMPTS_KEY, "0");
+        clearPendingScreenshotRequestBinding(chatId);
+
+        SendMessage m = new SendMessage();
+        m.setChatId(chatId.toString());
+        m.setText(String.format(
+                languageSessionService.getTranslation(chatId, "wallet.message.topup_success"),
+                request.getId(), request.getUniqueAmount(), walletLeft, date));
+        m.enableMarkdown(true);
+        messageSender.sendMessage(m, chatId);
+
+        String adminLog = String.format(
+                "\u2705 *Hamyon to'ldirildi*\n\n\uD83C\uDD94: `%d`\n\uD83D\uDC64: `%d` %s\n\uD83D\uDCB8 Summa: `%,d UZS`\n\uD83D\uDCB3 Karta: `%s`\n\uD83C\uDFE7 Hamyon: `%,d UZS`\n\n\uD83D\uDCC5 %s",
+                request.getId(), chatId, number, request.getUniqueAmount(),
+                adminCardNumber != null ? adminCardNumber : "-", walletLeft, date);
+        adminLogBotService.sendLog(adminLog);
+
+        sendMainMenu(chatId);
+    }
+
+    private BalanceLimit transferToPlatformInternal(HizmatRequest request, String cardNumber) {
         String platformName = request.getPlatform();
         Platform platform = platformRepository.findByName(platformName)
                 .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
@@ -979,7 +1166,7 @@ public class TopUpService {
         body.put("lng", lng);
         body.put("summa", amount);
         body.put("confirm", confirm);
-        body.put("cardNumber", adminCard.getCardNumber());
+        body.put("cardNumber", cardNumber);
 
         try {
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);

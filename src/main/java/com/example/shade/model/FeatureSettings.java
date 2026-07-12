@@ -27,6 +27,10 @@ public class FeatureSettings {
     @Column(name = "bonus_enabled", nullable = false)
     private Boolean bonusEnabled = true;
 
+    /** Wallet (hamyon) feature toggle. Nullable so Hibernate can add the column to existing rows without a NOT NULL failure. */
+    @Column(name = "wallet_enabled")
+    private Boolean walletEnabled = true;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 }

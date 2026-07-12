@@ -33,6 +33,7 @@ public class FeatureService {
                     settings.setTopUpEnabled(true);
                     settings.setWithdrawEnabled(true);
                     settings.setBonusEnabled(true);
+                    settings.setWalletEnabled(true);
                     settings.setCreatedAt(LocalDateTime.now());
                     return featureSettingsRepository.save(settings);
                 });
@@ -45,6 +46,7 @@ public class FeatureService {
         settings.setTopUpEnabled(enabled);
         settings.setWithdrawEnabled(current.getWithdrawEnabled());
         settings.setBonusEnabled(current.getBonusEnabled());
+        settings.setWalletEnabled(current.getWalletEnabled());
         settings.setCreatedAt(LocalDateTime.now());
         featureSettingsRepository.save(settings);
         logger.info("Top-up {} globally", enabled ? "enabled" : "disabled");
@@ -57,6 +59,7 @@ public class FeatureService {
         settings.setTopUpEnabled(current.getTopUpEnabled());
         settings.setWithdrawEnabled(enabled);
         settings.setBonusEnabled(current.getBonusEnabled());
+        settings.setWalletEnabled(current.getWalletEnabled());
         settings.setCreatedAt(LocalDateTime.now());
         featureSettingsRepository.save(settings);
         logger.info("Withdraw {} globally", enabled ? "enabled" : "disabled");
@@ -69,9 +72,23 @@ public class FeatureService {
         settings.setTopUpEnabled(current.getTopUpEnabled());
         settings.setWithdrawEnabled(current.getWithdrawEnabled());
         settings.setBonusEnabled(enabled);
+        settings.setWalletEnabled(current.getWalletEnabled());
         settings.setCreatedAt(LocalDateTime.now());
         featureSettingsRepository.save(settings);
         logger.info("Bonus {} globally", enabled ? "enabled" : "disabled");
+    }
+
+    @Transactional
+    public void toggleWallet(boolean enabled) {
+        FeatureSettings current = getGlobalSettings();
+        FeatureSettings settings = new FeatureSettings();
+        settings.setTopUpEnabled(current.getTopUpEnabled());
+        settings.setWithdrawEnabled(current.getWithdrawEnabled());
+        settings.setBonusEnabled(current.getBonusEnabled());
+        settings.setWalletEnabled(enabled);
+        settings.setCreatedAt(LocalDateTime.now());
+        featureSettingsRepository.save(settings);
+        logger.info("Wallet {} globally", enabled ? "enabled" : "disabled");
     }
 
     public boolean canPerformTopUp() {
@@ -84,5 +101,10 @@ public class FeatureService {
 
     public boolean canPerformBonus() {
         return getGlobalSettings().getBonusEnabled();
+    }
+
+    public boolean canPerformWallet() {
+        Boolean v = getGlobalSettings().getWalletEnabled();
+        return v == null || v;
     }
 }

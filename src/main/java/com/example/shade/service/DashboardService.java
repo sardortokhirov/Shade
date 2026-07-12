@@ -2,11 +2,14 @@ package com.example.shade.service;
 
 import com.example.shade.dto.DashboardStats;
 import com.example.shade.dto.RequestFilter;
+import com.example.shade.dto.UserWalletBalancesResponse;
 import com.example.shade.model.HizmatRequest;
 import com.example.shade.model.RequestStatus;
 import com.example.shade.model.RequestType;
+import com.example.shade.model.UserBalance;
 import com.example.shade.repository.HizmatRequestRepository;
 import com.example.shade.repository.PlatformRepository;
+import com.example.shade.repository.UserBalanceRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -22,6 +25,26 @@ public class DashboardService {
 
     @Autowired
     private HizmatRequestRepository requestRepository;
+
+    @Autowired
+    private UserBalanceRepository userBalanceRepository;
+
+    /** All users' wallet balances and the grand total (UZS), for the dashboard. */
+    public UserWalletBalancesResponse getAllUsersWalletMoney() {
+        List<UserWalletBalancesResponse.UserWalletBalanceItem> items = userBalanceRepository.findAll().stream()
+                .filter(b -> b.getWalletBalance() != null && b.getWalletBalance() > 0)
+                .sorted((a, b) -> Long.compare(b.getWalletBalance(), a.getWalletBalance()))
+                .map(b -> UserWalletBalancesResponse.UserWalletBalanceItem.builder()
+                        .chatId(b.getChatId())
+                        .walletBalance(b.getWalletBalance())
+                        .build())
+                .collect(Collectors.toList());
+        long total = items.stream().mapToLong(UserWalletBalancesResponse.UserWalletBalanceItem::getWalletBalance).sum();
+        return UserWalletBalancesResponse.builder()
+                .totalWalletMoney(total)
+                .userBalances(items)
+                .build();
+    }
 
     public DashboardStats getDashboardStats(RequestFilter filter) {
         long totalRequests = getRequestCount(filter);

@@ -67,4 +67,74 @@ public class SystemConfigurationController {
         SystemConfiguration saved = configurationService.updateConfiguration(config);
         return ResponseEntity.ok(saved);
     }
+
+    @GetMapping("/wallet-withdraw-ratio")
+    public ResponseEntity<?> getWalletWithdrawRatio(HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+        return ResponseEntity.ok(java.util.Map.of("walletWithdrawRatio", configurationService.getWalletWithdrawRatio()));
+    }
+
+    @PatchMapping("/wallet-withdraw-ratio")
+    public ResponseEntity<?> setWalletWithdrawRatio(@RequestParam Long ratio, HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+        if (ratio == null || ratio <= 0) {
+            return ResponseEntity.badRequest().body("Ratio must be greater than 0");
+        }
+        return ResponseEntity.ok(configurationService.setWalletWithdrawRatio(ratio));
+    }
+
+    @GetMapping("/wallet-min-withdraw")
+    public ResponseEntity<?> getWalletMinWithdraw(HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+        return ResponseEntity.ok(java.util.Map.of("walletMinWithdrawAmount", configurationService.getWalletMinWithdrawAmount()));
+    }
+
+    @PatchMapping("/wallet-min-withdraw")
+    public ResponseEntity<?> setWalletMinWithdraw(@RequestParam Long amount, HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+        if (amount == null || amount <= 0) {
+            return ResponseEntity.badRequest().body("Amount must be greater than 0");
+        }
+        return ResponseEntity.ok(configurationService.setWalletMinWithdrawAmount(amount));
+    }
+
+    @GetMapping("/wallet-transfer-amount-limits")
+    public ResponseEntity<?> getWalletTransferAmountLimits(HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+        return ResponseEntity.ok(java.util.Map.of(
+                "walletTransferMinAmount", configurationService.getWalletTransferMinAmount(),
+                "walletTransferMaxAmount", configurationService.getWalletTransferMaxAmount()));
+    }
+
+    @PatchMapping("/wallet-transfer-min")
+    public ResponseEntity<?> setWalletTransferMin(@RequestParam Long amount, HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+        if (amount == null || amount <= 0) {
+            return ResponseEntity.badRequest().body("Amount must be greater than 0");
+        }
+        return ResponseEntity.ok(configurationService.setWalletTransferMinAmount(amount));
+    }
+
+    @PatchMapping("/wallet-transfer-max")
+    public ResponseEntity<?> setWalletTransferMax(@RequestParam Long amount, HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+        if (amount == null || amount <= 0) {
+            return ResponseEntity.badRequest().body("Amount must be greater than 0");
+        }
+        return ResponseEntity.ok(configurationService.setWalletTransferMaxAmount(amount));
+    }
 }

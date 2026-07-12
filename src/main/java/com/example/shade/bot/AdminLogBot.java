@@ -6,6 +6,7 @@ import com.example.shade.repository.BlockedUserRepository;
 import com.example.shade.service.AdminLogBotService;
 import com.example.shade.service.BonusService;
 import com.example.shade.service.TopUpService;
+import com.example.shade.service.WalletService;
 import com.example.shade.service.WithdrawService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -36,6 +37,7 @@ public class AdminLogBot extends TelegramLongPollingBot {
     private final WithdrawService withdrawService;
     private final BonusService bonusService;
     private final TopUpService topUpService;
+    private final WalletService walletService;
     private final BlockedUserRepository blockedUserRepository;
 
     @Value("${telegram.admin.log.bot.token}")
@@ -247,6 +249,26 @@ public class AdminLogBot extends TelegramLongPollingBot {
         } else if (callbackData.startsWith("ADMIN_REMOVE_BONUS:")) {
             Long userId = Long.parseLong(callbackData.split(":")[1]);
             bonusService.handleAdminRemoveBonus(chatId, userId);
+            return;
+        } else if (callbackData.startsWith("WALLET_ADMIN_TAKE:")) {
+            Long requestId = Long.parseLong(callbackData.split(":")[1]);
+            walletService.handleAdminTake(requestId, chatId);
+            return;
+        } else if (callbackData.startsWith("WALLET_ADMIN_CONFIRM:")) {
+            Long requestId = Long.parseLong(callbackData.split(":")[1]);
+            walletService.handleAdminConfirm(requestId);
+            return;
+        } else if (callbackData.startsWith("WALLET_ADMIN_DECLINE:")) {
+            Long requestId = Long.parseLong(callbackData.split(":")[1]);
+            walletService.handleAdminDecline(requestId);
+            return;
+        } else if (callbackData.startsWith("WALLET_FAIL_REFUND:")) {
+            Long requestId = Long.parseLong(callbackData.split(":")[1]);
+            walletService.handleAdminRefundWalletFail(requestId, chatId);
+            return;
+        } else if (callbackData.startsWith("WALLET_FAIL_NOREFUND:")) {
+            Long requestId = Long.parseLong(callbackData.split(":")[1]);
+            walletService.handleAdminNoRefundWalletFail(requestId, chatId);
             return;
         } else if (callbackData.startsWith("ADMIN_BLOCK_USER:")) {
             Long userId = Long.parseLong(callbackData.split(":")[1]);

@@ -243,6 +243,33 @@ public class AdminLogBotService {
         }
     }
 
+    public void sendToSingleAdmin(Long adminChatId, String message) {
+        adminTelegramMessageSender.sendMessage(adminChatId, message);
+        logger.info("Sent message to single admin chatId: {}", adminChatId);
+    }
+
+    public void sendToSingleAdmin(Long adminChatId, String message, InlineKeyboardMarkup keyboard) {
+        SendMessage sendMessage = new SendMessage();
+        sendMessage.setChatId(adminChatId.toString());
+        sendMessage.setText(message);
+        sendMessage.enableMarkdown(true);
+        sendMessage.setReplyMarkup(keyboard);
+        adminTelegramMessageSender.sendMessage(sendMessage, adminChatId);
+        logger.info("Sent message with keyboard to single admin chatId: {}", adminChatId);
+    }
+
+    /** Refund / No-refund choice for a failed wallet→platform transfer. */
+    public InlineKeyboardMarkup createWalletFailRefundKeyboard(Long requestId) {
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        rows.add(List.of(
+                createButton("✅ Hamyonga qaytarish", "WALLET_FAIL_REFUND:" + requestId),
+                createButton("✔️ Qaytarilmasin", "WALLET_FAIL_NOREFUND:" + requestId)
+        ));
+        markup.setKeyboard(rows);
+        return markup;
+    }
+
     private InlineKeyboardMarkup createApprovalKeyboard(Long requestId) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();

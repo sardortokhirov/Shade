@@ -221,4 +221,12 @@ public class DashboardController {
         Map<String, Map<String, Double>> platformGraphData = dashboardService.getPlatformGraphData(filter);
         return ResponseEntity.ok(platformGraphData);
     }
+
+    @GetMapping("/wallet-balances")
+    public ResponseEntity<com.example.shade.dto.UserWalletBalancesResponse> getAllUsersWalletMoney(HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        return ResponseEntity.ok(dashboardService.getAllUsersWalletMoney());
+    }
 }

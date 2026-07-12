@@ -28,6 +28,10 @@ public class SystemConfigurationService {
     private static final BigDecimal DEFAULT_REFERRAL_COMMISSION = new BigDecimal("0.001");
     private static final BigDecimal DEFAULT_WITHDRAW_FEE_PERCENTAGE = new BigDecimal("1.00");
     private static final Long DEFAULT_TICKET_CALCULATION = 10_000L;
+    private static final Long DEFAULT_WALLET_MIN_WITHDRAW = 10_000L;
+    private static final Long DEFAULT_WALLET_WITHDRAW_RATIO = 1L;
+    private static final Long DEFAULT_WALLET_TRANSFER_MIN = 5_000L;
+    private static final Long DEFAULT_WALLET_TRANSFER_MAX = 10_000_000L;
 
     @Transactional
     public SystemConfiguration getConfiguration() {
@@ -124,5 +128,61 @@ public class SystemConfigurationService {
         return config.getTicketCalculationAmount() != null
                 ? config.getTicketCalculationAmount()
                 : DEFAULT_TICKET_CALCULATION;
+    }
+
+    public Long getWalletMinWithdrawAmount() {
+        SystemConfiguration config = getConfiguration();
+        return config.getWalletMinWithdrawAmount() != null
+                ? config.getWalletMinWithdrawAmount()
+                : DEFAULT_WALLET_MIN_WITHDRAW;
+    }
+
+    public Long getWalletWithdrawRatio() {
+        SystemConfiguration config = getConfiguration();
+        return config.getWalletWithdrawRatio() != null
+                ? config.getWalletWithdrawRatio()
+                : DEFAULT_WALLET_WITHDRAW_RATIO;
+    }
+
+    public Long getWalletTransferMinAmount() {
+        SystemConfiguration config = getConfiguration();
+        return config.getWalletTransferMinAmount() != null
+                ? config.getWalletTransferMinAmount()
+                : DEFAULT_WALLET_TRANSFER_MIN;
+    }
+
+    public Long getWalletTransferMaxAmount() {
+        SystemConfiguration config = getConfiguration();
+        return config.getWalletTransferMaxAmount() != null
+                ? config.getWalletTransferMaxAmount()
+                : DEFAULT_WALLET_TRANSFER_MAX;
+    }
+
+    @Transactional
+    public SystemConfiguration setWalletWithdrawRatio(Long ratio) {
+        SystemConfiguration config = getConfiguration();
+        config.setWalletWithdrawRatio(ratio);
+        return configurationRepository.save(config);
+    }
+
+    @Transactional
+    public SystemConfiguration setWalletMinWithdrawAmount(Long amount) {
+        SystemConfiguration config = getConfiguration();
+        config.setWalletMinWithdrawAmount(amount);
+        return configurationRepository.save(config);
+    }
+
+    @Transactional
+    public SystemConfiguration setWalletTransferMinAmount(Long amount) {
+        SystemConfiguration config = getConfiguration();
+        config.setWalletTransferMinAmount(amount);
+        return configurationRepository.save(config);
+    }
+
+    @Transactional
+    public SystemConfiguration setWalletTransferMaxAmount(Long amount) {
+        SystemConfiguration config = getConfiguration();
+        config.setWalletTransferMaxAmount(amount);
+        return configurationRepository.save(config);
     }
 }

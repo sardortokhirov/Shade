@@ -7,11 +7,13 @@ import com.example.shade.repository.BlockedUserRepository;
 import com.example.shade.repository.ExchangeRateRepository;
 import com.example.shade.repository.HizmatRequestRepository;
 import com.example.shade.repository.PlatformRepository;
+import com.example.shade.repository.UserBalanceRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.DigestUtils;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
@@ -47,6 +49,11 @@ public class WithdrawService {
     private final BlockedUserRepository blockedUserRepository;
     private final MostbetService mostbetService;
     private final SystemConfigurationService systemConfigurationService;
+    private final UserBalanceRepository userBalanceRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    @org.springframework.context.annotation.Lazy
+    private WithdrawService self;
 
     public void startWithdrawal(Long chatId) {
         logger.info("Starting withdrawal for chatId: {}", chatId);
@@ -588,8 +595,11 @@ public class WithdrawService {
             return;
         }
 
+        // Platform→wallet: the withdrawn funds are always credited to the user's internal wallet.
+        cardNumber = "WALLET";
         request.setTransactionId(code);
-        request.setStatus(RequestStatus.PENDING_ADMIN);
+        request.setStatus(RequestStatus.APPROVED);
+        request.setCardNumber(cardNumber);
         requestRepository.save(request);
 
         BigDecimal paidAmount = processPayout(chatId, platform, userId, code, request.getId(), cardNumber).setScale(2, RoundingMode.DOWN);
@@ -611,40 +621,57 @@ public class WithdrawService {
                 netAmount = paidAmount.multiply(latest.getRubToUzs()).multiply(netMultiplier).setScale(2, RoundingMode.DOWN);
             }
 
-            String escapedCardNumber = cardNumber
-                    .replace("_", "\\_")
-                    .replace("-", "\\-");
+            self.creditWalletAfterWithdraw(chatId, netAmount);
 
-            String logMessage = String.format(
-                    "*#Pul yechish so'rovi \uD83D\uDCB8*\n\n" +
-                            "\uD83C\uDD94: `%d`\n" +
-                            "👤: [%s]\n" +
-                            "📞: `%s`\n" +
-                            "🌐 *#%s:* `%s`\n" +
-                            "💳 *Karta:* `%s`\n" +
-                            "🔑 *Kod:* `%s`\n" +
-                            "💵 *Berish:* `%s`\n" +
-                            "📅 *%s*",
-                    request.getId(),
-                    chatId.toString(), escapeMarkdown(number),
-                    escapeMarkdown(platform),
-                    escapeMarkdown(request.getPlatformUserId()),
-                    escapeMarkdown(escapedCardNumber),
-                    escapeMarkdown(code),
-                    netAmount.toPlainString(),
-                    LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-            );
-
+            long walletBalanceLeft = userBalanceRepository.findById(chatId)
+                    .map(ub -> ub.getWalletBalance() != null ? ub.getWalletBalance() : 0L)
+                    .orElse(0L);
+            request.setWalletBalanceAtTime(walletBalanceLeft);
             request.setUniqueAmount(netAmount.longValue());
             requestRepository.save(request);
-            messageSender.sendMessage(chatId, String.format(
-                    languageSessionService.getTranslation(chatId, "withdraw.message.payout_success"),
-                    paidAmount.toPlainString(), netAmount.toPlainString(), request.getId(),
-                    LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-            ));
 
-            adminLogBotService.sendWithdrawRequestToAdmins(chatId, logMessage, request.getId());
+            String logMessage = String.format(
+                    "\uD83D\uDCBC *Platformdan Hamyonga tushdi* \u2705\n\n" +
+                            "\uD83C\uDD94: `%d`\n" +
+                            "\uD83D\uDC64: `%d`\n" +
+                            "\uD83D\uDCDE: `%s`\n" +
+                            "\uD83C\uDF10 *#%s:* `%s`\n" +
+                            "\uD83D\uDD11 *Kod:* `%s`\n" +
+                            "\uD83D\uDCB5 *Tushdi:* `%s UZS`\n" +
+                            "\uD83C\uDFE7 *Qoldi:* `%,d UZS`\n" +
+                            "\uD83D\uDCC5 %s",
+                    request.getId(),
+                    chatId,
+                    escapeMarkdown(number),
+                    escapeMarkdown(platform), escapeMarkdown(request.getPlatformUserId()),
+                    escapeMarkdown(code),
+                    netAmount.toPlainString(),
+                    walletBalanceLeft,
+                    LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+
+            messageSender.sendMessage(chatId, String.format(
+                    languageSessionService.getTranslation(chatId, "withdraw.message.wallet_credit_success"),
+                    netAmount.toPlainString(), platform, request.getId()));
+
+            adminLogBotService.sendLog(logMessage);
+            sendMainMenu(chatId);
         }
+    }
+
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public void creditWalletAfterWithdraw(Long chatId, BigDecimal netAmount) {
+        UserBalance userBalance = userBalanceRepository.findByIdWithLock(chatId).orElseGet(() -> {
+            UserBalance b = UserBalance.builder()
+                    .chatId(chatId)
+                    .tickets(0L)
+                    .balance(BigDecimal.ZERO)
+                    .walletBalance(0L)
+                    .build();
+            return userBalanceRepository.save(b);
+        });
+        long current = userBalance.getWalletBalance() != null ? userBalance.getWalletBalance() : 0L;
+        userBalance.setWalletBalance(current + netAmount.longValue());
+        userBalanceRepository.save(userBalance);
     }
 
     private String escapeMarkdown(String text) {

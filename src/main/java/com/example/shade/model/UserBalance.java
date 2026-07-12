@@ -22,4 +22,8 @@ public class UserBalance {
 
     @Column(name = "balance", nullable = false)
     private BigDecimal balance;
+
+    @Column(name = "wallet_balance", columnDefinition = "bigint default 0")
+    @Builder.Default
+    private Long walletBalance = 0L;
 }

@@ -38,6 +38,7 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
     private final TopUpService topUpService;
     private final WithdrawService withdrawService;
     private final BonusService bonusService;
+    private final WalletService walletService;
     private final ContactService contactService;
     private final ReferralRepository referralRepository;
     private final BlockedUserRepository blockedUserRepository;
@@ -391,6 +392,8 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
             withdrawService.handleTextInput(chatId, messageText);
         } else if (state != null && state.startsWith("BONUS_")) {
             bonusService.handleTextInput(chatId, messageText);
+        } else if (state != null && state.startsWith("WALLET_")) {
+            walletService.handleTextInput(chatId, messageText);
         } else {
             messageSender.sendMessage(chatId, languageSessionService.getTranslation(chatId, "message.invalid_command"));
             sendMainMenu(chatId, true);
@@ -431,6 +434,14 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                     // sessionService.getMessageIds(chatId), "OPEN");
                     bonusService.startBonus(chatId);
                 }
+                case "WALLET" -> {
+                    if (!featureService.canPerformWallet()) {
+                        messageSender.sendMessage(chatId,
+                                languageSessionService.getTranslation(chatId, "message.feature_unavailable"));
+                        return;
+                    }
+                    walletService.startWallet(chatId, "MAIN");
+                }
                 case "CONTACT" -> {
                     // messageSender.animateAndDeleteMessages(chatId,
                     // sessionService.getMessageIds(chatId), "OPEN");
@@ -447,6 +458,11 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                         withdrawService.handleBack(chatId);
                     } else if (state != null && state.startsWith("BONUS_")) {
                         bonusService.handleBack(chatId);
+                    } else if (state != null && state.startsWith("WALLET_")) {
+                        if (walletService.handleBack(chatId)) {
+                            sessionService.removeUserData(chatId, "returnToMainMenu");
+                            sendMainMenu(chatId, true);
+                        }
                     } else {
                         sendMainMenu(chatId, true);
                     }
@@ -467,7 +483,16 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                             // messageSender.animateAndDeleteMessages(chatId,
                             // sessionService.getMessageIds(chatId), "OPEN");
                         }
-                        topUpService.handleCallback(chatId, callback);
+                        if (callback.equals("TOPUP_PLATFORM:Wallet")) {
+                            if (!featureService.canPerformWallet()) {
+                                messageSender.sendMessage(chatId,
+                                        languageSessionService.getTranslation(chatId, "message.feature_unavailable"));
+                                return;
+                            }
+                            walletService.startWallet(chatId, "TOPUP");
+                        } else {
+                            topUpService.handleCallback(chatId, callback);
+                        }
                     } else if (callback.startsWith("WITHDRAW_")) {
                         if (!featureService.canPerformWithdraw()) {
                             messageSender.sendMessage(chatId,
@@ -476,7 +501,16 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                         }
                         // messageSender.animateAndDeleteMessages(chatId,
                         // sessionService.getMessageIds(chatId), "OPEN");
-                        withdrawService.handleCallback(chatId, callback);
+                        if (callback.equals("WITHDRAW_PLATFORM:Wallet")) {
+                            if (!featureService.canPerformWallet()) {
+                                messageSender.sendMessage(chatId,
+                                        languageSessionService.getTranslation(chatId, "message.feature_unavailable"));
+                                return;
+                            }
+                            walletService.startWallet(chatId, "WITHDRAW");
+                        } else {
+                            withdrawService.handleCallback(chatId, callback);
+                        }
                     } else if (callback.startsWith("BONUS_")) {
                         if (!featureService.canPerformBonus()) {
                             messageSender.sendMessage(chatId,
@@ -486,6 +520,13 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                         // messageSender.animateAndDeleteMessages(chatId,
                         // sessionService.getMessageIds(chatId), "OPEN");
                         bonusService.handleCallback(chatId, callback);
+                    } else if (callback.startsWith("WALLET_")) {
+                        if (!featureService.canPerformWallet()) {
+                            messageSender.sendMessage(chatId,
+                                    languageSessionService.getTranslation(chatId, "message.feature_unavailable"));
+                            return;
+                        }
+                        walletService.handleCallback(chatId, callback);
                     } else {
                         logger.warn("Unknown callback for chatId {}: {}", chatId, callback);
                         messageSender.sendMessage(chatId,
@@ -548,6 +589,9 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.topup"), "TOPUP")));
         rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.withdraw"), "WITHDRAW")));
+        if (featureService.canPerformWallet()) {
+            rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.wallet"), "WALLET")));
+        }
         rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.bonus"), "BONUS")));
         rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.contact"), "CONTACT")));
         markup.setKeyboard(rows);

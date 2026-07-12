@@ -45,6 +45,22 @@ public class SystemConfiguration {
     @Column(name = "ticket_calculation_amount", nullable = false)
     private Long ticketCalculationAmount = 10_000L;
 
+    /** Minimum wallet→card withdrawal amount (UZS). Nullable for legacy rows. */
+    @Column(name = "wallet_min_withdraw_amount")
+    private Long walletMinWithdrawAmount;
+
+    /** Withdraw quota earned per 1 UZS of wallet→platform transfer (ratio). Nullable for legacy rows. */
+    @Column(name = "wallet_withdraw_ratio")
+    private Long walletWithdrawRatio;
+
+    /** Minimum wallet→platform transfer amount (UZS). Nullable for legacy rows. */
+    @Column(name = "wallet_transfer_min_amount")
+    private Long walletTransferMinAmount;
+
+    /** Maximum wallet→platform transfer amount (UZS); 0 or null = no max. */
+    @Column(name = "wallet_transfer_max_amount")
+    private Long walletTransferMaxAmount;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 }
