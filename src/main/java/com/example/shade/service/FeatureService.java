@@ -6,7 +6,6 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -27,16 +26,25 @@ public class FeatureService {
 
     @Transactional
     public FeatureSettings getGlobalSettings() {
-        return featureSettingsRepository.findLatest()
+        FeatureSettings settings = featureSettingsRepository.findLatest()
                 .orElseGet(() -> {
-                    FeatureSettings settings = new FeatureSettings();
-                    settings.setTopUpEnabled(true);
-                    settings.setWithdrawEnabled(true);
-                    settings.setBonusEnabled(true);
-                    settings.setWalletEnabled(true);
-                    settings.setCreatedAt(LocalDateTime.now());
-                    return featureSettingsRepository.save(settings);
+                    FeatureSettings defaults = new FeatureSettings();
+                    defaults.setTopUpEnabled(true);
+                    defaults.setWithdrawEnabled(true);
+                    defaults.setBonusEnabled(true);
+                    defaults.setWalletEnabled(true);
+                    defaults.setCreatedAt(LocalDateTime.now());
+                    return featureSettingsRepository.save(defaults);
                 });
+
+        // Existing rows created before wallet_enabled was added can contain NULL.
+        // The bot treats NULL as enabled, so normalize the value before returning it
+        // to the admin panel to avoid showing Hamyon as red/off by mistake.
+        if (settings.getWalletEnabled() == null) {
+            settings.setWalletEnabled(true);
+            settings = featureSettingsRepository.save(settings);
+        }
+        return settings;
     }
 
     @Transactional
@@ -46,7 +54,7 @@ public class FeatureService {
         settings.setTopUpEnabled(enabled);
         settings.setWithdrawEnabled(current.getWithdrawEnabled());
         settings.setBonusEnabled(current.getBonusEnabled());
-        settings.setWalletEnabled(current.getWalletEnabled());
+        settings.setWalletEnabled(effectiveWalletEnabled(current));
         settings.setCreatedAt(LocalDateTime.now());
         featureSettingsRepository.save(settings);
         logger.info("Top-up {} globally", enabled ? "enabled" : "disabled");
@@ -59,7 +67,7 @@ public class FeatureService {
         settings.setTopUpEnabled(current.getTopUpEnabled());
         settings.setWithdrawEnabled(enabled);
         settings.setBonusEnabled(current.getBonusEnabled());
-        settings.setWalletEnabled(current.getWalletEnabled());
+        settings.setWalletEnabled(effectiveWalletEnabled(current));
         settings.setCreatedAt(LocalDateTime.now());
         featureSettingsRepository.save(settings);
         logger.info("Withdraw {} globally", enabled ? "enabled" : "disabled");
@@ -72,7 +80,7 @@ public class FeatureService {
         settings.setTopUpEnabled(current.getTopUpEnabled());
         settings.setWithdrawEnabled(current.getWithdrawEnabled());
         settings.setBonusEnabled(enabled);
-        settings.setWalletEnabled(current.getWalletEnabled());
+        settings.setWalletEnabled(effectiveWalletEnabled(current));
         settings.setCreatedAt(LocalDateTime.now());
         featureSettingsRepository.save(settings);
         logger.info("Bonus {} globally", enabled ? "enabled" : "disabled");
@@ -106,5 +114,10 @@ public class FeatureService {
     public boolean canPerformWallet() {
         Boolean v = getGlobalSettings().getWalletEnabled();
         return v == null || v;
+    }
+
+    private boolean effectiveWalletEnabled(FeatureSettings settings) {
+        Boolean value = settings.getWalletEnabled();
+        return value == null || value;
     }
 }
