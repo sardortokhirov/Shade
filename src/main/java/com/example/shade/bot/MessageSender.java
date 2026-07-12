@@ -35,7 +35,7 @@ public class MessageSender {
         this.bot = bot;
     }
 
-    public void sendMessage(SendMessage message, Long chatId) {
+    public boolean sendMessage(SendMessage message, Long chatId) {
         try {
             message.setChatId(chatId);
             var sentMessage = bot.execute(message);
@@ -45,8 +45,10 @@ public class MessageSender {
             messageIds.add(sentMessage.getMessageId());
             session.setMessageIds(messageIds);
             sessionService.saveUserSession(session);
+            return true;
         } catch (TelegramApiException e) {
             logger.error("Error sending message to chatId {}: {}", chatId, e.getMessage());
+            return false;
         }
     }
 

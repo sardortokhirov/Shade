@@ -41,8 +41,9 @@ public class LotteryService {
     private final SystemConfigurationService systemConfigurationService;
     private final Random random = new Random();
 
+    @Transactional
     public void awardTickets(Long chatId, Long amount) {
-        UserBalance balance = userBalanceRepository.findById(chatId)
+        UserBalance balance = userBalanceRepository.findByIdWithLock(chatId)
                 .orElse(UserBalance.builder()
                         .chatId(chatId)
                         .tickets(0L)
@@ -78,14 +79,22 @@ public class LotteryService {
 
     @Transactional
     public Map<Long, BigDecimal> playLotteryWithDetails(Long chatId, Long numberOfPlays) {
-        UserBalance balance = userBalanceRepository.findById(chatId)
+        UserBalance balance = userBalanceRepository.findByIdWithLock(chatId)
                 .orElseThrow(() -> new IllegalStateException("User balance not found: " + chatId));
+        if (balance.getTickets() == null) {
+            balance.setTickets(0L);
+        }
+        if (balance.getBalance() == null) {
+            balance.setBalance(BigDecimal.ZERO);
+        }
         long minT = systemConfigurationService.getMinTickets();
         long maxT = systemConfigurationService.getMaxTickets();
         if (balance.getTickets() < numberOfPlays || numberOfPlays < minT || numberOfPlays > maxT) {
             throw new IllegalStateException(String.format("Invalid ticket count: %d. Must be between %d and %d", balance.getTickets(), minT, maxT));
         }
-        List<LotteryPrize> prizes = lotteryPrizeRepository.findAll();
+        // Lock the finite prize inventory for the complete draw so concurrent
+        // players cannot win the same prize slot.
+        List<LotteryPrize> prizes = lotteryPrizeRepository.findAllWithLock();
         if (prizes.isEmpty()) {
             throw new IllegalStateException("No lottery prizes configured");
         }
@@ -153,7 +162,7 @@ public class LotteryService {
 
     @Transactional
     public Map<Long, BigDecimal> playLotteryWithDetailsLottoBot(Long chatId, Long numberOfPlays) {
-        List<LotteryPrize> prizes = lotteryPrizeRepository.findAll();
+        List<LotteryPrize> prizes = lotteryPrizeRepository.findAllWithLock();
         if (prizes.isEmpty()) {
             throw new IllegalStateException("No lottery prizes configured");
         }
@@ -248,7 +257,7 @@ public class LotteryService {
         // Update balances and send notifications
         for (Long chatId : selectedChatIds) {
             try {
-                UserBalance balance = userBalanceRepository.findById(chatId)
+                UserBalance balance = userBalanceRepository.findByIdWithLock(chatId)
                         .orElseGet(() -> {
                             UserBalance newBalance = UserBalance.builder()
                                     .chatId(chatId)

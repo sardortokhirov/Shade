@@ -63,6 +63,10 @@ public interface HizmatRequestRepository extends JpaRepository<HizmatRequest, Lo
     @Query("SELECT h FROM HizmatRequest h WHERE h.chatId = :chatId AND h.status = :status ORDER BY h.createdAt DESC limit 1")
     Optional<HizmatRequest> findByChatIdAndStatus(Long chatId, RequestStatus status);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT r FROM HizmatRequest r WHERE r.chatId = :chatId AND r.status = :status ORDER BY r.createdAt DESC")
+    List<HizmatRequest> findByChatIdAndStatusWithLock(@Param("chatId") Long chatId, @Param("status") RequestStatus status, Pageable pageable);
+
     @Query("SELECT h FROM HizmatRequest h WHERE h.chatId = :chatId AND h.status = :status ")
     List<HizmatRequest> findByChatsIdAndStatus(Long chatId, RequestStatus status);
 

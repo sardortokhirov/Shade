@@ -3,7 +3,6 @@ package com.example.shade.service;
 import com.example.shade.model.UserSession;
 import org.springframework.stereotype.Service;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -28,15 +27,17 @@ public class UserSessionService {
     }
 
     public void setUserData(Long chatId, String key, String value) {
-        Map<String, String> data = sessionDataStore.computeIfAbsent(chatId, k -> new HashMap<>());
+        Map<String, String> data = sessionDataStore.computeIfAbsent(chatId, k -> new ConcurrentHashMap<>());
         data.put(key, value);
-        sessionDataStore.put(chatId, data);
     }
 
     public void removeUserData(Long chatId, String key) {
         Map<String, String> data = sessionDataStore.get(chatId);
         if (data != null) {
             data.remove(key);
+            if (data.isEmpty()) {
+                sessionDataStore.remove(chatId, data);
+            }
         }
     }
     public String getUserData(Long chatId, String key, String defaultValue) {

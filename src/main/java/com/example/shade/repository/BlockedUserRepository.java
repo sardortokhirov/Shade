@@ -1,6 +1,8 @@
 package com.example.shade.repository;
 
 import com.example.shade.model.BlockedUser;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -12,4 +14,8 @@ public interface BlockedUserRepository extends JpaRepository<BlockedUser, Long> 
     Optional<BlockedUser> findByChatId(Long chatId);
 
     List<BlockedUser> findAllByPhoneNumberNot(String phoneNumber);
+
+    Page<BlockedUser> findByPhoneNumberNot(String phoneNumber, Pageable pageable);
+
+    long countByPhoneNumberNot(String phoneNumber);
 }

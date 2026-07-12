@@ -9,6 +9,7 @@ import com.example.shade.repository.*;
 import jakarta.xml.bind.DatatypeConverter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.PageRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.*;
@@ -132,7 +133,7 @@ public class TopUpService {
                 initiateTopUpRequest(chatId);
             }
             case "TOPUP_CONFIRM" -> initiateTopUpRequest(chatId);
-            case "TOPUP_PAYMENT_CONFIRM" -> verifyPayment(chatId);
+            case "TOPUP_PAYMENT_CONFIRM" -> self.verifyPayment(chatId);
             case "TOPUP_SEND_SCREENSHOT" -> {
                 HizmatRequest pendingPay = requestRepository
                         .findByChatIdAndStatus(chatId, RequestStatus.PENDING_PAYMENT)
@@ -547,8 +548,12 @@ public class TopUpService {
         sendPaymentInstruction(chatId);
     }
 
-    private void verifyPayment(Long chatId) throws Exception {
-        HizmatRequest request = requestRepository.findByChatIdAndStatus(chatId, RequestStatus.PENDING_PAYMENT)
+    @Transactional
+    public void verifyPayment(Long chatId) throws Exception {
+        HizmatRequest request = requestRepository
+                .findByChatIdAndStatusWithLock(chatId, RequestStatus.PENDING_PAYMENT, PageRequest.of(0, 1))
+                .stream()
+                .findFirst()
                 .orElse(null);
         if (request == null) {
             logger.error("No pending payment request found for chatId {}", chatId);
@@ -845,8 +850,11 @@ public class TopUpService {
                 .replace("[", "\\[");
     }
 
+    @Transactional
     public void handleScreenshotApproval(Long chatId, Long requestId, boolean approve) throws Exception {
-        HizmatRequest request = requestRepository.findById(requestId)
+        // Serialize manual approval/rejection of this payment row. This prevents
+        // two admin callbacks from both transferring the same paid amount.
+        HizmatRequest request = requestRepository.findByIdWithLock(requestId)
                 .orElse(null);
         if (request == null) {
             logger.error("No request found for ID {}", requestId);

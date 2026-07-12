@@ -18,6 +18,9 @@ import java.time.ZoneId;
 public class SystemConfigurationService {
     private static final Logger logger = LoggerFactory.getLogger(SystemConfigurationService.class);
     private final SystemConfigurationRepository configurationRepository;
+    private static final long CACHE_TTL_MS = 30_000L;
+    private volatile SystemConfiguration cachedConfig;
+    private volatile long cacheTimestamp;
 
     private static final Long DEFAULT_TOP_UP_MIN = 5_000L;
     private static final Long DEFAULT_TOP_UP_MAX = 10_000_000L;
@@ -35,7 +38,17 @@ public class SystemConfigurationService {
 
     @Transactional
     public SystemConfiguration getConfiguration() {
-        return configurationRepository.findFirstByOrderByCreatedAtDesc()
+        long now = System.currentTimeMillis();
+        SystemConfiguration cached = cachedConfig;
+        if (cached != null && now - cacheTimestamp < CACHE_TTL_MS) {
+            return cached;
+        }
+        synchronized (this) {
+            cached = cachedConfig;
+            if (cached != null && now - cacheTimestamp < CACHE_TTL_MS) {
+                return cached;
+            }
+            SystemConfiguration loadedConfig = configurationRepository.findFirstByOrderByCreatedAtDesc()
                 .orElseGet(() -> {
                     SystemConfiguration config = new SystemConfiguration();
                     config.setTopUpMinAmount(DEFAULT_TOP_UP_MIN);
@@ -50,14 +63,24 @@ public class SystemConfigurationService {
                     config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
                     return configurationRepository.save(config);
                 });
+            cachedConfig = loadedConfig;
+            cacheTimestamp = now;
+            return loadedConfig;
+        }
     }
 
     @Transactional
     public SystemConfiguration updateConfiguration(SystemConfiguration config) {
         config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
         SystemConfiguration saved = configurationRepository.save(config);
+        invalidateCache();
         logger.info("System configuration updated: {}", saved.getId());
         return saved;
+    }
+
+    private void invalidateCache() {
+        cachedConfig = null;
+        cacheTimestamp = 0L;
     }
 
     public Long getTopUpMinAmount() {
@@ -162,27 +185,35 @@ public class SystemConfigurationService {
     public SystemConfiguration setWalletWithdrawRatio(Long ratio) {
         SystemConfiguration config = getConfiguration();
         config.setWalletWithdrawRatio(ratio);
-        return configurationRepository.save(config);
+        SystemConfiguration saved = configurationRepository.save(config);
+        invalidateCache();
+        return saved;
     }
 
     @Transactional
     public SystemConfiguration setWalletMinWithdrawAmount(Long amount) {
         SystemConfiguration config = getConfiguration();
         config.setWalletMinWithdrawAmount(amount);
-        return configurationRepository.save(config);
+        SystemConfiguration saved = configurationRepository.save(config);
+        invalidateCache();
+        return saved;
     }
 
     @Transactional
     public SystemConfiguration setWalletTransferMinAmount(Long amount) {
         SystemConfiguration config = getConfiguration();
         config.setWalletTransferMinAmount(amount);
-        return configurationRepository.save(config);
+        SystemConfiguration saved = configurationRepository.save(config);
+        invalidateCache();
+        return saved;
     }
 
     @Transactional
     public SystemConfiguration setWalletTransferMaxAmount(Long amount) {
         SystemConfiguration config = getConfiguration();
         config.setWalletTransferMaxAmount(amount);
-        return configurationRepository.save(config);
+        SystemConfiguration saved = configurationRepository.save(config);
+        invalidateCache();
+        return saved;
     }
 }

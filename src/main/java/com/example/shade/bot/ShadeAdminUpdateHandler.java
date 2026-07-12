@@ -8,8 +8,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.Update;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.Collections;
+import java.util.HashMap;
 
 @Slf4j
 @Component
@@ -18,22 +19,24 @@ public class ShadeAdminUpdateHandler {
 
     private final AdminBotService adminBotService;
     private final AdminBotMessageSender adminBotMessageSender;
-    private final Map<Long, BotState> userStates = new HashMap<>();
-    private final Map<Long, Map<String, Object>> userContext = new HashMap<>();
+    // Synchronized maps preserve the existing null "in admin mode" marker while
+    // making access safe once bot updates are dispatched on worker threads.
+    private final Map<Long, BotState> userStates = Collections.synchronizedMap(new HashMap<>());
+    private final Map<Long, Map<String, Object>> userContext = Collections.synchronizedMap(new HashMap<>());
 
     public boolean isUserInAdminState(Long chatId) {
         return userStates.containsKey(chatId);
     }
 
     public void setUserInAdminState(Long chatId) {
-        userStates.put(chatId,null);
+        userStates.put(chatId, null);
     }
 
     public void clearAdminSession(Long chatId) {
         userStates.remove(chatId);
         userContext.remove(chatId);
     }
-    public boolean handleUpdate(Update update) {
+    public synchronized boolean handleUpdate(Update update) {
         try {
             if (update.hasMessage()) {
                 return handleMessage(update);

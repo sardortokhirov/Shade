@@ -19,6 +19,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -683,6 +685,7 @@ public class AdminBotService {
         }
     }
 
+    @Async("bonusProcessingExecutor")
     @Transactional
     public void awardRandomUsers(Long chatId, Map<String, Object> context) {
         try {
@@ -711,7 +714,8 @@ public class AdminBotService {
     public CompletableFuture<Void> confirmAndForwardMessage(Long chatId, Map<String, Object> context) {
         try {
             Message message = (Message) context.get("message");
-            List<User> users = userRepository.findAll();
+            final int batchSize = 50;
+            long totalUsers = userRepository.count();
 
             AtomicInteger successCount = new AtomicInteger(0);
             AtomicInteger failCount = new AtomicInteger(0);
@@ -727,23 +731,22 @@ public class AdminBotService {
             };
 
             // Process in batches
-            int batchSize = 100;
-            int totalBatches = (int) Math.ceil((double) users.size() / batchSize);
+            int totalBatches = Math.max(1, (int) Math.ceil((double) totalUsers / batchSize));
+            for (int pageNumber = 0; ; pageNumber++) {
+                Page<User> page = userRepository.findAll(PageRequest.of(pageNumber, batchSize));
+                if (page.isEmpty()) {
+                    break;
+                }
+                processForwardBatch(page.getContent(), message, chatId, adminSender, successCount, failCount);
 
-            for (int i = 0; i < users.size(); i += batchSize) {
-                int end = Math.min(i + batchSize, users.size());
-                List<User> batch = users.subList(i, end);
-
-                processForwardBatch(batch, message, chatId, adminSender, successCount, failCount);
-
-                int currentBatch = (i / batchSize) + 1;
+                int currentBatch = pageNumber + 1;
                 int progress = (currentBatch * 100) / totalBatches;
                 sendProgressUpdate(chatId, progress, currentBatch, totalBatches,
                         successCount.get(), failCount.get());
 
-                if (i + batchSize < users.size()) {
+                if (page.hasNext()) {
                     try {
-                        Thread.sleep(100);
+                        Thread.sleep(250);
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         log.warn("Forward message interrupted");
@@ -756,7 +759,7 @@ public class AdminBotService {
                     String.format("✅ Xabar yuborish yakunlandi!\n\n" +
                             "✔️ Muvaffaqiyatli: %d\n" +
                             "❌ Xato: %d\n" +
-                            "📊 Jami: %d", successCount.get(), failCount.get(), users.size()));
+                            "📊 Jami: %d", successCount.get(), failCount.get(), totalUsers));
 
             sendMainMenu(chatId);
 
@@ -781,6 +784,14 @@ public class AdminBotService {
                 adminSender.execute(forwardMessage);
                 successCount.incrementAndGet();
             } catch (TelegramApiException e) {
+                if (isFloodLimit(e)) {
+                    // Do not immediately retry via the user bot; that would
+                    // double the pressure exactly when Telegram is throttling us.
+                    log.warn("Telegram flood limit while forwarding to {}: {}", user.getChatId(), e.getMessage());
+                    failCount.incrementAndGet();
+                    pauseBetweenMessages(1_000);
+                    continue;
+                }
                 try {
                     boolean sent = sendMessageContentDirectly(user.getChatId(), message);
                     if (sent) {
@@ -796,6 +807,21 @@ public class AdminBotService {
                 log.error("Failed to send message to user: " + user.getChatId(), e);
                 failCount.incrementAndGet();
             }
+            pauseBetweenMessages(45);
+        }
+    }
+
+    private boolean isFloodLimit(TelegramApiException exception) {
+        String message = exception.getMessage();
+        return message != null && message.toLowerCase().contains("too many requests");
+    }
+
+    private void pauseBetweenMessages(long millis) {
+        try {
+            // Keep bulk forwarding below Telegram's global message rate limit.
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 

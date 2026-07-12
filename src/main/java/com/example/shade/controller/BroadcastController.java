@@ -25,6 +25,7 @@ public class BroadcastController {
         private String buttonText;
         private String buttonUrl;
         private LocalDateTime scheduledTime;
+        private Long adminChatId;
 
         // Getters and setters
         public String getMessageText() {
@@ -66,6 +67,14 @@ public class BroadcastController {
         public void setScheduledTime(LocalDateTime scheduledTime) {
             this.scheduledTime = scheduledTime;
         }
+
+        public Long getAdminChatId() {
+            return adminChatId;
+        }
+
+        public void setAdminChatId(Long adminChatId) {
+            this.adminChatId = adminChatId;
+        }
     }
 
     private boolean authenticate(HttpServletRequest request) {
@@ -92,9 +101,10 @@ public class BroadcastController {
                     broadcastRequest.getParseMode(),
                     broadcastRequest.getButtonText(),
                     broadcastRequest.getButtonUrl(),
-                    broadcastRequest.getScheduledTime()
+                    broadcastRequest.getScheduledTime(),
+                    broadcastRequest.getAdminChatId()
             );
-            return ResponseEntity.ok("Broadcast initiated successfully.");
+            return ResponseEntity.ok("Broadcast initiated successfully. Processing in background.");
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Failed to initiate broadcast: " + e.getMessage());
         }

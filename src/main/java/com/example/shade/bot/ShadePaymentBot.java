@@ -4,12 +4,14 @@ import com.example.shade.model.*;
 import com.example.shade.repository.*;
 import com.example.shade.service.*;
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
+import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.GetFile;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
@@ -30,6 +32,8 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 @Component
 @RequiredArgsConstructor
@@ -52,6 +56,8 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
     private final AdminChatRepository adminChatRepository;
     private final ShadeAdminUpdateHandler adminUpdateHandler;
     private final AdminBotService adminBotService;
+    private final CallbackDeduplicationService callbackDeduplicationService;
+    private final ExecutorService updateExecutor = Executors.newFixedThreadPool(10);
 
     @Value("${telegram.bot.token}")
     private String botToken;
@@ -75,6 +81,11 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
         }
     }
 
+    @PreDestroy
+    public void shutdownUpdateExecutor() {
+        updateExecutor.shutdown();
+    }
+
     @Override
     public String getBotUsername() {
         return botUsername;
@@ -91,11 +102,15 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
 
     @Override
     public void onUpdateReceived(Update update) {
+        if (update == null) {
+            logger.warn("Received null update");
+            return;
+        }
+        updateExecutor.submit(() -> processUpdate(update));
+    }
+
+    private void processUpdate(Update update) {
         try {
-            if (update == null) {
-                logger.warn("Received null update");
-                return;
-            }
             Long chatId = null;
             if (update.hasMessage()) {
                 chatId = update.getMessage().getChatId();
@@ -107,6 +122,18 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
             if (chatId == null) {
                 logger.warn("No chatId found in update: {}", update);
                 return;
+            }
+            if (update.hasCallbackQuery()) {
+                String callbackId = update.getCallbackQuery().getId();
+                if (!callbackDeduplicationService.tryProcess(callbackId)) {
+                    logger.debug("Duplicate callback ignored for chatId {}", chatId);
+                    return;
+                }
+                try {
+                    execute(new AnswerCallbackQuery(callbackId));
+                } catch (TelegramApiException e) {
+                    logger.warn("Failed to answer callback {}: {}", callbackId, e.getMessage());
+                }
             }
             Optional<AdminChat> adminChatOpt = adminChatRepository.findById(chatId);
             boolean isAdmin = adminChatOpt.isPresent();
@@ -193,8 +220,16 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                 }
                 user.setPhoneNumber(receivedPhoneNumber);
                 blockedUserRepository.save(user);
-                userBalanceRepository
-                        .save(UserBalance.builder().chatId(chatId).tickets(0L).balance(BigDecimal.ZERO).build());
+                // Do not overwrite an existing user's tickets, bonus balance, or wallet balance
+                // when they share their contact again.
+                if (userBalanceRepository.findById(chatId).isEmpty()) {
+                    userBalanceRepository.save(UserBalance.builder()
+                            .chatId(chatId)
+                            .tickets(0L)
+                            .balance(BigDecimal.ZERO)
+                            .walletBalance(0L)
+                            .build());
+                }
 
                 logger.info("Phone number saved for chatId {}: {}", chatId, receivedPhoneNumber);
                 sessionService.clearSession(chatId);
