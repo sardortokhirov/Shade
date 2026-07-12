@@ -1344,14 +1344,14 @@ public class WalletService {
         }
 
         UserBalance balance = userBalanceRepository.findByIdWithLock(chatId).orElse(null);
-        if (balance == null || balance.getWalletBalance() < amount) {
+        if (balance == null || balance.getWalletBalance() == null || balance.getWalletBalance() < amount) {
             SendMessage m = new SendMessage();
             m.setChatId(chatId.toString());
             m.setText(String.format(
                     languageSessionService.getTranslation(chatId, "wallet.message.insufficient_funds"),
-                    balance != null ? balance.getWalletBalance() : 0));
+                    (balance != null && balance.getWalletBalance() != null) ? balance.getWalletBalance() : 0));
             m.enableMarkdown(true);
-            m.setReplyMarkup(createMainMenuOnlyMarkup(chatId));
+            m.setReplyMarkup(createTopUpAndHomeMarkup(chatId));
             messageSender.sendMessage(m, chatId);
             return;
         }
@@ -1477,6 +1477,15 @@ public class WalletService {
     private InlineKeyboardMarkup createMainMenuOnlyMarkup(Long chatId) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         markup.setKeyboard(List.of(List.of(createButton(languageSessionService.getTranslation(chatId, "button.home"), "HOME"))));
+        return markup;
+    }
+
+    /** Keyboard shown when the wallet balance is too low: a top-up button plus the home button. */
+    private InlineKeyboardMarkup createTopUpAndHomeMarkup(Long chatId) {
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        markup.setKeyboard(List.of(
+                List.of(createButton(languageSessionService.getTranslation(chatId, "wallet.button.topup"), "WALLET_TOPUP")),
+                List.of(createButton(languageSessionService.getTranslation(chatId, "button.home"), "HOME"))));
         return markup;
     }
 
