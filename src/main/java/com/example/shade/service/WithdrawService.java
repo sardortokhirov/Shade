@@ -8,6 +8,7 @@ import com.example.shade.repository.ExchangeRateRepository;
 import com.example.shade.repository.HizmatRequestRepository;
 import com.example.shade.repository.PlatformRepository;
 import com.example.shade.repository.UserBalanceRepository;
+import com.example.shade.repository.UserWalletQuotaRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,6 +51,7 @@ public class WithdrawService {
     private final MostbetService mostbetService;
     private final SystemConfigurationService systemConfigurationService;
     private final UserBalanceRepository userBalanceRepository;
+    private final UserWalletQuotaRepository walletQuotaRepository;
 
     @org.springframework.beans.factory.annotation.Autowired
     @org.springframework.context.annotation.Lazy
@@ -290,7 +292,9 @@ public class WithdrawService {
                     String errorMsg = "Platform returned status: " + status;
                     String cancelLogMessage = String.format(
                             languageSessionService.getTranslation(chatId, "withdraw.message.payout_failed"),
-                            request != null ? request.getId() : requestId, cardNumber, platform.getName(), userId, code, errorMsg,
+                            request != null ? request.getId() : requestId,
+                            displayDestination(chatId, cardNumber),
+                            platform.getName(), userId, code, errorMsg,
                             LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
                     );
                     messageSender.sendMessage(chatId, cancelLogMessage);
@@ -307,7 +311,9 @@ public class WithdrawService {
                 String errorMsg = e.getMessage(); // Get the specific error from the exception
                 String cancelLogMessage = String.format(
                         languageSessionService.getTranslation(chatId, "withdraw.message.payout_failed"),
-                        request != null ? request.getId() : requestId, cardNumber, platform.getName(), userId, code, errorMsg,
+                        request != null ? request.getId() : requestId,
+                        displayDestination(chatId, cardNumber),
+                        platform.getName(), userId, code, errorMsg,
                         LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
                 );
 
@@ -374,7 +380,7 @@ public class WithdrawService {
 
                 String cancelLogMessage = String.format(
                         languageSessionService.getTranslation(chatId, "withdraw.message.payout_failed"),
-                        request.getId(), cardNumber, platform.getName(), userId, code, errorMsg,
+                        request.getId(), displayDestination(chatId, cardNumber), platform.getName(), userId, code, errorMsg,
                         LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
                 );
                 if (response.getStatusCode().is2xxSuccessful() && Boolean.TRUE.equals(successObj)) {
@@ -654,9 +660,10 @@ public class WithdrawService {
                     walletBalanceLeft,
                     LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
+            long withdrawLimit = getWithdrawLimit(chatId);
             messageSender.sendMessage(chatId, String.format(
                     languageSessionService.getTranslation(chatId, "withdraw.message.wallet_credit_success"),
-                    netAmount.toPlainString(), platform, request.getId()));
+                    netAmount.toPlainString(), platform, request.getId(), walletBalanceLeft, withdrawLimit));
 
             adminLogBotService.sendLog(logMessage);
             sendMainMenu(chatId);
@@ -689,13 +696,39 @@ public class WithdrawService {
     }
 
     private void sendPlatformSelection(Long chatId) {
+        long walletBalance = userBalanceRepository.findById(chatId)
+                .map(ub -> ub.getWalletBalance() != null ? ub.getWalletBalance() : 0L)
+                .orElse(0L);
+        long withdrawLimit = getWithdrawLimit(chatId);
+
         SendMessage message = new SendMessage();
         message.setChatId(chatId.toString());
-        message.setText(languageSessionService.getTranslation(chatId, "withdraw.message.platform_selection"));
+        message.setText(String.format(
+                languageSessionService.getTranslation(chatId, "withdraw.message.platform_selection"),
+                walletBalance, withdrawLimit));
         InlineKeyboardMarkup keyboard = createPlatformKeyboard(chatId);
         message.setReplyMarkup(keyboard);
         messageSender.sendMessage(message, chatId);
         logger.info("Sent platform selection to chatId {} with {} buttons", chatId, keyboard.getKeyboard().size());
+    }
+
+    private long getWithdrawLimit(Long chatId) {
+        UserWalletQuota quota = walletQuotaRepository.findById(chatId)
+                .orElse(UserWalletQuota.builder()
+                        .chatId(chatId)
+                        .earnedQuota(0L)
+                        .usedQuota(0L)
+                        .bonusQuota(0L)
+                        .build());
+        return quota.getRemainingQuota() != null ? quota.getRemainingQuota() : 0L;
+    }
+
+    /** User-facing destination label; avoid showing raw WALLET in Telegram messages. */
+    private String displayDestination(Long chatId, String cardNumber) {
+        if (cardNumber != null && "WALLET".equalsIgnoreCase(cardNumber.trim())) {
+            return languageSessionService.getTranslation(chatId, "withdraw.label.wallet");
+        }
+        return cardNumber != null ? cardNumber : "";
     }
 
     private void sendUserIdInput(Long chatId, String platform) {

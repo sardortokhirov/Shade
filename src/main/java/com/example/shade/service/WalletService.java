@@ -64,13 +64,16 @@ public class WalletService {
 
     private void sendWalletMenu(Long chatId) {
         UserBalance balance = getOrCreateUserBalance(chatId);
-        Long walletAmount = balance.getWalletBalance();
+        Long walletAmount = balance.getWalletBalance() != null ? balance.getWalletBalance() : 0L;
+        UserWalletQuota quota = walletQuotaRepository.findById(chatId)
+                .orElse(UserWalletQuota.builder().chatId(chatId).earnedQuota(0L).usedQuota(0L).bonusQuota(0L).build());
+        long withdrawLimit = quota.getRemainingQuota() != null ? quota.getRemainingQuota() : 0L;
 
         SendMessage message = new SendMessage();
         message.setChatId(chatId.toString());
         message.setText(String.format(
                 languageSessionService.getTranslation(chatId, "wallet.message.menu"),
-                walletAmount));
+                walletAmount, withdrawLimit));
 
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
