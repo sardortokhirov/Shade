@@ -9,7 +9,6 @@ import com.example.shade.repository.*;
 import jakarta.xml.bind.DatatypeConverter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.data.domain.PageRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.*;
@@ -551,9 +550,7 @@ public class TopUpService {
     @Transactional
     public void verifyPayment(Long chatId) throws Exception {
         HizmatRequest request = requestRepository
-                .findByChatIdAndStatusWithLock(chatId, RequestStatus.PENDING_PAYMENT, PageRequest.of(0, 1))
-                .stream()
-                .findFirst()
+                .findFirstByChatIdAndStatusForUpdate(chatId, RequestStatus.PENDING_PAYMENT)
                 .orElse(null);
         if (request == null) {
             logger.error("No pending payment request found for chatId {}", chatId);
@@ -595,6 +592,8 @@ public class TopUpService {
                 }
             }
         } catch (Exception e) {
+            logger.error("Payment verification error for chatId {}, request {}: {}",
+                    chatId, request.getId(), e.getMessage(), e);
             request.setStatus(RequestStatus.PENDING_SCREENSHOT);
             requestRepository.save(request);
             SendMessage message = new SendMessage();
@@ -611,7 +610,8 @@ public class TopUpService {
             sessionService.setUserState(chatId, "TOPUP_AWAITING_SCREENSHOT");
             bindPendingScreenshotRequest(chatId, request);
 
-            String number = blockedUserRepository.findByChatId(request.getChatId()).get().getPhoneNumber();
+            String number = blockedUserRepository.findByChatId(request.getChatId())
+                    .map(BlockedUser::getPhoneNumber).orElse("N/A");
             String logMessage = String.format(
                     "🆔: %d  \n" +
                             "👤: [%s] %s\n" +
@@ -628,41 +628,63 @@ public class TopUpService {
                     request.getPlatformUserId(),
                     request.getUniqueAmount(),
                     rubAmount,
-                    request.getCardNumber(),
+                    request.getCardNumber() != null ? request.getCardNumber() : "Hamyon",
                     adminCard.getCardNumber(),
                     LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
             );
             adminLogBotService.sendLog("Osonda Xatolik Yuz berdi ⚠\uFE0F \n\n" + logMessage);
+            // Status is already PENDING_SCREENSHOT — do not continue into the
+            // "payment not received" branch (that would look up PENDING_PAYMENT and crash).
+            return;
         }
 
         boolean isPaymentReceived = response || (statusResponse != null ? "SUCCESS".equals(statusResponse.get("status")) : false);
 
         if (isPaymentReceived) {
-            if (adminCard.getPaymentSystem().equals(PaymentSystem.UZCARD)) {
-                request.setTransactionId((String) statusResponse.get("transactionId"));
-                request.setBillId(Long.parseLong(String.valueOf(statusResponse.get("billId"))));
-                request.setPayUrl((String) statusResponse.get("payUrl"));
+            if (adminCard.getPaymentSystem().equals(PaymentSystem.UZCARD) && statusResponse != null) {
+                Object txId = statusResponse.get("transactionId");
+                if (txId != null) {
+                    request.setTransactionId(String.valueOf(txId));
+                }
+                Object billId = statusResponse.get("billId");
+                if (billId != null) {
+                    try {
+                        request.setBillId(Long.parseLong(String.valueOf(billId).replaceAll("[^\\d-]", "")));
+                    } catch (NumberFormatException ignored) {
+                        logger.warn("Non-numeric billId for request {}: {}", request.getId(), billId);
+                    }
+                }
+                Object payUrl = statusResponse.get("payUrl");
+                if (payUrl != null) {
+                    request.setPayUrl(String.valueOf(payUrl));
+                }
             }
 
             request.setStatus(RequestStatus.APPROVED);
             requestRepository.save(request);
             String platformName = request.getPlatform();
             BalanceLimit transferSuccessful = null;
-            if ("Wallet".equals(platformName)) {
-                transferSuccessful = self.creditWalletBalance(request);
-                Long w = userBalanceRepository.findById(chatId)
-                        .map(ub -> ub.getWalletBalance() != null ? ub.getWalletBalance() : 0L)
-                        .orElse(0L);
-                request.setWalletBalanceAtTime(w);
-                requestRepository.save(request);
-            } else {
-                Platform platform = platformRepository.findByName(platformName)
-                        .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
-                if (platform.getType().equals("mostbet")) {
-                    transferSuccessful = mostbetService.transferToPlatform(request);
+            try {
+                if ("Wallet".equals(platformName)) {
+                    transferSuccessful = self.creditWalletBalance(request);
+                    Long w = userBalanceRepository.findById(chatId)
+                            .map(ub -> ub.getWalletBalance() != null ? ub.getWalletBalance() : 0L)
+                            .orElse(0L);
+                    request.setWalletBalanceAtTime(w);
+                    requestRepository.save(request);
                 } else {
-                    transferSuccessful = transferToPlatform(request, adminCard);
+                    Platform platform = platformRepository.findByName(platformName)
+                            .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
+                    if (platform.getType().equals("mostbet")) {
+                        transferSuccessful = mostbetService.transferToPlatform(request);
+                    } else {
+                        transferSuccessful = transferToPlatform(request, adminCard);
+                    }
                 }
+            } catch (Exception e) {
+                logger.error("Credit/transfer failed for request {} (platform={}): {}",
+                        request.getId(), platformName, e.getMessage(), e);
+                transferSuccessful = null;
             }
             if ("Wallet".equals(platformName) && transferSuccessful != null) {
                 handleWalletTopUpSuccess(chatId, request, adminCard.getCardNumber());
@@ -885,21 +907,27 @@ public class TopUpService {
 
             String platformName = request.getPlatform();
             BalanceLimit transferSuccessful = null;
-            if ("Wallet".equals(platformName)) {
-                transferSuccessful = self.creditWalletBalance(request);
-                Long w = userBalanceRepository.findById(request.getChatId())
-                        .map(ub -> ub.getWalletBalance() != null ? ub.getWalletBalance() : 0L)
-                        .orElse(0L);
-                request.setWalletBalanceAtTime(w);
-                requestRepository.save(request);
-            } else {
-                Platform platform = platformRepository.findByName(platformName)
-                        .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
-                if (platform.getType().equals("mostbet")) {
-                    transferSuccessful = mostbetService.transferToPlatform(request);
+            try {
+                if ("Wallet".equals(platformName)) {
+                    transferSuccessful = self.creditWalletBalance(request);
+                    Long w = userBalanceRepository.findById(request.getChatId())
+                            .map(ub -> ub.getWalletBalance() != null ? ub.getWalletBalance() : 0L)
+                            .orElse(0L);
+                    request.setWalletBalanceAtTime(w);
+                    requestRepository.save(request);
                 } else {
-                    transferSuccessful = transferToPlatform(request, adminCard);
+                    Platform platform = platformRepository.findByName(platformName)
+                            .orElseThrow(() -> new IllegalStateException("Platform not found: " + platformName));
+                    if (platform.getType().equals("mostbet")) {
+                        transferSuccessful = mostbetService.transferToPlatform(request);
+                    } else {
+                        transferSuccessful = transferToPlatform(request, adminCard);
+                    }
                 }
+            } catch (Exception e) {
+                logger.error("Screenshot credit/transfer failed for request {} (platform={}): {}",
+                        request.getId(), platformName, e.getMessage(), e);
+                transferSuccessful = null;
             }
             if ("Wallet".equals(platformName) && transferSuccessful != null) {
                 handleWalletTopUpSuccess(request.getChatId(), request, adminCard.getCardNumber());

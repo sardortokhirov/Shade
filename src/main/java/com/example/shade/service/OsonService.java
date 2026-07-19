@@ -149,7 +149,8 @@ public class OsonService {
             Map<String, Object> responseBody = apiResponse.getBody();
             if (apiResponse.getStatusCode().is2xxSuccessful() && responseBody != null && "0".equals(String.valueOf(responseBody.get("errno")))) {
                 List<Map<String, Object>> transactions = (List<Map<String, Object>>) responseBody.get("array");
-                String userCardLastDigits = userCardNumber.substring(userCardNumber.length() - 4);
+                // Wallet top-ups skip user card entry, so card number may be null.
+                // Match by unique amount + recent timestamp only (same as xonpey).
                 OffsetDateTime now = OffsetDateTime.now();
 
                 for (Map<String, Object> transaction : transactions) {
@@ -187,8 +188,10 @@ public class OsonService {
             logger.error("HTTP error fetching card history: {}", e.getMessage());
             response.put("error", "HTTP error: " + e.getStatusCode());
         } catch (Exception e) {
-            authToken = null;
-            return verifyPaymentByAmountAndCard(chatId, platform, platformUserId, amount, userCardNumber, adminCardId, uniqueAmount);
+            // Do not recurse on unexpected errors — that used to stack-overflow when
+            // wallet top-ups had a null user card number.
+            logger.error("Error verifying Oson payment for chatId {}: {}", chatId, e.getMessage(), e);
+            response.put("error", "Verification error: " + e.getMessage());
         }
         return response;
     }
