@@ -7,6 +7,8 @@ import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageReplyMarkup;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.bots.AbsSender;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
@@ -79,6 +81,45 @@ public class AdminTelegramMessageSender {
             } catch (TelegramApiException e) {
                 logger.error("Failed to delete messageId {} for chatId {}: {}", messageId, chatId, e.getMessage());
             }
+        }
+    }
+
+    /** Remove inline buttons from an admin message without deleting the text. */
+    public void removeInlineButtons(Long chatId, Integer messageId) {
+        if (bot == null || chatId == null || messageId == null) {
+            return;
+        }
+        try {
+            EditMessageReplyMarkup edit = new EditMessageReplyMarkup();
+            edit.setChatId(chatId.toString());
+            edit.setMessageId(messageId);
+            edit.setReplyMarkup(null);
+            bot.execute(edit);
+        } catch (TelegramApiException e) {
+            logger.warn("Failed to remove buttons from admin message {}/{}: {}", chatId, messageId, e.getMessage());
+        }
+    }
+
+    /**
+     * Replace admin request message text and clear buttons.
+     * Used so wallet withdraw requests keep a visible ✅/❌ status instead of "disappearing".
+     */
+    public void editMessageText(Long chatId, Integer messageId, String text) {
+        if (bot == null || chatId == null || messageId == null || text == null) {
+            return;
+        }
+        try {
+            EditMessageText edit = new EditMessageText();
+            edit.setChatId(chatId.toString());
+            edit.setMessageId(messageId);
+            edit.setText(text);
+            edit.enableMarkdown(true);
+            edit.setReplyMarkup(null);
+            bot.execute(edit);
+        } catch (TelegramApiException e) {
+            logger.warn("Failed to edit admin message {}/{}: {}", chatId, messageId, e.getMessage());
+            // Fallback: at least strip buttons so the spinner/actions do not hang.
+            removeInlineButtons(chatId, messageId);
         }
     }
 }

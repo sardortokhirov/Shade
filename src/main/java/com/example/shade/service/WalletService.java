@@ -1039,13 +1039,13 @@ public class WalletService {
     // ----- ADMIN AND CANCEL ACTIONS -----
 
     @Transactional
-    public void handleAdminTake(Long requestId, Long adminChatId) {
+    public boolean handleAdminTake(Long requestId, Long adminChatId) {
         HizmatRequest request = requestRepository.findByIdWithLock(requestId).orElse(null);
         if (request == null || request.getStatus() != RequestStatus.PENDING_ADMIN
                 || request.getType() != RequestType.WALLET_WITHDRAWAL) {
             adminLogBotService.sendToSingleAdmin(adminChatId,
                     "❌ So'rov topilmadi yoki allaqachon ko'rib chiqilgan: 🆔 " + requestId);
-            return;
+            return false;
         }
 
         // Lock it so user cannot cancel
@@ -1070,17 +1070,22 @@ public class WalletService {
         adminMarkup.setKeyboard(adminRows);
 
         adminLogBotService.sendToSingleAdmin(adminChatId, adminMsg, adminMarkup);
+        return true;
     }
 
+    /**
+     * Approves a wallet→card withdrawal.
+     * @return confirmation text for editing the admin request message (with ✅), or null if already processed
+     */
     @Transactional
-    public void handleAdminConfirm(Long requestId) {
+    public String handleAdminConfirm(Long requestId) {
         HizmatRequest request = requestRepository.findByIdWithLock(requestId).orElse(null);
         if (request == null
                 || (request.getStatus() != RequestStatus.PENDING_ADMIN
                         && request.getStatus() != RequestStatus.PROCESSING)
                 || request.getType() != RequestType.WALLET_WITHDRAWAL) {
             adminLogBotService.sendToAdmins("❌ Request not found or already processed: 🆔 " + requestId);
-            return;
+            return null;
         }
 
         // Mark as approved
@@ -1101,41 +1106,50 @@ public class WalletService {
         adminLogBotService.sendToAdmins(adminMsg);
 
         // Notify User
-        SendMessage m = new SendMessage();
-        m.setChatId(request.getChatId().toString());
-        m.setText(String.format(
-                languageSessionService.getTranslation(request.getChatId(), "wallet.message.withdraw_admin_confirmed"),
-                request.getId(), request.getAmount(), escapeMarkdown(request.getCardNumber())));
-        m.enableMarkdown(true);
-        m.setReplyMarkup(createMainMenuOnlyMarkup(request.getChatId()));
-        messageSender.sendMessage(m, request.getChatId());
+        try {
+            SendMessage m = new SendMessage();
+            m.setChatId(request.getChatId().toString());
+            m.setText(String.format(
+                    languageSessionService.getTranslation(request.getChatId(), "wallet.message.withdraw_admin_confirmed"),
+                    request.getId(), request.getAmount(), escapeMarkdown(request.getCardNumber())));
+            m.enableMarkdown(true);
+            m.setReplyMarkup(createMainMenuOnlyMarkup(request.getChatId()));
+            messageSender.sendMessage(m, request.getChatId());
+        } catch (Exception e) {
+            logger.error("Wallet withdraw {} confirmed, but user notify failed: {}", requestId, e.getMessage(), e);
+        }
+        return adminMsg;
     }
 
     @Transactional
-    public void handleAdminDecline(Long requestId) {
+    public boolean handleAdminDecline(Long requestId) {
         HizmatRequest request = requestRepository.findByIdWithLock(requestId).orElse(null);
         if (request == null
                 || (request.getStatus() != RequestStatus.PENDING_ADMIN
                         && request.getStatus() != RequestStatus.PROCESSING)
                 || request.getType() != RequestType.WALLET_WITHDRAWAL) {
             adminLogBotService.sendToAdmins("❌ Request not found or already processed: 🆔 " + requestId);
-            return;
+            return false;
         }
 
         // Return funds
         UserBalance balance = userBalanceRepository.findByIdWithLock(request.getChatId()).orElse(null);
         if (balance != null) {
-            balance.setWalletBalance(balance.getWalletBalance() + request.getAmount());
+            long current = balance.getWalletBalance() != null ? balance.getWalletBalance() : 0L;
+            long amount = request.getAmount() != null ? request.getAmount() : 0L;
+            balance.setWalletBalance(current + amount);
             userBalanceRepository.save(balance);
         }
 
         // Return quota (was decreased when request was sent to admin)
         walletQuotaRepository.findByIdWithLock(request.getChatId()).ifPresent(quota -> {
-            long newUsed = Math.max(0L, quota.getUsedQuota() - request.getAmount());
+            long amount = request.getAmount() != null ? request.getAmount() : 0L;
+            long used = quota.getUsedQuota() != null ? quota.getUsedQuota() : 0L;
+            long newUsed = Math.max(0L, used - amount);
             quota.setUsedQuota(newUsed);
             walletQuotaRepository.save(quota);
             logger.info("Quota returned on decline for chatId {}: -{}, total used={}, remaining={}",
-                    request.getChatId(), request.getAmount(), newUsed, quota.getRemainingQuota());
+                    request.getChatId(), amount, newUsed, quota.getRemainingQuota());
         });
 
         // Mark as declined/canceled
@@ -1143,18 +1157,23 @@ public class WalletService {
         requestRepository.save(request);
 
         // Notify Admins
-        String adminMsg = String.format("❌ Wallet Withdrawal Declined: 🆔 %d", request.getId());
+        String adminMsg = String.format("❌ Hamyondan kartaga yechish rad etildi: 🆔 `%d`", request.getId());
         adminLogBotService.sendToAdmins(adminMsg);
 
         // Notify User
-        SendMessage m = new SendMessage();
-        m.setChatId(request.getChatId().toString());
-        m.setText(String.format(
-                languageSessionService.getTranslation(request.getChatId(), "wallet.message.withdraw_admin_declined"),
-                request.getId()));
-        m.enableMarkdown(true);
-        m.setReplyMarkup(createMainMenuOnlyMarkup(request.getChatId()));
-        messageSender.sendMessage(m, request.getChatId());
+        try {
+            SendMessage m = new SendMessage();
+            m.setChatId(request.getChatId().toString());
+            m.setText(String.format(
+                    languageSessionService.getTranslation(request.getChatId(), "wallet.message.withdraw_admin_declined"),
+                    request.getId()));
+            m.enableMarkdown(true);
+            m.setReplyMarkup(createMainMenuOnlyMarkup(request.getChatId()));
+            messageSender.sendMessage(m, request.getChatId());
+        } catch (Exception e) {
+            logger.error("Wallet withdraw {} declined, but user notify failed: {}", requestId, e.getMessage(), e);
+        }
+        return true;
     }
 
     /**
@@ -1265,18 +1284,21 @@ public class WalletService {
 
         // Return funds
         UserBalance balance = userBalanceRepository.findByIdWithLock(chatId).orElse(null);
+        long amount = request.getAmount() != null ? request.getAmount() : 0L;
         if (balance != null) {
-            balance.setWalletBalance(balance.getWalletBalance() + request.getAmount());
+            long current = balance.getWalletBalance() != null ? balance.getWalletBalance() : 0L;
+            balance.setWalletBalance(current + amount);
             userBalanceRepository.save(balance);
         }
 
         // Return quota (was decreased when request was sent to admin)
         walletQuotaRepository.findByIdWithLock(chatId).ifPresent(quota -> {
-            long newUsed = Math.max(0L, quota.getUsedQuota() - request.getAmount());
+            long used = quota.getUsedQuota() != null ? quota.getUsedQuota() : 0L;
+            long newUsed = Math.max(0L, used - amount);
             quota.setUsedQuota(newUsed);
             walletQuotaRepository.save(quota);
             logger.info("Quota returned on user cancel for chatId {}: -{}, total used={}, remaining={}",
-                    chatId, request.getAmount(), newUsed, quota.getRemainingQuota());
+                    chatId, amount, newUsed, quota.getRemainingQuota());
         });
 
         // Mark as canceled

@@ -14,9 +14,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
+import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updates.DeleteWebhook;
-import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageReplyMarkup;
+import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
@@ -103,7 +104,17 @@ public class AdminLogBot extends TelegramLongPollingBot {
             if (update.hasMessage() && update.getMessage().hasText()) {
                 handleTextMessage(update.getMessage().getText(), update.getMessage().getChatId(), update.getMessage().getMessageId());
             } else if (update.hasCallbackQuery()) {
-                handleCallbackQuery(update.getCallbackQuery().getData(), update.getCallbackQuery().getMessage().getChatId(), update.getCallbackQuery().getMessage().getMessageId());
+                CallbackQuery callbackQuery = update.getCallbackQuery();
+                try {
+                    execute(new AnswerCallbackQuery(callbackQuery.getId()));
+                } catch (Exception e) {
+                    logger.warn("Failed to answer admin callback {}: {}", callbackQuery.getId(), e.getMessage());
+                }
+                handleCallbackQuery(
+                        callbackQuery.getData(),
+                        callbackQuery.getMessage().getChatId(),
+                        callbackQuery.getMessage().getMessageId(),
+                        callbackQuery.getMessage().getText());
             }
         } catch (Exception e) {
             logger.error("Error processing update: {}", update, e);
@@ -190,20 +201,8 @@ public class AdminLogBot extends TelegramLongPollingBot {
         logger.info("Sent message to admin chatId {}: {}", chatId, message.getText());
     }
 
-    private void handleCallbackQuery(String callbackData, Long chatId, Integer messageId) throws Exception {
+    private void handleCallbackQuery(String callbackData, Long chatId, Integer messageId, String originalText) throws Exception {
         logger.info("Processing callback from admin chatId {}: {}", chatId, callbackData);
-
-        // Remove buttons from original message
-        EditMessageReplyMarkup editMessage = new EditMessageReplyMarkup();
-        editMessage.setChatId(chatId.toString());
-        editMessage.setMessageId(messageId);
-//        editMessage.setReplyMarkup(null);
-        try {
-            execute(editMessage);
-            logger.info("Removed buttons from messageId {} in admin chatId {}", messageId, chatId);
-        } catch (Exception e) {
-            logger.error("Failed to remove buttons from messageId {} in admin chatId {}: {}", messageId, chatId, e.getMessage());
-        }
 
         SendMessage message = new SendMessage();
         message.setChatId(chatId.toString());
@@ -212,63 +211,94 @@ public class AdminLogBot extends TelegramLongPollingBot {
         if (callbackData.startsWith("APPROVE_WITHDRAW:")) {
             Long requestId = Long.parseLong(callbackData.split(":")[1]);
             withdrawService.processAdminApproval(chatId, requestId, true);
+            markAdminRequestResolved(chatId, messageId, originalText, "✅");
             return;
         } else if (callbackData.startsWith("REJECT_WITHDRAW:")) {
             Long requestId = Long.parseLong(callbackData.split(":")[1]);
             withdrawService.processAdminApproval(chatId, requestId, false);
+            markAdminRequestResolved(chatId, messageId, originalText, "❌");
             return;
-        }else if (callbackData.startsWith("SCREENSHOT_APPROVE_CHAT:")) {
+        } else if (callbackData.startsWith("SCREENSHOT_APPROVE_CHAT:")) {
             Long requestId = Long.parseLong(callbackData.split(":")[1]);
             topUpService.handleScreenshotApprovalChat(chatId, requestId, true);
+            markAdminRequestResolved(chatId, messageId, originalText, "✅");
             return;
         } else if (callbackData.startsWith("SCREENSHOT_REJECT_CHAT:")) {
             Long requestId = Long.parseLong(callbackData.split(":")[1]);
             topUpService.handleScreenshotApprovalChat(chatId, requestId, false);
+            markAdminRequestResolved(chatId, messageId, originalText, "❌");
             return;
-        }
-        else if (callbackData.startsWith("SCREENSHOT_APPROVE:")) {
+        } else if (callbackData.startsWith("SCREENSHOT_APPROVE:")) {
             Long requestId = Long.parseLong(callbackData.split(":")[1]);
             topUpService.handleScreenshotApproval(chatId, requestId, true);
+            markAdminRequestResolved(chatId, messageId, originalText, "✅");
             return;
         } else if (callbackData.startsWith("SCREENSHOT_REJECT:")) {
             Long requestId = Long.parseLong(callbackData.split(":")[1]);
             topUpService.handleScreenshotApproval(chatId, requestId, false);
+            markAdminRequestResolved(chatId, messageId, originalText, "❌");
             return;
         } else if (callbackData.startsWith("ADMIN_APPROVE_TRANSFER:")) {
             Long requestId = Long.parseLong(callbackData.split(":")[1]);
             bonusService.handleAdminApproveTransfer(chatId, requestId);
+            markAdminRequestResolved(chatId, messageId, originalText, "✅");
             return;
         } else if (callbackData.startsWith("ADMIN_DECLINE_TRANSFER:")) {
             Long requestId = Long.parseLong(callbackData.split(":")[1]);
             bonusService.handleAdminDeclineTransfer(chatId, requestId);
+            markAdminRequestResolved(chatId, messageId, originalText, "❌");
             return;
         } else if (callbackData.startsWith("ADMIN_REMOVE_TICKETS:")) {
             Long userId = Long.parseLong(callbackData.split(":")[1]);
             bonusService.handleAdminRemoveTickets(chatId, userId);
+            adminTelegramMessageSender.removeInlineButtons(chatId, messageId);
             return;
         } else if (callbackData.startsWith("ADMIN_REMOVE_BONUS:")) {
             Long userId = Long.parseLong(callbackData.split(":")[1]);
             bonusService.handleAdminRemoveBonus(chatId, userId);
+            adminTelegramMessageSender.removeInlineButtons(chatId, messageId);
             return;
         } else if (callbackData.startsWith("WALLET_ADMIN_TAKE:")) {
             Long requestId = Long.parseLong(callbackData.split(":")[1]);
-            walletService.handleAdminTake(requestId, chatId);
+            boolean taken = walletService.handleAdminTake(requestId, chatId);
+            if (taken) {
+                // Keep the request visible with a check/progress mark; details arrive in a new message.
+                String takenText = "⏳ *Qabul qilindi*\n\n" + (originalText != null ? originalText : ("🆔: `" + requestId + "`"));
+                adminTelegramMessageSender.editMessageText(chatId, messageId, takenText);
+            } else {
+                adminTelegramMessageSender.removeInlineButtons(chatId, messageId);
+            }
             return;
         } else if (callbackData.startsWith("WALLET_ADMIN_CONFIRM:")) {
             Long requestId = Long.parseLong(callbackData.split(":")[1]);
-            walletService.handleAdminConfirm(requestId);
+            String confirmedText = walletService.handleAdminConfirm(requestId);
+            if (confirmedText != null) {
+                // Replace the actionable request with the final ✅ confirmation (птичка).
+                adminTelegramMessageSender.editMessageText(chatId, messageId, confirmedText);
+            } else {
+                adminTelegramMessageSender.removeInlineButtons(chatId, messageId);
+            }
             return;
         } else if (callbackData.startsWith("WALLET_ADMIN_DECLINE:")) {
             Long requestId = Long.parseLong(callbackData.split(":")[1]);
-            walletService.handleAdminDecline(requestId);
+            boolean declined = walletService.handleAdminDecline(requestId);
+            if (declined) {
+                String declinedText = "❌ *Hamyondan kartaga yechish rad etildi*\n\n"
+                        + (originalText != null ? originalText : ("🆔: `" + requestId + "`"));
+                adminTelegramMessageSender.editMessageText(chatId, messageId, declinedText);
+            } else {
+                adminTelegramMessageSender.removeInlineButtons(chatId, messageId);
+            }
             return;
         } else if (callbackData.startsWith("WALLET_FAIL_REFUND:")) {
             Long requestId = Long.parseLong(callbackData.split(":")[1]);
             walletService.handleAdminRefundWalletFail(requestId, chatId);
+            markAdminRequestResolved(chatId, messageId, originalText, "✅");
             return;
         } else if (callbackData.startsWith("WALLET_FAIL_NOREFUND:")) {
             Long requestId = Long.parseLong(callbackData.split(":")[1]);
             walletService.handleAdminNoRefundWalletFail(requestId, chatId);
+            markAdminRequestResolved(chatId, messageId, originalText, "✔️");
             return;
         } else if (callbackData.startsWith("ADMIN_BLOCK_USER:")) {
             Long userId = Long.parseLong(callbackData.split(":")[1]);
@@ -282,10 +312,22 @@ public class AdminLogBot extends TelegramLongPollingBot {
                 message.setText("✅ Foydalanuvchi (ID: " + userId + ") bloklandi.");
                 logger.info("User {} blocked by admin chatId {}", userId, chatId);
             }
+            adminTelegramMessageSender.removeInlineButtons(chatId, messageId);
         } else {
             message.setText("Noto‘g‘ri buyruq.");
+            adminTelegramMessageSender.removeInlineButtons(chatId, messageId);
         }
         adminTelegramMessageSender.sendMessage(message, chatId);
+    }
+
+    /** Prefix the original request with a status mark and clear action buttons. */
+    private void markAdminRequestResolved(Long chatId, Integer messageId, String originalText, String mark) {
+        if (originalText != null && !originalText.isBlank()) {
+            String updated = originalText.startsWith(mark) ? originalText : (mark + " " + originalText);
+            adminTelegramMessageSender.editMessageText(chatId, messageId, updated);
+        } else {
+            adminTelegramMessageSender.removeInlineButtons(chatId, messageId);
+        }
     }
 
     private String getRandomMotivationalText() {
