@@ -135,9 +135,18 @@ public class AdminTelegramMessageSender {
             edit.setReplyMarkup(null);
             bot.execute(edit);
         } catch (TelegramApiException e) {
-            logger.warn("Failed to edit admin message {}/{}: {}", chatId, messageId, e.getMessage());
-            // Fallback: at least strip buttons so the spinner/actions do not hang.
-            removeInlineButtons(chatId, messageId);
+            logger.warn("Markdown edit failed for admin message {}/{}, retrying plain: {}", chatId, messageId, e.getMessage());
+            try {
+                EditMessageText plain = new EditMessageText();
+                plain.setChatId(chatId.toString());
+                plain.setMessageId(messageId);
+                plain.setText(text);
+                plain.setReplyMarkup(null);
+                bot.execute(plain);
+            } catch (TelegramApiException e2) {
+                logger.warn("Failed to edit admin message {}/{}: {}", chatId, messageId, e2.getMessage());
+                removeInlineButtons(chatId, messageId);
+            }
         }
     }
 }

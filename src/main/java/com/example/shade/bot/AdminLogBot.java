@@ -262,8 +262,9 @@ public class AdminLogBot extends TelegramLongPollingBot {
             Long requestId = Long.parseLong(callbackData.split(":")[1]);
             boolean taken = walletService.handleAdminTake(requestId, chatId);
             if (taken) {
-                // Keep the request visible with a check/progress mark; details arrive in a new message.
-                String takenText = "⏳ *Qabul qilindi*\n\n" + (originalText != null ? originalText : ("🆔: `" + requestId + "`"));
+                // Do not re-append callback originalText: Telegram returns plain text, and
+                // re-parsing leftover * / # from a prior failed send breaks markdown.
+                String takenText = "⏳ *Qabul qilindi*\n🆔: `" + requestId + "`";
                 adminTelegramMessageSender.editMessageText(chatId, messageId, takenText);
             } else {
                 adminTelegramMessageSender.removeInlineButtons(chatId, messageId);
@@ -283,8 +284,7 @@ public class AdminLogBot extends TelegramLongPollingBot {
             Long requestId = Long.parseLong(callbackData.split(":")[1]);
             boolean declined = walletService.handleAdminDecline(requestId);
             if (declined) {
-                String declinedText = "❌ *Hamyondan kartaga yechish rad etildi*\n\n"
-                        + (originalText != null ? originalText : ("🆔: `" + requestId + "`"));
+                String declinedText = "❌ *Hamyondan kartaga yechish rad etildi*\n🆔: `" + requestId + "`";
                 adminTelegramMessageSender.editMessageText(chatId, messageId, declinedText);
             } else {
                 adminTelegramMessageSender.removeInlineButtons(chatId, messageId);

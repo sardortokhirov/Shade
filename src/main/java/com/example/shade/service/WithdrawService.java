@@ -646,7 +646,7 @@ public class WithdrawService {
                             "\uD83C\uDD94: `%d`\n" +
                             "\uD83D\uDC64: `%d`\n" +
                             "\uD83D\uDCDE: `%s`\n" +
-                            "\uD83C\uDF10 *#%s:* `%s`\n" +
+                            "\uD83C\uDF10 Kontora: *%s*\n👤 Akk: `%s`\n" +
                             "\uD83D\uDD11 *Kod:* `%s`\n" +
                             "\uD83D\uDCB5 *Tushdi:* `%s UZS`\n" +
                             "\uD83C\uDFE7 *Qoldi:* `%,d UZS`\n" +

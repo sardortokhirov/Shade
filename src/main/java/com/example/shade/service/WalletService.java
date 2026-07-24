@@ -971,7 +971,7 @@ public class WalletService {
         String adminDateStr = request.getCreatedAt() != null
                 ? request.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
                 : LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-        String kontoraLine = formatSourceKontoraLines(chatId);
+        String kontoraLine = formatSourceKontoraLine(request);
         String adminMsg = String.format(
                 "💸 *Yechish so'rovi*\n\n🆔: `%d`\n👤: `%d`\n%s💵 Summa: `%,d UZS`\n📅 %s",
                 request.getId(), chatId, kontoraLine, amount, adminDateStr);
@@ -1022,6 +1022,17 @@ public class WalletService {
         request.setStatus(RequestStatus.PENDING_ADMIN);
         request.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
         request.setWalletBalanceAtTime(balance.getWalletBalance() != null ? balance.getWalletBalance() : 0L);
+        // Snapshot the latest platform→wallet kontora so admin sees where funds came from.
+        Optional<HizmatRequest> sourceKontora = resolveLatestSourceKontora(chatId);
+        if (sourceKontora.isPresent()) {
+            HizmatRequest src = sourceKontora.get();
+            if (src.getPlatform() != null && !src.getPlatform().isBlank()) {
+                request.setFullName(src.getPlatform());
+            }
+            if (src.getPlatformUserId() != null && !src.getPlatformUserId().isBlank()) {
+                request.setPlatformUserId(src.getPlatformUserId());
+            }
+        }
         request = requestRepository.save(request);
 
         // Decrease quota immediately when request is sent to admin (not on approval)
@@ -1059,7 +1070,7 @@ public class WalletService {
                 ? request.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
                 : LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         String cardNum = request.getCardNumber() != null ? request.getCardNumber() : "-";
-        String kontoraLine = formatSourceKontoraLines(request.getChatId());
+        String kontoraLine = formatSourceKontoraLine(request);
         String adminMsg = String.format(
                 "💸 *Pul yechish so'rovi*\n\n🆔: `%d`\n👤: `%d`\n📞: `%s`\n%s💳 Karta: `%s`\n💵 Summa: `%,d UZS`\n📅 %s",
                 request.getId(), request.getChatId(), escapeMarkdown(phone), kontoraLine,
@@ -1159,8 +1170,8 @@ public class WalletService {
         request.setStatus(RequestStatus.CANCELED);
         requestRepository.save(request);
 
-        // Notify Admins
-        String adminMsg = String.format("❌ Hamyondan kartaga yechish rad etildi: 🆔 `%d`", request.getId());
+        // Notify other admins (acting admin's message is edited in place by AdminLogBot)
+        String adminMsg = String.format("❌ *Hamyondan kartaga yechish rad etildi*\n🆔: `%d`", request.getId());
         adminLogBotService.sendToAdmins(adminMsg);
 
         // Notify User
@@ -1534,27 +1545,38 @@ public class WalletService {
         return emoji + " " + label;
     }
 
-    /**
-     * Recent platform→wallet credits for this user, so admins see which kontora funded the cashout.
-     */
-    private String formatSourceKontoraLines(Long chatId) {
+    /** Latest approved platform→wallet credit (source kontora for wallet funds). */
+    private Optional<HizmatRequest> resolveLatestSourceKontora(Long chatId) {
         List<HizmatRequest> recent = requestRepository.findRecentPlatformToWalletByChatId(
                 chatId,
                 RequestStatus.APPROVED,
-                org.springframework.data.domain.PageRequest.of(0, 3));
+                org.springframework.data.domain.PageRequest.of(0, 1));
         if (recent == null || recent.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(recent.get(0));
+    }
+
+    /**
+     * One kontora line for admin cashout alerts.
+     * Avoid "#NAME" inside markdown — Telegram hashtag + bold often fails parse → raw * visible.
+     */
+    private String formatSourceKontoraLine(HizmatRequest cashoutRequest) {
+        String platform = cashoutRequest.getFullName();
+        String platformUserId = cashoutRequest.getPlatformUserId();
+        if (platform == null || platform.isBlank() || "WALLET".equalsIgnoreCase(platform)) {
+            Optional<HizmatRequest> src = resolveLatestSourceKontora(cashoutRequest.getChatId());
+            if (src.isPresent()) {
+                platform = src.get().getPlatform();
+                platformUserId = src.get().getPlatformUserId();
+            }
+        }
+        if (platform == null || platform.isBlank() || "WALLET".equalsIgnoreCase(platform)) {
             return "🌐 Kontora: `noma'lum`\n";
         }
-        StringBuilder sb = new StringBuilder();
-        for (HizmatRequest src : recent) {
-            String platform = src.getPlatform() != null ? src.getPlatform() : "-";
-            String platformUserId = src.getPlatformUserId() != null ? src.getPlatformUserId() : "-";
-            long amt = src.getUniqueAmount() != null ? src.getUniqueAmount()
-                    : (src.getAmount() != null ? src.getAmount() : 0L);
-            sb.append(String.format("🌐 *#%s:* `%s` — `%,d UZS`\n",
-                    escapeMarkdown(platform), escapeMarkdown(platformUserId), amt));
-        }
-        return sb.toString();
+        String id = (platformUserId != null && !platformUserId.isBlank()) ? platformUserId : "-";
+        return String.format("🌐 Kontora: *%s*\n👤 Akk: `%s`\n",
+                escapeMarkdown(platform), escapeMarkdown(id));
     }
 
     private String escapeMarkdown(String text) {
