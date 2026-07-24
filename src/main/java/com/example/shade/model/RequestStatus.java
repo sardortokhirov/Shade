@@ -12,6 +12,8 @@ public enum RequestStatus {
     APPROVED,
     BONUS_APPROVED,
     CANCELED,
+    /** Admin canceled after Accept; wallet/quota were NOT refunded. */
+    CANCELED_NO_REFUND,
     PENDING_PAYMENT,
     FAILED,
     /** Wallet-to-platform transfer failed; admin chose to refund user's wallet. */

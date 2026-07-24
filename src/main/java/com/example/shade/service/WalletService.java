@@ -1088,17 +1088,16 @@ public class WalletService {
     }
 
     /**
-     * Approves a wallet→card withdrawal.
+     * Approves a wallet→card withdrawal (only after admin Accept / PROCESSING).
      * @return confirmation text for editing the admin request message (with ✅), or null if already processed
      */
     @Transactional
     public String handleAdminConfirm(Long requestId) {
         HizmatRequest request = requestRepository.findByIdWithLock(requestId).orElse(null);
         if (request == null
-                || (request.getStatus() != RequestStatus.PENDING_ADMIN
-                        && request.getStatus() != RequestStatus.PROCESSING)
+                || request.getStatus() != RequestStatus.PROCESSING
                 || request.getType() != RequestType.WALLET_WITHDRAWAL) {
-            adminLogBotService.sendToAdmins("❌ Request not found or already processed: 🆔 " + requestId);
+            logger.warn("Wallet confirm ignored for requestId {}: missing or not PROCESSING", requestId);
             return null;
         }
 
@@ -1136,7 +1135,7 @@ public class WalletService {
     }
 
     /**
-     * First-screen admin Reject (PENDING_ADMIN): cancel and refund wallet + quota.
+     * First-screen admin Reject (PENDING_ADMIN only): cancel and refund wallet + quota.
      */
     @Transactional
     public boolean handleAdminDecline(Long requestId) {
@@ -1144,41 +1143,40 @@ public class WalletService {
         if (request == null
                 || request.getStatus() != RequestStatus.PENDING_ADMIN
                 || request.getType() != RequestType.WALLET_WITHDRAWAL) {
-            adminLogBotService.sendToAdmins("❌ Request not found or already processed: 🆔 " + requestId);
+            logger.warn("Wallet decline (refund) ignored for requestId {}: missing or not PENDING_ADMIN", requestId);
             return false;
         }
 
+        long amount = request.getAmount() != null ? request.getAmount() : 0L;
+
         // Return funds
         UserBalance balance = userBalanceRepository.findByIdWithLock(request.getChatId()).orElse(null);
-        if (balance != null) {
+        if (balance != null && amount > 0) {
             long current = balance.getWalletBalance() != null ? balance.getWalletBalance() : 0L;
-            long amount = request.getAmount() != null ? request.getAmount() : 0L;
             balance.setWalletBalance(current + amount);
             userBalanceRepository.save(balance);
         }
 
         // Return quota (was decreased when request was sent to admin)
-        walletQuotaRepository.findByIdWithLock(request.getChatId()).ifPresent(quota -> {
-            long amount = request.getAmount() != null ? request.getAmount() : 0L;
-            long used = quota.getUsedQuota() != null ? quota.getUsedQuota() : 0L;
-            long newUsed = Math.max(0L, used - amount);
-            quota.setUsedQuota(newUsed);
-            walletQuotaRepository.save(quota);
-            logger.info("Quota returned on decline for chatId {}: -{}, total used={}, remaining={}",
-                    request.getChatId(), amount, newUsed, quota.getRemainingQuota());
-        });
+        if (amount > 0) {
+            walletQuotaRepository.findByIdWithLock(request.getChatId()).ifPresent(quota -> {
+                long used = quota.getUsedQuota() != null ? quota.getUsedQuota() : 0L;
+                long newUsed = Math.max(0L, used - amount);
+                quota.setUsedQuota(newUsed);
+                walletQuotaRepository.save(quota);
+                logger.info("Quota returned on decline for chatId {}: -{}, total used={}, remaining={}",
+                        request.getChatId(), amount, newUsed, quota.getRemainingQuota());
+            });
+        }
 
-        // Mark as declined/canceled
         request.setStatus(RequestStatus.CANCELED);
         requestRepository.save(request);
 
-        // Notify other admins (acting admin's message is edited in place by AdminLogBot)
         String adminMsg = String.format(
-                "❌ *Hamyondan kartaga yechish rad etildi*\n💰 Pul hamyonga qaytarildi\n🆔: `%d`",
-                request.getId());
+                "❌ *Hamyondan kartaga yechish rad etildi*\n💰 Pul hamyonga qaytarildi\n🆔: `%d`\n💸 Summa: `%,d UZS`",
+                request.getId(), amount);
         adminLogBotService.sendToAdmins(adminMsg);
 
-        // Notify User
         try {
             SendMessage m = new SendMessage();
             m.setChatId(request.getChatId().toString());
@@ -1195,7 +1193,7 @@ public class WalletService {
     }
 
     /**
-     * After Accept (PROCESSING): cancel without refunding wallet or quota.
+     * After Accept (PROCESSING only): cancel without refunding wallet or quota.
      * Money stays deducted — admin already took the request and then cancelled.
      */
     @Transactional
@@ -1204,16 +1202,17 @@ public class WalletService {
         if (request == null
                 || request.getStatus() != RequestStatus.PROCESSING
                 || request.getType() != RequestType.WALLET_WITHDRAWAL) {
-            adminLogBotService.sendToAdmins("❌ Request not found or already processed: 🆔 " + requestId);
+            logger.warn("Wallet cancel (no refund) ignored for requestId {}: missing or not PROCESSING", requestId);
             return false;
         }
 
-        request.setStatus(RequestStatus.CANCELED);
+        long amount = request.getAmount() != null ? request.getAmount() : 0L;
+        request.setStatus(RequestStatus.CANCELED_NO_REFUND);
         requestRepository.save(request);
 
         String adminMsg = String.format(
-                "❌ *Hamyondan kartaga yechish bekor qilindi*\n⚠️ Pul hamyonga qaytarilmadi\n🆔: `%d`",
-                request.getId());
+                "❌ *Hamyondan kartaga yechish bekor qilindi*\n⚠️ Pul hamyonga qaytarilmadi\n🆔: `%d`\n💸 Summa: `%,d UZS`",
+                request.getId(), amount);
         adminLogBotService.sendToAdmins(adminMsg);
 
         try {
@@ -1570,7 +1569,7 @@ public class WalletService {
         return switch (status) {
             case APPROVED, BONUS_APPROVED -> "✅";
             case PENDING, PENDING_SMS, PENDING_ADMIN, PENDING_PAYMENT, PENDING_SCREENSHOT, PROCESSING -> "⏳";
-            case CANCELED, USER_CANCELED -> "❌";
+            case CANCELED, USER_CANCELED, CANCELED_NO_REFUND -> "❌";
             case FAILED, FAILED_REFUNDED -> "💥";
         };
     }
@@ -1582,6 +1581,7 @@ public class WalletService {
             case APPROVED, BONUS_APPROVED -> "wallet.message.history_status_approved";
             case PENDING, PENDING_SMS, PENDING_ADMIN, PENDING_PAYMENT, PENDING_SCREENSHOT, PROCESSING -> "wallet.message.history_status_pending";
             case CANCELED, USER_CANCELED -> "wallet.message.history_status_canceled";
+            case CANCELED_NO_REFUND -> "wallet.message.history_status_canceled_no_refund";
             case FAILED, FAILED_REFUNDED -> "wallet.message.history_status_failed";
         };
         String label = languageSessionService.getTranslation(chatId, key);
