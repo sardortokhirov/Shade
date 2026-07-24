@@ -1171,7 +1171,9 @@ public class WalletService {
         requestRepository.save(request);
 
         // Notify other admins (acting admin's message is edited in place by AdminLogBot)
-        String adminMsg = String.format("❌ *Hamyondan kartaga yechish rad etildi*\n🆔: `%d`", request.getId());
+        String adminMsg = String.format(
+                "❌ *Hamyondan kartaga yechish rad etildi*\n💰 Pul hamyonga qaytarildi\n🆔: `%d`",
+                request.getId());
         adminLogBotService.sendToAdmins(adminMsg);
 
         // Notify User

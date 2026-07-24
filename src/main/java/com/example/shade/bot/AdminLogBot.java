@@ -284,7 +284,8 @@ public class AdminLogBot extends TelegramLongPollingBot {
             Long requestId = Long.parseLong(callbackData.split(":")[1]);
             boolean declined = walletService.handleAdminDecline(requestId);
             if (declined) {
-                String declinedText = "❌ *Hamyondan kartaga yechish rad etildi*\n🆔: `" + requestId + "`";
+                String declinedText = "❌ *Hamyondan kartaga yechish rad etildi*\n💰 Pul hamyonga qaytarildi\n🆔: `"
+                        + requestId + "`";
                 adminTelegramMessageSender.editMessageText(chatId, messageId, declinedText);
             } else {
                 adminTelegramMessageSender.removeInlineButtons(chatId, messageId);
