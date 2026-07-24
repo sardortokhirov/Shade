@@ -1080,7 +1080,7 @@ public class WalletService {
         List<List<InlineKeyboardButton>> adminRows = new ArrayList<>();
         adminRows.add(List.of(
                 createButton("✅ Bajarildi", "WALLET_ADMIN_CONFIRM:" + request.getId()),
-                createButton("❌ Bekor qilish", "WALLET_ADMIN_DECLINE:" + request.getId())));
+                createButton("❌ Bekor qilish", "WALLET_ADMIN_CANCEL_NO_REFUND:" + request.getId())));
         adminMarkup.setKeyboard(adminRows);
 
         adminLogBotService.sendToSingleAdmin(adminChatId, adminMsg, adminMarkup);
@@ -1135,12 +1135,14 @@ public class WalletService {
         return adminMsg;
     }
 
+    /**
+     * First-screen admin Reject (PENDING_ADMIN): cancel and refund wallet + quota.
+     */
     @Transactional
     public boolean handleAdminDecline(Long requestId) {
         HizmatRequest request = requestRepository.findByIdWithLock(requestId).orElse(null);
         if (request == null
-                || (request.getStatus() != RequestStatus.PENDING_ADMIN
-                        && request.getStatus() != RequestStatus.PROCESSING)
+                || request.getStatus() != RequestStatus.PENDING_ADMIN
                 || request.getType() != RequestType.WALLET_WITHDRAWAL) {
             adminLogBotService.sendToAdmins("❌ Request not found or already processed: 🆔 " + requestId);
             return false;
@@ -1188,6 +1190,45 @@ public class WalletService {
             messageSender.sendMessage(m, request.getChatId());
         } catch (Exception e) {
             logger.error("Wallet withdraw {} declined, but user notify failed: {}", requestId, e.getMessage(), e);
+        }
+        return true;
+    }
+
+    /**
+     * After Accept (PROCESSING): cancel without refunding wallet or quota.
+     * Money stays deducted — admin already took the request and then cancelled.
+     */
+    @Transactional
+    public boolean handleAdminCancelNoRefund(Long requestId) {
+        HizmatRequest request = requestRepository.findByIdWithLock(requestId).orElse(null);
+        if (request == null
+                || request.getStatus() != RequestStatus.PROCESSING
+                || request.getType() != RequestType.WALLET_WITHDRAWAL) {
+            adminLogBotService.sendToAdmins("❌ Request not found or already processed: 🆔 " + requestId);
+            return false;
+        }
+
+        request.setStatus(RequestStatus.CANCELED);
+        requestRepository.save(request);
+
+        String adminMsg = String.format(
+                "❌ *Hamyondan kartaga yechish bekor qilindi*\n⚠️ Pul hamyonga qaytarilmadi\n🆔: `%d`",
+                request.getId());
+        adminLogBotService.sendToAdmins(adminMsg);
+
+        try {
+            SendMessage m = new SendMessage();
+            m.setChatId(request.getChatId().toString());
+            m.setText(String.format(
+                    languageSessionService.getTranslation(request.getChatId(),
+                            "wallet.message.withdraw_admin_canceled_no_refund"),
+                    request.getId()));
+            m.enableMarkdown(true);
+            m.setReplyMarkup(createMainMenuOnlyMarkup(request.getChatId()));
+            messageSender.sendMessage(m, request.getChatId());
+        } catch (Exception e) {
+            logger.error("Wallet withdraw {} canceled without refund, but user notify failed: {}",
+                    requestId, e.getMessage(), e);
         }
         return true;
     }

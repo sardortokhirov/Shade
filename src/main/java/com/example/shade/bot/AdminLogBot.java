@@ -291,6 +291,17 @@ public class AdminLogBot extends TelegramLongPollingBot {
                 adminTelegramMessageSender.removeInlineButtons(chatId, messageId);
             }
             return;
+        } else if (callbackData.startsWith("WALLET_ADMIN_CANCEL_NO_REFUND:")) {
+            Long requestId = Long.parseLong(callbackData.split(":")[1]);
+            boolean canceled = walletService.handleAdminCancelNoRefund(requestId);
+            if (canceled) {
+                String canceledText = "❌ *Hamyondan kartaga yechish bekor qilindi*\n⚠️ Pul hamyonga qaytarilmadi\n🆔: `"
+                        + requestId + "`";
+                adminTelegramMessageSender.editMessageText(chatId, messageId, canceledText);
+            } else {
+                adminTelegramMessageSender.removeInlineButtons(chatId, messageId);
+            }
+            return;
         } else if (callbackData.startsWith("WALLET_FAIL_REFUND:")) {
             Long requestId = Long.parseLong(callbackData.split(":")[1]);
             walletService.handleAdminRefundWalletFail(requestId, chatId);
