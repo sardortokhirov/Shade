@@ -72,6 +72,23 @@ public interface HizmatRequestRepository extends JpaRepository<HizmatRequest, Lo
     Optional<HizmatRequest> findFirstByChatIdAndStatusForUpdate(@Param("chatId") Long chatId,
                                                                 @Param("status") RequestStatus status);
 
+    /**
+     * Recent successful platform→wallet withdrawals for a user (kontora source of wallet funds).
+     */
+    @Query("""
+            SELECT h FROM HizmatRequest h
+            WHERE h.chatId = :chatId
+              AND h.type = com.example.shade.model.RequestType.WITHDRAWAL
+              AND h.cardNumber = 'WALLET'
+              AND h.status = :status
+              AND h.platform IS NOT NULL
+              AND h.platform <> 'Wallet'
+            ORDER BY h.createdAt DESC
+            """)
+    List<HizmatRequest> findRecentPlatformToWalletByChatId(@Param("chatId") Long chatId,
+                                                           @Param("status") RequestStatus status,
+                                                           Pageable pageable);
+
     @Query("SELECT h FROM HizmatRequest h WHERE h.chatId = :chatId AND h.status = :status ")
     List<HizmatRequest> findByChatsIdAndStatus(Long chatId, RequestStatus status);
 

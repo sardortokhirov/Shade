@@ -971,9 +971,10 @@ public class WalletService {
         String adminDateStr = request.getCreatedAt() != null
                 ? request.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
                 : LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        String kontoraLine = formatSourceKontoraLines(chatId);
         String adminMsg = String.format(
-                "#Yechish so'rovi\n\n🆔: `%d`\n👤: `%d`\n💵 Summa: `%,d UZS`\n📅 %s",
-                request.getId(), chatId, amount, adminDateStr);
+                "💸 *Yechish so'rovi*\n\n🆔: `%d`\n👤: `%d`\n%s💵 Summa: `%,d UZS`\n📅 %s",
+                request.getId(), chatId, kontoraLine, amount, adminDateStr);
 
         InlineKeyboardMarkup adminMarkup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> adminRows = new ArrayList<>();
@@ -1058,9 +1059,11 @@ public class WalletService {
                 ? request.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
                 : LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         String cardNum = request.getCardNumber() != null ? request.getCardNumber() : "-";
+        String kontoraLine = formatSourceKontoraLines(request.getChatId());
         String adminMsg = String.format(
-                "#Pul yechish so'rovi 💸\n\n🆔: `%d`\n👤: `%d`\n📞: `%s`\n💳 Karta: `%s`\n💵 Summa: %,d UZS\n📅 %s",
-                request.getId(), request.getChatId(), phone, cardNum, request.getAmount(), dateStr);
+                "💸 *Pul yechish so'rovi*\n\n🆔: `%d`\n👤: `%d`\n📞: `%s`\n%s💳 Karta: `%s`\n💵 Summa: `%,d UZS`\n📅 %s",
+                request.getId(), request.getChatId(), escapeMarkdown(phone), kontoraLine,
+                escapeMarkdown(cardNum), request.getAmount(), dateStr);
 
         InlineKeyboardMarkup adminMarkup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> adminRows = new ArrayList<>();
@@ -1529,6 +1532,29 @@ public class WalletService {
         };
         String label = languageSessionService.getTranslation(chatId, key);
         return emoji + " " + label;
+    }
+
+    /**
+     * Recent platform→wallet credits for this user, so admins see which kontora funded the cashout.
+     */
+    private String formatSourceKontoraLines(Long chatId) {
+        List<HizmatRequest> recent = requestRepository.findRecentPlatformToWalletByChatId(
+                chatId,
+                RequestStatus.APPROVED,
+                org.springframework.data.domain.PageRequest.of(0, 3));
+        if (recent == null || recent.isEmpty()) {
+            return "🌐 Kontora: `noma'lum`\n";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (HizmatRequest src : recent) {
+            String platform = src.getPlatform() != null ? src.getPlatform() : "-";
+            String platformUserId = src.getPlatformUserId() != null ? src.getPlatformUserId() : "-";
+            long amt = src.getUniqueAmount() != null ? src.getUniqueAmount()
+                    : (src.getAmount() != null ? src.getAmount() : 0L);
+            sb.append(String.format("🌐 *#%s:* `%s` — `%,d UZS`\n",
+                    escapeMarkdown(platform), escapeMarkdown(platformUserId), amt));
+        }
+        return sb.toString();
     }
 
     private String escapeMarkdown(String text) {

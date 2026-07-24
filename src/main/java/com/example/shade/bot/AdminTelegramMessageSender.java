@@ -32,11 +32,22 @@ public class AdminTelegramMessageSender {
         SendMessage message = new SendMessage();
         message.setChatId(chatId.toString());
         message.setText(text);
+        message.enableMarkdown(true);
         try {
             bot.execute(message);
             logger.info("Sent message to admin chatId {}: {}", chatId, text);
         } catch (TelegramApiException e) {
-            logger.error("Failed to send message to admin chatId {}: {}", chatId, e.getMessage());
+            // Fallback without markdown if Telegram rejects the parse mode
+            // (e.g. unescaped underscores in phone/card numbers).
+            logger.warn("Markdown send failed for admin chatId {}, retrying plain: {}", chatId, e.getMessage());
+            try {
+                SendMessage plain = new SendMessage();
+                plain.setChatId(chatId.toString());
+                plain.setText(text);
+                bot.execute(plain);
+            } catch (TelegramApiException e2) {
+                logger.error("Failed to send message to admin chatId {}: {}", chatId, e2.getMessage());
+            }
         }
     }
 
@@ -49,7 +60,14 @@ public class AdminTelegramMessageSender {
             bot.execute(sendMessage);
             logger.info("Sent message with keyboard to admin chatId {}: {}", chatId, sendMessage.getText());
         } catch (TelegramApiException e) {
-            logger.error("Failed to send message with keyboard to admin chatId {}: {}", chatId, e.getMessage());
+            logger.warn("Send with keyboard failed for admin chatId {}, retrying plain text: {}", chatId, e.getMessage());
+            try {
+                // If markdown parse failed, retry without parse mode but keep keyboard.
+                sendMessage.setParseMode(null);
+                bot.execute(sendMessage);
+            } catch (TelegramApiException e2) {
+                logger.error("Failed to send message with keyboard to admin chatId {}: {}", chatId, e2.getMessage());
+            }
         }
     }
 
