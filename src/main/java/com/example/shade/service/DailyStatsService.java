@@ -26,6 +26,7 @@ public class DailyStatsService {
     private final UserLimitIncreaseService userLimitIncreaseService;
     private final FeatureService featureService;
     private final PromoAllowedChatRepository promoAllowedChatRepository;
+    private final PromoWhitelistService promoWhitelistService;
     private static final ZoneId GMT_PLUS_5 = ZoneId.of("GMT+5");
 
     /**
@@ -126,59 +127,81 @@ public class DailyStatsService {
     }
 
     /**
-     * Adds top-up amount to today's stats (called when top-up is confirmed)
-     * Also calculates and adds the permanent limit increase based on configured percentage
-     * Decreases carryover by deposit amount (excess deposit will be calculated as carryover for next day)
+     * Whether a deposit should grow the user's bonus limit (permanent TD + daily LD).
+     * Promo OFF → yes for every platform ID. Promo ON → only linked promo_platform_link IDs.
+     * Wallet withdraw quota must not use this gate.
+     */
+    public boolean shouldIncreaseBonusLimitOnDeposit(Long chatId, String platformUserId) {
+        if (!featureService.isPromoEnabled()) {
+            return true;
+        }
+        boolean linked = promoWhitelistService.isPromoLinkAllowed(chatId, platformUserId);
+        if (!linked) {
+            logger.info("Bonus limit increase blocked: promo ON and platformUserId '{}' not linked for chatId {}",
+                    platformUserId, chatId);
+        }
+        return linked;
+    }
+
+    /**
+     * Adds top-up amount to today's stats (called when top-up is confirmed).
+     * Always tracks deposit amount / carryover. Bonus limit increases follow
+     * {@link #shouldIncreaseBonusLimitOnDeposit(Long, String)}.
      */
     @Transactional
     public void addTopUpAmount(Long chatId, Long amount) {
+        addTopUpAmount(chatId, amount, null);
+    }
+
+    /**
+     * @param platformUserId destination platform account ID; used when promo mode gates limit increases
+     */
+    @Transactional
+    public void addTopUpAmount(Long chatId, Long amount, String platformUserId) {
         DailyUserStats stats = getOrCreateTodayStats(chatId);
         stats.setDailyTopUpAmount(stats.getDailyTopUpAmount() + amount);
-        
-        // Decrease carryover by deposit amount
+
         Long currentCarryover = stats.getCarryoverAmount() != null ? stats.getCarryoverAmount() : 0L;
         Long newCarryover = Math.max(0L, currentCarryover - amount);
         stats.setCarryoverAmount(newCarryover);
-        
-        // If deposit exceeds carryover, excess will be calculated at midnight for next day
-        // (excess is: amount - currentCarryover, but we don't store it separately)
-        
-        // Calculate and add permanent limit increase based on configured percentage
-        BigDecimal percentage = configurationService.getTopUpDailyLimitIncreasePercentage();
-        logger.info("Top-up limit increase percentage for chatId {}: {}% (amount: {})", 
-                chatId, percentage, amount);
-        
-        if (percentage.compareTo(BigDecimal.ZERO) > 0) {
-            // Store precise decimal value without rounding
-            BigDecimal increaseAmount = BigDecimal.valueOf(amount)
-                    .multiply(percentage)
-                    .divide(BigDecimal.valueOf(100), 8, java.math.RoundingMode.HALF_UP);
-            // Add to permanent increase (accumulates forever, never resets)
-            userLimitIncreaseService.addPermanentLimitIncrease(chatId, increaseAmount);
-            logger.info("Added permanent limit increase {} ({}% of {}) for chatId {}", 
-                    increaseAmount, percentage, amount, chatId);
+
+        boolean increaseBonusLimit = shouldIncreaseBonusLimitOnDeposit(chatId, platformUserId);
+        if (increaseBonusLimit) {
+            BigDecimal percentage = configurationService.getTopUpDailyLimitIncreasePercentage();
+            logger.info("Top-up limit increase percentage for chatId {}: {}% (amount: {})",
+                    chatId, percentage, amount);
+
+            if (percentage.compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal increaseAmount = BigDecimal.valueOf(amount)
+                        .multiply(percentage)
+                        .divide(BigDecimal.valueOf(100), 8, java.math.RoundingMode.HALF_UP);
+                userLimitIncreaseService.addPermanentLimitIncrease(chatId, increaseAmount);
+                logger.info("Added permanent limit increase {} ({}% of {}) for chatId {}",
+                        increaseAmount, percentage, amount, chatId);
+            } else {
+                logger.warn("Permanent limit increase skipped for chatId {}: topUpDailyLimitIncreasePercentage is 0% or not configured. "
+                        + "To enable permanent limit increases, set topUpDailyLimitIncreasePercentage > 0 in system configuration.", chatId);
+            }
+
+            BigDecimal dailyPercentage = configurationService.getDepositDailyLimitIncreasePercentage();
+            if (dailyPercentage.compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal dailyIncrease = BigDecimal.valueOf(amount)
+                        .multiply(dailyPercentage)
+                        .divide(BigDecimal.valueOf(100), 8, java.math.RoundingMode.HALF_UP);
+                BigDecimal currentDailyIncrease = stats.getDailyLimitIncrease() != null ? stats.getDailyLimitIncrease() : BigDecimal.ZERO;
+                BigDecimal newDailyIncrease = currentDailyIncrease.add(dailyIncrease);
+                stats.setDailyLimitIncrease(newDailyIncrease);
+                logger.info("Added daily limit increase {} ({}% of {}) for chatId {}. Total daily increase: {}",
+                        dailyIncrease.toPlainString(), dailyPercentage, amount, chatId, newDailyIncrease.toPlainString());
+            }
         } else {
-            logger.warn("Permanent limit increase skipped for chatId {}: topUpDailyLimitIncreasePercentage is 0% or not configured. " +
-                    "To enable permanent limit increases, set topUpDailyLimitIncreasePercentage > 0 in system configuration.", chatId);
+            logger.info("Skipped bonus limit increase for chatId {} amount {} (promo ON, unlinked platformUserId={})",
+                    chatId, amount, platformUserId);
         }
-        
-        // Calculate and add daily limit increase based on configured percentage (resets daily)
-        // Uses 8 decimal precision for accurate tracking
-        BigDecimal dailyPercentage = configurationService.getDepositDailyLimitIncreasePercentage();
-        if (dailyPercentage.compareTo(BigDecimal.ZERO) > 0) {
-            BigDecimal dailyIncrease = BigDecimal.valueOf(amount)
-                    .multiply(dailyPercentage)
-                    .divide(BigDecimal.valueOf(100), 8, java.math.RoundingMode.HALF_UP);
-            BigDecimal currentDailyIncrease = stats.getDailyLimitIncrease() != null ? stats.getDailyLimitIncrease() : BigDecimal.ZERO;
-            BigDecimal newDailyIncrease = currentDailyIncrease.add(dailyIncrease);
-            stats.setDailyLimitIncrease(newDailyIncrease);
-            logger.info("Added daily limit increase {} ({}% of {}) for chatId {}. Total daily increase: {}", 
-                    dailyIncrease.toPlainString(), dailyPercentage, amount, chatId, newDailyIncrease.toPlainString());
-        }
-        
+
         stats.setLastUpdated(LocalDateTime.now(GMT_PLUS_5));
         statsRepository.save(stats);
-        logger.info("Added top-up amount {} for chatId {} on date {}. Carryover decreased from {} to {}", 
+        logger.info("Added top-up amount {} for chatId {} on date {}. Carryover decreased from {} to {}",
                 amount, chatId, stats.getDate(), currentCarryover, newCarryover);
     }
 

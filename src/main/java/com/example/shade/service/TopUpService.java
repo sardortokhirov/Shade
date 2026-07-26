@@ -916,7 +916,8 @@ public class TopUpService {
 
                     bonusService.creditReferral(request.getChatId(), request.getAmount());
 
-                    dailyStatsService.addTopUpAmount(request.getChatId(), request.getAmount());
+                    dailyStatsService.addTopUpAmount(request.getChatId(), request.getAmount(),
+                            request.getPlatformUserId());
                 }
 
                 long quotaEarned = 0L;
@@ -1227,18 +1228,21 @@ public class TopUpService {
 
                         bonusService.creditReferral(request.getChatId(), request.getAmount());
 
-                        // Calculate limit increase directly from percentage (optimize: avoid multiple
-                        // DB calls)
-                        java.math.BigDecimal topUpPercentage = configurationService.getTopUpDailyLimitIncreasePercentage();
-                        if (topUpPercentage.compareTo(java.math.BigDecimal.ZERO) > 0) {
-                            java.math.BigDecimal increaseAmountBD = java.math.BigDecimal.valueOf(request.getAmount())
-                                    .multiply(topUpPercentage)
-                                    .divide(java.math.BigDecimal.valueOf(100), 8, java.math.RoundingMode.HALF_UP);
-                            limitIncrease = increaseAmountBD.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
+                        // Calculate limit increase for admin log only when promo gate allows it
+                        if (dailyStatsService.shouldIncreaseBonusLimitOnDeposit(
+                                request.getChatId(), request.getPlatformUserId())) {
+                            java.math.BigDecimal topUpPercentage = configurationService.getTopUpDailyLimitIncreasePercentage();
+                            if (topUpPercentage.compareTo(java.math.BigDecimal.ZERO) > 0) {
+                                java.math.BigDecimal increaseAmountBD = java.math.BigDecimal.valueOf(request.getAmount())
+                                        .multiply(topUpPercentage)
+                                        .divide(java.math.BigDecimal.valueOf(100), 8, java.math.RoundingMode.HALF_UP);
+                                limitIncrease = increaseAmountBD.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
+                            }
                         }
 
                         // Process top-up (this will add the limit increase internally)
-                        dailyStatsService.addTopUpAmount(request.getChatId(), request.getAmount());
+                        dailyStatsService.addTopUpAmount(request.getChatId(), request.getAmount(),
+                            request.getPlatformUserId());
                     }
 
                     long quotaEarned = 0L;
@@ -1547,18 +1551,21 @@ public class TopUpService {
 
                     bonusService.creditReferral(request.getChatId(), request.getAmount());
 
-                    // Calculate limit increase directly from percentage (optimize: avoid multiple
-                    // DB calls)
-                    java.math.BigDecimal topUpPercentage = configurationService.getTopUpDailyLimitIncreasePercentage();
-                    if (topUpPercentage.compareTo(java.math.BigDecimal.ZERO) > 0) {
-                        java.math.BigDecimal increaseAmountBD = java.math.BigDecimal.valueOf(request.getAmount())
-                                .multiply(topUpPercentage)
-                                .divide(java.math.BigDecimal.valueOf(100), 8, java.math.RoundingMode.HALF_UP);
-                        limitIncrease = increaseAmountBD.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
+                    // Calculate limit increase for admin log only when promo gate allows it
+                    if (dailyStatsService.shouldIncreaseBonusLimitOnDeposit(
+                            request.getChatId(), request.getPlatformUserId())) {
+                        java.math.BigDecimal topUpPercentage = configurationService.getTopUpDailyLimitIncreasePercentage();
+                        if (topUpPercentage.compareTo(java.math.BigDecimal.ZERO) > 0) {
+                            java.math.BigDecimal increaseAmountBD = java.math.BigDecimal.valueOf(request.getAmount())
+                                    .multiply(topUpPercentage)
+                                    .divide(java.math.BigDecimal.valueOf(100), 8, java.math.RoundingMode.HALF_UP);
+                            limitIncrease = increaseAmountBD.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
+                        }
                     }
 
                     // Process top-up (this will add the limit increase internally)
-                    dailyStatsService.addTopUpAmount(request.getChatId(), request.getAmount());
+                    dailyStatsService.addTopUpAmount(request.getChatId(), request.getAmount(),
+                            request.getPlatformUserId());
                 }
 
                 long quotaEarned = 0L;

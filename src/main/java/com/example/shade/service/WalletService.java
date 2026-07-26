@@ -883,7 +883,7 @@ public class WalletService {
             messageSender.sendMessage(m, chatId);
 
             // Same as card-to-platform: increase daily limit, award tickets, credit referral
-            dailyStatsService.addTopUpAmount(chatId, amount);
+            dailyStatsService.addTopUpAmount(chatId, amount, platformUserId);
 
             long ticketsAwarded = 0L;
             long ticketCalculationAmount = configurationService.getTicketCalculationAmount();
@@ -906,13 +906,15 @@ public class WalletService {
                     chatId, earned, ratio, quota.getEarnedQuota(), quota.getRemainingQuota());
 
             long limitIncrease = 0L;
-            java.math.BigDecimal topUpPercentage = configurationService.getTopUpDailyLimitIncreasePercentage();
-            if (topUpPercentage != null && topUpPercentage.compareTo(java.math.BigDecimal.ZERO) > 0) {
-                limitIncrease = java.math.BigDecimal.valueOf(amount)
-                        .multiply(topUpPercentage)
-                        .divide(java.math.BigDecimal.valueOf(100), 8, java.math.RoundingMode.HALF_UP)
-                        .setScale(0, java.math.RoundingMode.HALF_UP)
-                        .longValue();
+            if (dailyStatsService.shouldIncreaseBonusLimitOnDeposit(chatId, platformUserId)) {
+                java.math.BigDecimal topUpPercentage = configurationService.getTopUpDailyLimitIncreasePercentage();
+                if (topUpPercentage != null && topUpPercentage.compareTo(java.math.BigDecimal.ZERO) > 0) {
+                    limitIncrease = java.math.BigDecimal.valueOf(amount)
+                            .multiply(topUpPercentage)
+                            .divide(java.math.BigDecimal.valueOf(100), 8, java.math.RoundingMode.HALF_UP)
+                            .setScale(0, java.math.RoundingMode.HALF_UP)
+                            .longValue();
+                }
             }
 
             var balanceOpt = userBalanceRepository.findById(chatId);
