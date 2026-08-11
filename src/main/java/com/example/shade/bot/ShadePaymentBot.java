@@ -289,6 +289,19 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                             languageSessionService.getTranslation(chatId, "message.feature_unavailable"));
                     return;
                 }
+                String requestIdValue = sessionService.getUserData(
+                        chatId, TopUpService.PENDING_TOPUP_REQUEST_ID_KEY);
+                final long requestId;
+                try {
+                    requestId = Long.parseLong(requestIdValue);
+                } catch (NumberFormatException | NullPointerException e) {
+                    logger.error("Screenshot upload has no valid request binding for chatId {}: {}",
+                            chatId, requestIdValue);
+                    messageSender.sendMessage(chatId,
+                            languageSessionService.getTranslation(chatId,
+                                    "message.please_confirm_payment_transaction"));
+                    return;
+                }
                 PhotoSize photo = update.getMessage().getPhoto().get(update.getMessage().getPhoto().size() - 1);
                 if (photo.getFileId() == null || photo.getFileId().isEmpty()) {
                     logger.error("Invalid photo file ID for chatId {}", chatId);
@@ -311,7 +324,7 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                     // Note: Reply markup with approval buttons is now set in
                     // AdminLogBotService.sendScreenshotRequest()
                     // using the actual request ID to prevent approval mismatches
-                    adminLogBotService.sendScreenshotRequest(sendPhoto, chatId);
+                    adminLogBotService.sendScreenshotRequest(sendPhoto, chatId, requestId);
                     sessionService.setUserState(chatId, TopUpService.STATE_TOPUP_SCREENSHOT_PENDING_ADMIN);
                     sessionService.setUserData(chatId, TopUpService.SESSION_TOPUP_SCREENSHOT_SUBMITTED, "1");
                     messageSender.sendMessage(chatId,

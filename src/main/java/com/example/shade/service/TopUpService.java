@@ -56,6 +56,8 @@ public class TopUpService {
     private final RestTemplate restTemplate = new RestTemplate();
     private static final String PAYMENT_MESSAGE_KEY = "payment_message_id";
     private static final String PAYMENT_ATTEMPTS_KEY = "payment_attempts";
+    /** Exact top-up row currently shown to the user and eligible for a screenshot upload. */
+    public static final String PENDING_TOPUP_REQUEST_ID_KEY = "pending_topup_request_id";
     /** Session: user already sent a screenshot; waiting for admin (second photo gets a short wait message). */
     public static final String SESSION_TOPUP_SCREENSHOT_SUBMITTED = "topup_screenshot_submitted";
     /** User state after screenshot was forwarded to admins. */
@@ -79,6 +81,7 @@ public class TopUpService {
     public void startTopUp(Long chatId) {
         logger.info("Starting top-up for chatId: {}", chatId);
         sessionService.removeUserData(chatId, SESSION_TOPUP_SCREENSHOT_SUBMITTED);
+        clearPendingTopUpRequestBinding(chatId);
         sessionService.setUserState(chatId, "TOPUP_PLATFORM_SELECTION");
         sessionService.addNavigationState(chatId, "MAIN_MENU");
         sessionService.setUserData(chatId, PAYMENT_ATTEMPTS_KEY, "0");
@@ -208,6 +211,20 @@ public class TopUpService {
             case "TOPUP_CONFIRM" -> initiateTopUpRequest(chatId, false);
             case "TOPUP_PAYMENT_CONFIRM" -> self.verifyPayment(chatId);
             case "TOPUP_SEND_SCREENSHOT" -> {
+                HizmatRequest request = getBoundTopUpRequest(chatId);
+                if (request == null
+                        || (request.getStatus() != RequestStatus.PENDING_PAYMENT
+                                && request.getStatus() != RequestStatus.PENDING_SCREENSHOT)) {
+                    logger.warn("Cannot start screenshot upload: no bound pending request for chatId {}", chatId);
+                    messageSender.sendMessage(chatId,
+                            languageSessionService.getTranslation(chatId, "topup.message.request_not_found"));
+                    return;
+                }
+                if (request.getStatus() == RequestStatus.PENDING_PAYMENT) {
+                    request.setStatus(RequestStatus.PENDING_SCREENSHOT);
+                    requestRepository.save(request);
+                }
+                bindPendingTopUpRequest(chatId, request);
                 sessionService.setUserState(chatId, "TOPUP_AWAITING_SCREENSHOT");
                 messageSender.sendMessage(chatId,
                         languageSessionService.getTranslation(chatId, "topup.message.send_screenshot"));
@@ -689,7 +706,11 @@ public class TopUpService {
         request.setPaymentAttempts(0);
         requestRepository.save(request);
 
+        // Keep the session counter and the persisted request in sync. A stale value >= 2
+        // used to expose "Send screenshot" for a fresh request and attach it to an older row.
+        sessionService.setUserData(chatId, PAYMENT_ATTEMPTS_KEY, "0");
         sessionService.removeUserData(chatId, SESSION_TOPUP_SCREENSHOT_SUBMITTED);
+        bindPendingTopUpRequest(chatId, request);
 
         sessionService.setUserState(chatId, "TOPUP_PAYMENT_CONFIRM");
         sessionService.addNavigationState(chatId, "TOPUP_CONFIRMATION");
@@ -700,6 +721,7 @@ public class TopUpService {
             String adminLogTitle) {
         request.setStatus(RequestStatus.PENDING_SCREENSHOT);
         requestRepository.save(request);
+        bindPendingTopUpRequest(chatId, request);
         SendMessage message = new SendMessage();
         message.setChatId(chatId);
         message.setText(languageSessionService.getTranslation(chatId, "topup.message.send_screenshot"));
@@ -737,6 +759,40 @@ public class TopUpService {
         }
     }
 
+    private void bindPendingTopUpRequest(Long chatId, HizmatRequest request) {
+        if (request != null && request.getId() != null) {
+            sessionService.setUserData(chatId, PENDING_TOPUP_REQUEST_ID_KEY, String.valueOf(request.getId()));
+        }
+    }
+
+    private void clearPendingTopUpRequestBinding(Long chatId) {
+        sessionService.removeUserData(chatId, PENDING_TOPUP_REQUEST_ID_KEY);
+    }
+
+    private Long getBoundTopUpRequestId(Long chatId) {
+        String requestId = sessionService.getUserData(chatId, PENDING_TOPUP_REQUEST_ID_KEY);
+        if (requestId == null || requestId.isBlank()) {
+            return null;
+        }
+        try {
+            return Long.valueOf(requestId);
+        } catch (NumberFormatException e) {
+            logger.error("Invalid bound top-up request ID '{}' for chatId {}", requestId, chatId);
+            clearPendingTopUpRequestBinding(chatId);
+            return null;
+        }
+    }
+
+    private HizmatRequest getBoundTopUpRequest(Long chatId) {
+        Long requestId = getBoundTopUpRequestId(chatId);
+        if (requestId == null) {
+            return null;
+        }
+        return requestRepository.findById(requestId)
+                .filter(request -> chatId.equals(request.getChatId()))
+                .orElse(null);
+    }
+
     /**
      * Rebuilds the payment instruction inline keyboard after the message text is edited (e.g. card blur).
      */
@@ -755,8 +811,16 @@ public class TopUpService {
     @Transactional
     public void verifyPayment(Long chatId) throws Exception {
         // Pessimistic lock prevents double processing when user double-clicks Confirm
-        HizmatRequest request = requestRepository.findFirstByChatIdAndStatusForUpdate(chatId, RequestStatus.PENDING_PAYMENT)
-                .orElse(null);
+        Long boundRequestId = getBoundTopUpRequestId(chatId);
+        HizmatRequest request = boundRequestId == null ? null
+                : requestRepository.findByIdWithLock(boundRequestId)
+                        .filter(r -> chatId.equals(r.getChatId()) && r.getStatus() == RequestStatus.PENDING_PAYMENT)
+                        .orElse(null);
+        if (request == null) {
+            request = requestRepository.findFirstByChatIdAndStatusForUpdate(chatId, RequestStatus.PENDING_PAYMENT)
+                    .orElse(null);
+            bindPendingTopUpRequest(chatId, request);
+        }
         if (request == null) {
             logger.error("No pending payment request found for chatId {}", chatId);
             // messageSender.animateAndDeleteMessages(chatId,
@@ -796,8 +860,9 @@ public class TopUpService {
         request.setPaymentAttempts(attempts);
         requestRepository.save(request);
 
-        AdminCard adminCard = adminCardRepository.findById(request.getAdminCardId())
-                .orElseThrow(() -> new IllegalStateException("Admin card not found: " + request.getAdminCardId()));
+        Long adminCardId = request.getAdminCardId();
+        AdminCard adminCard = adminCardRepository.findById(adminCardId)
+                .orElseThrow(() -> new IllegalStateException("Admin card not found: " + adminCardId));
         Map<String, Object> statusResponse = null;
         boolean response = false;
         ExchangeRate latest = exchangeRateRepository.findLatest()
@@ -2001,12 +2066,17 @@ public class TopUpService {
     }
 
     private void sendPaymentInstruction(Long chatId) {
-        HizmatRequest request = requestRepository
-                .findFirstByChatIdAndStatusOrderByCreatedAtDesc(chatId, RequestStatus.PENDING_PAYMENT)
-                .orElseThrow(
-                        () -> new IllegalStateException("Pending payment request not found for chatId: " + chatId));
-        AdminCard adminCard = adminCardRepository.findById(request.getAdminCardId())
-                .orElseThrow(() -> new IllegalStateException("Admin card not found: " + request.getAdminCardId()));
+        HizmatRequest request = getBoundTopUpRequest(chatId);
+        if (request == null || request.getStatus() != RequestStatus.PENDING_PAYMENT) {
+            request = requestRepository
+                    .findFirstByChatIdAndStatusOrderByCreatedAtDesc(chatId, RequestStatus.PENDING_PAYMENT)
+                    .orElseThrow(
+                            () -> new IllegalStateException("Pending payment request not found for chatId: " + chatId));
+            bindPendingTopUpRequest(chatId, request);
+        }
+        Long adminCardId = request.getAdminCardId();
+        AdminCard adminCard = adminCardRepository.findById(adminCardId)
+                .orElseThrow(() -> new IllegalStateException("Admin card not found: " + adminCardId));
 
         int attempts = Integer.parseInt(sessionService.getUserData(chatId, PAYMENT_ATTEMPTS_KEY, "0"));
         ExchangeRate latest = exchangeRateRepository.findLatest()

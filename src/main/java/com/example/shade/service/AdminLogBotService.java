@@ -30,7 +30,7 @@ public class AdminLogBotService {
     private final AdminCardRepository adminCardRepository;
     private final BlockedUserRepository blockedUserRepository;
 
-    public void sendScreenshotRequest(SendPhoto sendPhoto, Long userChatId) {
+    public void sendScreenshotRequest(SendPhoto sendPhoto, Long userChatId, Long requestId) {
         if (sendPhoto == null || sendPhoto.getPhoto() == null) {
             logger.error("Invalid SendPhoto object or file for userChatId {}", userChatId);
             return;
@@ -42,13 +42,17 @@ public class AdminLogBotService {
             return;
         }
 
-        // Fetch the latest pending screenshot request for the user
-        HizmatRequest request = requestRepository
-                .findFirstByChatIdAndStatusOrderByCreatedAtDesc(userChatId, RequestStatus.PENDING_SCREENSHOT)
-                .orElse(null);
-        if (request == null) {
-            logger.error("No pending screenshot request found for userChatId {}", userChatId);
-            sendToAdmins("❌ No pending screenshot request found for userChatId: " + userChatId);
+        // The photo must stay attached to the exact request shown to the user.
+        // Looking up "latest pending by chatId" can pair a new receipt with an old amount.
+        HizmatRequest request = requestId == null ? null : requestRepository.findById(requestId).orElse(null);
+        if (request == null
+                || !userChatId.equals(request.getChatId())
+                || request.getStatus() != RequestStatus.PENDING_SCREENSHOT) {
+            logger.error("Invalid screenshot binding: requestId={}, userChatId={}, foundChatId={}, status={}",
+                    requestId, userChatId,
+                    request != null ? request.getChatId() : null,
+                    request != null ? request.getStatus() : null);
+            sendToAdmins("❌ Screenshot request mismatch. User: " + userChatId + ", request: " + requestId);
             return;
         }
 

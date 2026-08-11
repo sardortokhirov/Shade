@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 
@@ -27,7 +28,10 @@ public class ExchangeRateService {
     @Transactional
     public void updateRate(Double rate) {
         BigDecimal rubToUzs = BigDecimal.valueOf(rate);
-        BigDecimal uzsToRub = BigDecimal.ONE.divide(rubToUzs, 6, BigDecimal.ROUND_HALF_UP);
+        // All top-up code defines uzsToRub as RUB received for 1000 UZS.
+        // Example: 1 RUB = 160 UZS means 1000 UZS = 6.25 RUB.
+        BigDecimal uzsToRub = BigDecimal.valueOf(1000)
+                .divide(rubToUzs, 6, RoundingMode.HALF_UP);
 
         ExchangeRate exchangeRate = ExchangeRate.builder()
                 .rubToUzs(rubToUzs)
