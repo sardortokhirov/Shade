@@ -29,7 +29,6 @@ public class OsonService {
     private final OsonConfigRepository osonConfigRepository;
     private static final DateTimeFormatter OSON_TIMESTAMP_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ssXXX");
     private String authToken;
-    private volatile long authTokenExpiresAtMs;
 
     private OsonConfig getConfig() {
         return osonConfigRepository.findByPrimaryConfigTrue()
@@ -37,10 +36,6 @@ public class OsonService {
     }
 
     private synchronized String login() {
-        long now = System.currentTimeMillis();
-        if (authToken != null && now < authTokenExpiresAtMs) {
-            return authToken;
-        }
         OsonConfig config = getConfig();
         String url = config.getApiUrl() + "/api/user/login";
         HttpHeaders headers = new HttpHeaders();
@@ -67,7 +62,6 @@ public class OsonService {
             Map<String, Object> responseBody = response.getBody();
             if (response.getStatusCode().is2xxSuccessful() && responseBody != null && "0".equals(String.valueOf(responseBody.get("errno")))) {
                 authToken = (String) responseBody.get("token");
-                authTokenExpiresAtMs = System.currentTimeMillis() + (25L * 60L * 1000L);
                 logger.info("Oson login successful");
                 return authToken;
             } else {
