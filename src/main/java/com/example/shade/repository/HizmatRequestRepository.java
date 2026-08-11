@@ -42,6 +42,20 @@ public interface HizmatRequestRepository
       @Param("status") RequestStatus status,
       @Param("type") RequestType type);
 
+  @Query("SELECT r FROM HizmatRequest r WHERE " +
+      "(:cardId IS NULL OR r.adminCardId = :cardId) AND " +
+      "(:platformId IS NULL OR r.platform IN (SELECT p.name FROM Platform p WHERE p.id = :platformId)) AND "
+      +
+      "(:status IS NULL OR r.status = :status) AND " +
+      "(:type IS NULL OR r.type = :type) " +
+      "ORDER BY r.createdAt DESC")
+  List<HizmatRequest> findByFilters(
+      @Param("cardId") Long cardId,
+      @Param("platformId") Long platformId,
+      @Param("status") RequestStatus status,
+      @Param("type") RequestType type,
+      Pageable pageable);
+
   @Query("""
           SELECT r FROM HizmatRequest r
           WHERE (:status IS NULL OR r.status = :status)

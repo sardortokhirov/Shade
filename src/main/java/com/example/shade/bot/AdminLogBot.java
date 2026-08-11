@@ -28,6 +28,9 @@ import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 
 @Component
 @RequiredArgsConstructor
@@ -48,6 +51,8 @@ public class AdminLogBot extends TelegramLongPollingBot {
 
     @Value("${telegram.admin.log.bot.username}")
     private String botUsername;
+
+    private final ExecutorService updateExecutor = Executors.newFixedThreadPool(8);
 
     // Static list of motivational texts in Uzbek
     private static final List<String> MOTIVATIONAL_TEXTS = List.of(
@@ -97,6 +102,14 @@ public class AdminLogBot extends TelegramLongPollingBot {
 
     @Override
     public void onUpdateReceived(Update update) {
+        try {
+            updateExecutor.execute(() -> processUpdate(update));
+        } catch (RejectedExecutionException e) {
+            logger.error("Admin bot update queue saturated, dropping update", e);
+        }
+    }
+
+    private void processUpdate(Update update) {
         try {
             if (update == null) {
                 logger.warn("Received null update");

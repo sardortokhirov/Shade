@@ -46,11 +46,9 @@ public class TransactionController {
         RequestStatus requestStatus = status != null ? RequestStatus.valueOf(status) : null;
         RequestType requestType = type != null ? RequestType.valueOf(type) : null;
 
-        Pageable pageable = PageRequest.of(0, 100); // Fetch last 100 records
-        List<HizmatRequest> transactions = hizmatRequestRepository.findByFilters(cardId, platformId, requestStatus, requestType)
-                .stream()
-                .limit(100)
-                .toList();
+        Pageable pageable = PageRequest.of(0, 100);
+        List<HizmatRequest> transactions = hizmatRequestRepository.findByFilters(
+                cardId, platformId, requestStatus, requestType, pageable);
 
         return ResponseEntity.ok(transactions);
     }

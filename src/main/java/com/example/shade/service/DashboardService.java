@@ -57,52 +57,110 @@ public class DashboardService {
         private UserBalanceRepository userBalanceRepository;
 
         public DashboardStats getDashboardStats(RequestFilter filter) {
-                long totalRequests = getRequestCount(filter);
-                long approvedRequests = getRequestCount(new RequestFilter(
-                                filter.getCardId(), filter.getPlatformId(), RequestStatus.APPROVED, filter.getType(),
-                                filter.getStartDate(), filter.getEndDate()));
-                long pendingRequests = getRequestCount(new RequestFilter(
-                                filter.getCardId(), filter.getPlatformId(), RequestStatus.PENDING, filter.getType(),
-                                filter.getStartDate(), filter.getEndDate()));
-                long pendingAdminRequests = getRequestCount(new RequestFilter(
-                                filter.getCardId(), filter.getPlatformId(), RequestStatus.PENDING_ADMIN,
-                                filter.getType(),
-                                filter.getStartDate(), filter.getEndDate()));
-                long canceledRequests = getRequestCount(new RequestFilter(
-                                filter.getCardId(), filter.getPlatformId(), RequestStatus.CANCELED, filter.getType(),
-                                filter.getStartDate(), filter.getEndDate()));
-                long failedRequests = getRequestCount(new RequestFilter(
-                                filter.getCardId(), filter.getPlatformId(), RequestStatus.FAILED, filter.getType(),
-                                filter.getStartDate(), filter.getEndDate()));
-                double totalApprovedWithdrawalAmount = getTotalApprovedWithdrawalAmount(new RequestFilter(
-                                filter.getCardId(), filter.getPlatformId(), RequestStatus.APPROVED,
-                                RequestType.WITHDRAWAL,
-                                filter.getStartDate(), filter.getEndDate()));
-                double totalApprovedTopUpAmount = getTotalApprovedTopUpAmount(new RequestFilter(
-                                filter.getCardId(), filter.getPlatformId(), RequestStatus.APPROVED, RequestType.TOP_UP,
-                                filter.getStartDate(), filter.getEndDate()));
-                double totalApprovedBonusAmount = getTotalApprovedBonusAmount(new RequestFilter(
-                                filter.getCardId(), filter.getPlatformId(), RequestStatus.BONUS_APPROVED, null,
-                                filter.getStartDate(), filter.getEndDate()));
-                double totalApprovedTipAmount = getTotalApprovedTipAmount(new RequestFilter(
-                                filter.getCardId(), filter.getPlatformId(), RequestStatus.APPROVED, RequestType.TIP,
-                                filter.getStartDate(), filter.getEndDate()));
-                Map<RequestStatus, Long> statusDistribution = getStatusDistribution(filter);
-                Map<String, Long> requestsByPlatform = getRequestsByPlatform(filter);
-                Map<String, Long> requestsByDate = getRequestsByDate(filter);
-                Map<String, Double> amountByPlatform = getAmountByPlatform(new RequestFilter(
-                                filter.getCardId(), filter.getPlatformId(), RequestStatus.APPROVED,
-                                RequestType.WITHDRAWAL,
-                                filter.getStartDate(), filter.getEndDate()));
-                double averageApprovedAmount = getAverageApprovedAmount(new RequestFilter(
-                                filter.getCardId(), filter.getPlatformId(), RequestStatus.APPROVED,
-                                RequestType.WITHDRAWAL,
-                                filter.getStartDate(), filter.getEndDate()));
-                Map<Long, Long> topUsers = getTopUsersByRequestCount(filter);
-                List<Map<String, Object>> recentRequests = getRecentRequests(filter);
-                Map<String, Map<String, Double>> platformGraphData = getPlatformGraphData(new RequestFilter(
-                                filter.getCardId(), filter.getPlatformId(), RequestStatus.APPROVED, null,
-                                filter.getStartDate(), filter.getEndDate()));
+                // One DB load instead of ~18 full-table scans (same filters/math as before).
+                List<HizmatRequest> all = requestRepository.findByFilters(
+                                filter.getCardId(), filter.getPlatformId(), null, null);
+                List<HizmatRequest> byCreated = filterByCreatedAt(all, filter.getStartDate(), filter.getEndDate());
+                if (filter.getStatus() != null) {
+                        byCreated = byCreated.stream()
+                                        .filter(r -> r.getStatus() == filter.getStatus())
+                                        .collect(Collectors.toList());
+                }
+                if (filter.getType() != null) {
+                        byCreated = byCreated.stream()
+                                        .filter(r -> r.getType() == filter.getType())
+                                        .collect(Collectors.toList());
+                }
+
+                long totalRequests = byCreated.size();
+                long approvedRequests = byCreated.stream().filter(r -> r.getStatus() == RequestStatus.APPROVED).count();
+                long pendingRequests = byCreated.stream().filter(r -> r.getStatus() == RequestStatus.PENDING).count();
+                long pendingAdminRequests = byCreated.stream().filter(r -> r.getStatus() == RequestStatus.PENDING_ADMIN).count();
+                long canceledRequests = byCreated.stream().filter(r -> r.getStatus() == RequestStatus.CANCELED).count();
+                long failedRequests = byCreated.stream().filter(r -> r.getStatus() == RequestStatus.FAILED).count();
+
+                double totalApprovedWithdrawalAmount = byCreated.stream()
+                                .filter(r -> r.getStatus() == RequestStatus.APPROVED && r.getType() == RequestType.WITHDRAWAL)
+                                .mapToDouble(r -> r.getUniqueAmount() != null ? r.getUniqueAmount() : 0.0)
+                                .sum();
+                double totalApprovedTopUpAmount = byCreated.stream()
+                                .filter(r -> r.getStatus() == RequestStatus.APPROVED && r.getType() == RequestType.TOP_UP)
+                                .mapToDouble(r -> r.getUniqueAmount() != null ? r.getUniqueAmount() : 0.0)
+                                .sum();
+                double totalApprovedTipAmount = byCreated.stream()
+                                .filter(r -> r.getStatus() == RequestStatus.APPROVED && r.getType() == RequestType.TIP)
+                                .mapToDouble(r -> r.getUniqueAmount() != null ? r.getUniqueAmount() : 0.0)
+                                .sum();
+                // Bonus uses approval event time (approvedAt/createdAt), same as before.
+                double totalApprovedBonusAmount = all.stream()
+                                .filter(r -> r.getStatus() == RequestStatus.BONUS_APPROVED)
+                                .filter(r -> isWithinApprovalRange(r, filter.getStartDate(), filter.getEndDate()))
+                                .mapToDouble(DashboardService::requestAmount)
+                                .sum();
+
+                Map<RequestStatus, Long> statusDistribution = byCreated.stream()
+                                .collect(Collectors.groupingBy(HizmatRequest::getStatus, Collectors.counting()));
+                Map<String, Long> requestsByPlatform = byCreated.stream()
+                                .collect(Collectors.groupingBy(HizmatRequest::getPlatform, Collectors.counting()));
+                Map<String, Long> requestsByDate = byCreated.stream()
+                                .collect(Collectors.groupingBy(
+                                                r -> r.getCreatedAt().toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE),
+                                                Collectors.counting()));
+                Map<String, Double> amountByPlatform = byCreated.stream()
+                                .filter(r -> r.getStatus() == RequestStatus.APPROVED && r.getType() == RequestType.WITHDRAWAL)
+                                .collect(Collectors.groupingBy(
+                                                HizmatRequest::getPlatform,
+                                                Collectors.summingDouble(r -> r.getUniqueAmount() != null ? r.getUniqueAmount() : 0.0)));
+                double averageApprovedAmount = byCreated.stream()
+                                .filter(r -> r.getStatus() == RequestStatus.APPROVED && r.getType() == RequestType.WITHDRAWAL)
+                                .mapToDouble(r -> r.getUniqueAmount() != null ? r.getUniqueAmount() : 0.0)
+                                .average()
+                                .orElse(0.0);
+                Map<Long, Long> topUsers = byCreated.stream()
+                                .collect(Collectors.groupingBy(HizmatRequest::getChatId, Collectors.counting()))
+                                .entrySet().stream()
+                                .sorted(Map.Entry.<Long, Long>comparingByValue().reversed())
+                                .limit(10)
+                                .collect(Collectors.toMap(
+                                                Map.Entry::getKey,
+                                                Map.Entry::getValue,
+                                                (e1, e2) -> e1,
+                                                HashMap::new));
+                List<Map<String, Object>> recentRequests = byCreated.stream()
+                                .sorted((r1, r2) -> r2.getCreatedAt().compareTo(r1.getCreatedAt()))
+                                .limit(5)
+                                .map(r -> {
+                                        Map<String, Object> map = new HashMap<>();
+                                        map.put("id", r.getId());
+                                        map.put("chatId", r.getChatId());
+                                        map.put("platform", r.getPlatform());
+                                        map.put("platformUserId", r.getPlatformUserId());
+                                        map.put("fullName", r.getFullName());
+                                        map.put("cardNumber", r.getCardNumber());
+                                        map.put("amount", r.getUniqueAmount());
+                                        map.put("status", r.getStatus());
+                                        map.put("type", r.getType());
+                                        map.put("createdAt", r.getCreatedAt());
+                                        return map;
+                                })
+                                .collect(Collectors.toList());
+
+                Map<String, Map<String, Double>> platformGraphData = new HashMap<>();
+                byCreated.stream()
+                                .filter(r -> r.getStatus() == RequestStatus.APPROVED)
+                                .collect(Collectors.groupingBy(HizmatRequest::getPlatform))
+                                .forEach((platform, platformRequests) -> {
+                                        Map<String, Double> amounts = new HashMap<>();
+                                        amounts.put("withdrawal", platformRequests.stream()
+                                                        .filter(r -> r.getType() == RequestType.WITHDRAWAL)
+                                                        .mapToDouble(r -> r.getUniqueAmount() != null ? r.getUniqueAmount() : 0.0)
+                                                        .sum());
+                                        amounts.put("top_up", platformRequests.stream()
+                                                        .filter(r -> r.getType() == RequestType.TOP_UP)
+                                                        .mapToDouble(r -> r.getUniqueAmount() != null ? r.getUniqueAmount() : 0.0)
+                                                        .sum());
+                                        platformGraphData.put(platform, amounts);
+                                });
 
                 return new DashboardStats(totalRequests, approvedRequests, pendingRequests, pendingAdminRequests,
                                 canceledRequests, failedRequests, totalApprovedWithdrawalAmount, statusDistribution,
@@ -110,6 +168,14 @@ public class DashboardService {
                                 requestsByDate, amountByPlatform, averageApprovedAmount, topUsers, recentRequests,
                                 totalApprovedTopUpAmount, totalApprovedBonusAmount, totalApprovedTipAmount,
                                 platformGraphData);
+        }
+
+        private static List<HizmatRequest> filterByCreatedAt(List<HizmatRequest> requests,
+                        LocalDateTime startDate, LocalDateTime endDate) {
+                return requests.stream()
+                                .filter(r -> startDate == null || (r.getCreatedAt() != null && !r.getCreatedAt().isBefore(startDate)))
+                                .filter(r -> endDate == null || (r.getCreatedAt() != null && !r.getCreatedAt().isAfter(endDate)))
+                                .collect(Collectors.toList());
         }
 
         public long getRequestCount(RequestFilter filter) {

@@ -18,6 +18,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.DigestUtils;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
@@ -752,15 +754,16 @@ public class TopUpService {
         return createPaymentConfirmKeyboard(attempts, chatId);
     }
 
+    /**
+     * Claim PENDING_PAYMENT under lock, then run Oson/Humo/Mostbet AFTER commit
+     * so DB row locks are not held during external HTTP (prevents bot freeze).
+     */
     @Transactional
     public void verifyPayment(Long chatId) throws Exception {
-        // Pessimistic lock prevents double processing when user double-clicks Confirm
         HizmatRequest request = requestRepository.findFirstByChatIdAndStatusForUpdate(chatId, RequestStatus.PENDING_PAYMENT)
                 .orElse(null);
         if (request == null) {
             logger.error("No pending payment request found for chatId {}", chatId);
-            // messageSender.animateAndDeleteMessages(chatId,
-            // sessionService.getMessageIds(chatId), "OPEN");
             sessionService.clearMessageIds(chatId);
             messageSender.sendMessage(chatId,
                     languageSessionService.getTranslation(chatId, "topup.message.request_not_found"));
@@ -794,7 +797,52 @@ public class TopUpService {
         attempts++;
         sessionService.setUserData(chatId, PAYMENT_ATTEMPTS_KEY, String.valueOf(attempts));
         request.setPaymentAttempts(attempts);
+        request.setStatus(RequestStatus.PROCESSING);
         requestRepository.save(request);
+        Long requestId = request.getId();
+        final int attemptsFinal = attempts;
+
+        Runnable work = () -> {
+            try {
+                self.continueVerifyPayment(chatId, requestId, attemptsFinal);
+            } catch (Exception e) {
+                logger.error("Payment verify continuation failed for request {}: {}", requestId, e.getMessage(), e);
+                self.revertPaymentVerifyToPending(requestId);
+            }
+        };
+
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    work.run();
+                }
+            });
+        } else {
+            work.run();
+        }
+    }
+
+    @Transactional
+    public void revertPaymentVerifyToPending(Long requestId) {
+        requestRepository.findByIdWithLock(requestId).ifPresent(r -> {
+            if (r.getStatus() == RequestStatus.PROCESSING) {
+                r.setStatus(RequestStatus.PENDING_PAYMENT);
+                requestRepository.save(r);
+                logger.warn("Reverted payment request {} to PENDING_PAYMENT after verify failure", requestId);
+            }
+        });
+    }
+
+    /**
+     * Continues payment verify after DB claim committed. Must not hold the claim lock.
+     */
+    public void continueVerifyPayment(Long chatId, Long requestId, int attempts) throws Exception {
+        HizmatRequest request = requestRepository.findById(requestId).orElse(null);
+        if (request == null || request.getStatus() != RequestStatus.PROCESSING) {
+            logger.warn("Skip continueVerifyPayment for request {}: missing or not PROCESSING", requestId);
+            return;
+        }
 
         AdminCard adminCard = adminCardRepository.findById(request.getAdminCardId())
                 .orElseThrow(() -> new IllegalStateException("Admin card not found: " + request.getAdminCardId()));
@@ -1047,6 +1095,8 @@ public class TopUpService {
             if (attempts >= 2) {
                 sendTopupScreenshotFlow(chatId, request, adminCard, rubAmount, null);
             } else {
+                request.setStatus(RequestStatus.PENDING_PAYMENT);
+                requestRepository.save(request);
                 messageSender.sendMessage(chatId,
                         languageSessionService.getTranslation(chatId, "topup.message.payment_not_received"));
                 sendPaymentInstruction(chatId);
