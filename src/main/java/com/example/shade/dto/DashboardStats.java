@@ -24,6 +24,8 @@ public class DashboardStats {
     private final double totalApprovedTopUpAmount;
     private final double totalApprovedBonusAmount;
     private final double totalApprovedTipAmount;
+    private final double totalWalletToWalletFees;
+    private final double totalTicketTradeFees;
     private final Map<String, Map<String, Double>> platformGraphData;
 
     public DashboardStats(long totalRequests, long approvedRequests, long pendingRequests, long pendingAdminRequests,
@@ -32,6 +34,7 @@ public class DashboardStats {
             Map<String, Long> requestsByDate, Map<String, Double> amountByPlatform,
             double averageApprovedAmount, Map<Long, Long> topUsers, List<Map<String, Object>> recentRequests,
             double totalApprovedTopUpAmount, double totalApprovedBonusAmount, double totalApprovedTipAmount,
+            double totalWalletToWalletFees, double totalTicketTradeFees,
             Map<String, Map<String, Double>> platformGraphData) {
         this.totalRequests = totalRequests;
         this.approvedRequests = approvedRequests;
@@ -50,6 +53,8 @@ public class DashboardStats {
         this.totalApprovedTopUpAmount = totalApprovedTopUpAmount;
         this.totalApprovedBonusAmount = totalApprovedBonusAmount;
         this.totalApprovedTipAmount = totalApprovedTipAmount;
+        this.totalWalletToWalletFees = totalWalletToWalletFees;
+        this.totalTicketTradeFees = totalTicketTradeFees;
         this.platformGraphData = platformGraphData;
     }
 
@@ -119,6 +124,14 @@ public class DashboardStats {
 
     public double getTotalApprovedTipAmount() {
         return totalApprovedTipAmount;
+    }
+
+    public double getTotalWalletToWalletFees() {
+        return totalWalletToWalletFees;
+    }
+
+    public double getTotalTicketTradeFees() {
+        return totalTicketTradeFees;
     }
 
     public Map<String, Map<String, Double>> getPlatformGraphData() {

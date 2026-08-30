@@ -1766,6 +1766,8 @@ public class BonusService {
         }
         rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.buy_tickets"),
                 "BONUS_LOTTERY_BUY")));
+        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.lottery_trade"),
+                "LOTTERY_TRADE_MENU")));
         rows.add(createNavigationButtons(chatId));
         markup.setKeyboard(rows);
         return markup;

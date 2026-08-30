@@ -395,6 +395,33 @@ public class LotteryController {
         }
     }
 
+    @GetMapping("/lottery/p2p-settings")
+    public ResponseEntity<P2pSettingsResponse> getP2pSettings(HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+        return ResponseEntity.ok(new P2pSettingsResponse(
+                configService.getP2pMinPricePerTicket(),
+                configService.getP2pFeePercentage()));
+    }
+
+    @PutMapping("/lottery/p2p-settings")
+    public ResponseEntity<?> setP2pSettings(
+            @RequestBody P2pSettingsRequest requestBody,
+            HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+        try {
+            configService.setP2pSettings(requestBody.getMinPricePerTicket(), requestBody.getFeePercentage());
+            return ResponseEntity.ok(new P2pSettingsResponse(
+                    configService.getP2pMinPricePerTicket(),
+                    configService.getP2pFeePercentage()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
     // DTOs for request/response
     @Data
     public static class CooldownRequest {
@@ -419,6 +446,23 @@ public class LotteryController {
         private BigDecimal percentage;
         public WinningsPercentageResponse(BigDecimal percentage) {
             this.percentage = percentage;
+        }
+    }
+
+    @Data
+    public static class P2pSettingsRequest {
+        private Long minPricePerTicket;
+        private BigDecimal feePercentage;
+    }
+
+    @Data
+    public static class P2pSettingsResponse {
+        private Long minPricePerTicket;
+        private BigDecimal feePercentage;
+
+        public P2pSettingsResponse(Long minPricePerTicket, BigDecimal feePercentage) {
+            this.minPricePerTicket = minPricePerTicket;
+            this.feePercentage = feePercentage;
         }
     }
 }

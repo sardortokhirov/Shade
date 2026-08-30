@@ -55,6 +55,7 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
     private final ShadeAdminUpdateHandler adminUpdateHandler;
     private final AdminBotService adminBotService;
     private final CallbackDeduplicationService callbackDeduplicationService;
+    private final TicketMarketplaceService ticketMarketplaceService;
     private final ExecutorService updateExecutor = Executors.newFixedThreadPool(10);
 
     @Value("${telegram.bot.token}")
@@ -445,6 +446,8 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
             withdrawService.handleTextInput(chatId, messageText);
         } else if (state != null && state.startsWith("BONUS_")) {
             bonusService.handleTextInput(chatId, messageText);
+        } else if (state != null && state.startsWith("LOTTERY_TRADE_")) {
+            ticketMarketplaceService.handleTextInput(chatId, messageText);
         } else if (state != null && state.startsWith("WALLET_")) {
             walletService.handleTextInput(chatId, messageText);
         } else {
@@ -511,6 +514,8 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                         withdrawService.handleBack(chatId);
                     } else if (state != null && state.startsWith("BONUS_")) {
                         bonusService.handleBack(chatId);
+                    } else if (state != null && state.startsWith("LOTTERY_TRADE_")) {
+                        ticketMarketplaceService.handleBack(chatId);
                     } else if (state != null && state.startsWith("WALLET_")) {
                         if (walletService.handleBack(chatId)) {
                             sessionService.removeUserData(chatId, "returnToMainMenu");
@@ -573,6 +578,13 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                         // messageSender.animateAndDeleteMessages(chatId,
                         // sessionService.getMessageIds(chatId), "OPEN");
                         bonusService.handleCallback(chatId, callback);
+                    } else if (callback.startsWith("LOTTERY_TRADE_")) {
+                        if (!featureService.canPerformBonus()) {
+                            messageSender.sendMessage(chatId,
+                                    languageSessionService.getTranslation(chatId, "message.feature_unavailable"));
+                            return;
+                        }
+                        ticketMarketplaceService.handleCallback(chatId, callback);
                     } else if (callback.startsWith("WALLET_")) {
                         if (!featureService.canPerformWallet()) {
                             messageSender.sendMessage(chatId,

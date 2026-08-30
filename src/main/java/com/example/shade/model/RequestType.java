@@ -11,5 +11,7 @@ public enum RequestType {
     WALLET_DEPOSIT,
     WALLET_WITHDRAWAL,
     WALLET_TO_PLATFORM,
-    TIP
+    WALLET_TO_WALLET,
+    TIP,
+    TICKET_TRADE
 }

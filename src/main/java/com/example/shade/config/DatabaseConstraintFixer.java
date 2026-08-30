@@ -36,6 +36,39 @@ public class DatabaseConstraintFixer {
         fixNullableEnumConstraint("system_configuration", "uzcard_rail", "system_configuration_uzcard_rail_check",
                 UzcardRail.class);
         fixBotTipConfigurationColumns();
+        fixWalletP2pAndTicketTradeColumns();
+    }
+
+    private void fixWalletP2pAndTicketTradeColumns() {
+        try {
+            jdbcTemplate.execute(
+                    "ALTER TABLE hizmat_request ADD COLUMN IF NOT EXISTS recipient_chat_id BIGINT");
+            jdbcTemplate.execute(
+                    "ALTER TABLE hizmat_request ADD COLUMN IF NOT EXISTS fee_amount BIGINT");
+            jdbcTemplate.execute(
+                    "ALTER TABLE hizmat_request ADD COLUMN IF NOT EXISTS net_amount BIGINT");
+            jdbcTemplate.execute(
+                    "ALTER TABLE system_configuration ADD COLUMN IF NOT EXISTS wallet_to_wallet_fee_percentage NUMERIC(9,8) NOT NULL DEFAULT 0");
+            jdbcTemplate.execute(
+                    "ALTER TABLE lottery_configuration ADD COLUMN IF NOT EXISTS p2p_min_price_per_ticket BIGINT NOT NULL DEFAULT 1");
+            jdbcTemplate.execute(
+                    "ALTER TABLE lottery_configuration ADD COLUMN IF NOT EXISTS p2p_fee_percentage NUMERIC(9,8) NOT NULL DEFAULT 0");
+            jdbcTemplate.execute(
+                    "CREATE TABLE IF NOT EXISTS ticket_listing ("
+                            + "id BIGSERIAL PRIMARY KEY, "
+                            + "seller_chat_id BIGINT NOT NULL, "
+                            + "ticket_quantity BIGINT NOT NULL, "
+                            + "total_price BIGINT NOT NULL, "
+                            + "status VARCHAR(32) NOT NULL, "
+                            + "buyer_chat_id BIGINT, "
+                            + "fee_amount BIGINT, "
+                            + "net_amount BIGINT, "
+                            + "created_at TIMESTAMP NOT NULL, "
+                            + "sold_at TIMESTAMP)");
+            logger.info("Ensured wallet P2P / lottery trade columns and ticket_listing table exist");
+        } catch (Exception e) {
+            logger.warn("Could not ensure wallet P2P / lottery trade schema: {}", e.getMessage());
+        }
     }
 
     private void fixBotTipConfigurationColumns() {

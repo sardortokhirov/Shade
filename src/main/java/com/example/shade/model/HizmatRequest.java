@@ -75,4 +75,16 @@ public class HizmatRequest {
     @Column(name = "wallet_balance_at_time")
     private Long walletBalanceAtTime;
 
+    /** Telegram chat ID of the counterparty (wallet P2P receiver or ticket trade seller/buyer). */
+    @Column(name = "recipient_chat_id")
+    private Long recipientChatId;
+
+    /** Platform fee deducted from the transfer/sale (UZS). Not credited to any user wallet. */
+    @Column(name = "fee_amount")
+    private Long feeAmount;
+
+    /** Amount credited to the receiver/seller after fee (UZS). */
+    @Column(name = "net_amount")
+    private Long netAmount;
+
 }

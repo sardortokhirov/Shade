@@ -47,6 +47,7 @@ public class SystemConfigurationService {
     private static final Long DEFAULT_WALLET_WITHDRAW_RATIO = 10L;
     private static final Long DEFAULT_WALLET_TRANSFER_MIN = 5_000L;
     private static final Long DEFAULT_WALLET_TRANSFER_MAX = 10_000_000L;
+    private static final BigDecimal DEFAULT_WALLET_TO_WALLET_FEE = BigDecimal.ZERO;
 
     @Transactional
     public SystemConfiguration getConfiguration() {
@@ -77,6 +78,7 @@ public class SystemConfigurationService {
                     config.setWalletMinWithdrawAmount(DEFAULT_WALLET_MIN_WITHDRAW_AMOUNT);
                     config.setWalletTransferMinAmount(DEFAULT_WALLET_TRANSFER_MIN);
                     config.setWalletTransferMaxAmount(DEFAULT_WALLET_TRANSFER_MAX);
+                    config.setWalletToWalletFeePercentage(DEFAULT_WALLET_TO_WALLET_FEE);
                     config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
                     return configurationRepository.save(config);
                 });
@@ -334,6 +336,33 @@ public class SystemConfigurationService {
         config.setWalletWithdrawRatio(current.getWalletWithdrawRatio());
         config.setWalletTransferMinAmount(current.getWalletTransferMinAmount());
         config.setWalletTransferMaxAmount(current.getWalletTransferMaxAmount());
+        config.setWalletToWalletFeePercentage(
+                current.getWalletToWalletFeePercentage() != null
+                        ? current.getWalletToWalletFeePercentage()
+                        : DEFAULT_WALLET_TO_WALLET_FEE);
         return config;
+    }
+
+    public BigDecimal getWalletToWalletFeePercentage() {
+        SystemConfiguration config = getConfiguration();
+        return config.getWalletToWalletFeePercentage() != null
+                ? config.getWalletToWalletFeePercentage()
+                : DEFAULT_WALLET_TO_WALLET_FEE;
+    }
+
+    @Transactional
+    public SystemConfiguration setWalletToWalletFeePercentage(BigDecimal percentage) {
+        if (percentage == null || percentage.compareTo(BigDecimal.ZERO) < 0
+                || percentage.compareTo(BigDecimal.ONE) > 0) {
+            throw new IllegalArgumentException("Wallet-to-wallet fee must be between 0 and 1");
+        }
+        SystemConfiguration current = getConfiguration();
+        SystemConfiguration config = copyConfig(current);
+        config.setWalletToWalletFeePercentage(percentage);
+        config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
+        SystemConfiguration saved = configurationRepository.save(config);
+        invalidateConfigCache();
+        logger.info("Wallet-to-wallet fee percentage updated to {}", percentage);
+        return saved;
     }
 }

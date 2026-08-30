@@ -163,7 +163,8 @@ public interface HizmatRequestRepository
   @jakarta.transaction.Transactional
   void deleteByChatId(Long chatId);
 
-  @Query("SELECT h FROM HizmatRequest h WHERE h.chatId = :chatId "
+  @Query("SELECT h FROM HizmatRequest h WHERE "
+      + "(h.chatId = :chatId OR ((h.type = com.example.shade.model.RequestType.WALLET_TO_WALLET OR h.type = com.example.shade.model.RequestType.TICKET_TRADE) AND h.recipientChatId = :chatId)) "
       + "AND ( (h.type <> com.example.shade.model.RequestType.WALLET_WITHDRAWAL AND h.type <> com.example.shade.model.RequestType.WITHDRAWAL AND h.status IN :successStatuses) "
       + "OR (h.type = com.example.shade.model.RequestType.WALLET_WITHDRAWAL AND h.status IN :withdrawalStatuses) "
       + "OR (h.type = com.example.shade.model.RequestType.WITHDRAWAL AND h.cardNumber = 'WALLET' AND h.status IN :successStatuses) ) "
@@ -172,6 +173,8 @@ public interface HizmatRequestRepository
       + "OR (h.type = com.example.shade.model.RequestType.WALLET_WITHDRAWAL) "
       + "OR h.type = com.example.shade.model.RequestType.WALLET_TO_PLATFORM "
       + "OR h.type = com.example.shade.model.RequestType.TIP "
+      + "OR h.type = com.example.shade.model.RequestType.WALLET_TO_WALLET "
+      + "OR h.type = com.example.shade.model.RequestType.TICKET_TRADE "
       + "OR (h.type = com.example.shade.model.RequestType.WITHDRAWAL AND h.cardNumber = 'WALLET') "
       + ") "
       + "ORDER BY h.createdAt DESC")
@@ -181,7 +184,8 @@ public interface HizmatRequestRepository
       @Param("withdrawalStatuses") List<RequestStatus> withdrawalStatuses,
       Pageable pageable);
 
-  @Query("SELECT COUNT(h) FROM HizmatRequest h WHERE h.chatId = :chatId "
+  @Query("SELECT COUNT(h) FROM HizmatRequest h WHERE "
+      + "(h.chatId = :chatId OR ((h.type = com.example.shade.model.RequestType.WALLET_TO_WALLET OR h.type = com.example.shade.model.RequestType.TICKET_TRADE) AND h.recipientChatId = :chatId)) "
       + "AND ( (h.type <> com.example.shade.model.RequestType.WALLET_WITHDRAWAL AND h.type <> com.example.shade.model.RequestType.WITHDRAWAL AND h.status IN :successStatuses) "
       + "OR (h.type = com.example.shade.model.RequestType.WALLET_WITHDRAWAL AND h.status IN :withdrawalStatuses) "
       + "OR (h.type = com.example.shade.model.RequestType.WITHDRAWAL AND h.cardNumber = 'WALLET' AND h.status IN :successStatuses) ) "
@@ -190,6 +194,8 @@ public interface HizmatRequestRepository
       + "OR (h.type = com.example.shade.model.RequestType.WALLET_WITHDRAWAL) "
       + "OR h.type = com.example.shade.model.RequestType.WALLET_TO_PLATFORM "
       + "OR h.type = com.example.shade.model.RequestType.TIP "
+      + "OR h.type = com.example.shade.model.RequestType.WALLET_TO_WALLET "
+      + "OR h.type = com.example.shade.model.RequestType.TICKET_TRADE "
       + "OR (h.type = com.example.shade.model.RequestType.WITHDRAWAL AND h.cardNumber = 'WALLET') "
       + ")")
   long countWalletHistoryByChatId(

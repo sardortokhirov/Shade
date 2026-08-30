@@ -91,6 +91,16 @@ public class DashboardService {
                                 .filter(r -> r.getStatus() == RequestStatus.APPROVED && r.getType() == RequestType.TIP)
                                 .mapToDouble(r -> r.getUniqueAmount() != null ? r.getUniqueAmount() : 0.0)
                                 .sum();
+                double totalWalletToWalletFees = byCreated.stream()
+                                .filter(r -> r.getStatus() == RequestStatus.APPROVED
+                                                && r.getType() == RequestType.WALLET_TO_WALLET)
+                                .mapToDouble(r -> r.getFeeAmount() != null ? r.getFeeAmount() : 0.0)
+                                .sum();
+                double totalTicketTradeFees = byCreated.stream()
+                                .filter(r -> r.getStatus() == RequestStatus.APPROVED
+                                                && r.getType() == RequestType.TICKET_TRADE)
+                                .mapToDouble(r -> r.getFeeAmount() != null ? r.getFeeAmount() : 0.0)
+                                .sum();
                 // Bonus uses approval event time (approvedAt/createdAt), same as before.
                 double totalApprovedBonusAmount = all.stream()
                                 .filter(r -> r.getStatus() == RequestStatus.BONUS_APPROVED)
@@ -167,6 +177,7 @@ public class DashboardService {
                                 requestsByPlatform,
                                 requestsByDate, amountByPlatform, averageApprovedAmount, topUsers, recentRequests,
                                 totalApprovedTopUpAmount, totalApprovedBonusAmount, totalApprovedTipAmount,
+                                totalWalletToWalletFees, totalTicketTradeFees,
                                 platformGraphData);
         }
 

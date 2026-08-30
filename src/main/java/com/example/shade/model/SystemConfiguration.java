@@ -107,6 +107,15 @@ public class SystemConfiguration {
     @Column(name = "wallet_transfer_max_amount", columnDefinition = "bigint default 10000000")
     private Long walletTransferMaxAmount = 10_000_000L;
 
+    /**
+     * Fee fraction for wallet-to-wallet transfers (e.g. 0.05 = 5%).
+     * Deducted from the sent amount; receiver gets the remainder.
+     */
+    @Column(name = "wallet_to_wallet_fee_percentage", nullable = false, precision = 9, scale = 8,
+            columnDefinition = "numeric(9,8) default 0")
+    @JsonSerialize(using = BigDecimalPlainSerializer.class)
+    private BigDecimal walletToWalletFeePercentage = BigDecimal.ZERO;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
