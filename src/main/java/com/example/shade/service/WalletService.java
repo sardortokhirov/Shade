@@ -78,7 +78,8 @@ public class WalletService {
         message.setChatId(chatId.toString());
         message.setText(String.format(
                 languageSessionService.getTranslation(chatId, "wallet.message.menu"),
-                walletAmount));
+                chatId,
+                walletAmount != null ? walletAmount : 0L));
 
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();

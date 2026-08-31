@@ -232,7 +232,7 @@ contact.button.home=🏠 Bosh sahifa
 button.wallet=💰 Hamyon
 
 # Wallet
-wallet.message.menu=💳 Hamyon:\nBalans: %,d so'm\n\nQuyidagi amallardan birini tanlang:
+wallet.message.menu=💳 Hamyon:\n🆔 Telegram ID: `%d`\nBalans: %,d so'm\n\nBoshqa foydalanuvchi shu ID orqali sizga pul o'tkazishi mumkin.\n\nQuyidagi amallardan birini tanlang:
 wallet.button.topup=💳 Hamyonni to'ldirish
 wallet.button.deposit=📥 Kontorani to'ldirish
 wallet.button.withdraw=💸 Kartaga pul yechish
