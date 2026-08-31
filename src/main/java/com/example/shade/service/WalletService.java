@@ -1407,7 +1407,7 @@ public class WalletService {
                 messageSender.sendMessage(m, chatId);
                 return;
             }
-            if (blockedUserRepository.existsByChatId(recipientId)) {
+            if (isChatBlocked(recipientId)) {
                 SendMessage m = new SendMessage();
                 m.setChatId(chatId.toString());
                 m.setText(languageSessionService.getTranslation(chatId, "wallet.message.p2p_recipient_blocked"));
@@ -1555,8 +1555,7 @@ public class WalletService {
                         languageSessionService.getTranslation(chatId, "wallet.message.invalid_amount"));
                 return;
             }
-            if (blockedUserRepository.existsByChatId(recipientId)
-                    || blockedUserRepository.existsByChatId(chatId)) {
+            if (isChatBlocked(recipientId) || isChatBlocked(chatId)) {
                 sessionService.setUserState(chatId, "WALLET_MENU");
                 messageSender.sendMessage(chatId,
                         languageSessionService.getTranslation(chatId, "wallet.message.p2p_recipient_blocked"));
@@ -1789,6 +1788,15 @@ public class WalletService {
     }
 
     // ----- UTILS -----
+
+    /**
+     * blocked_user holds every user's phone. A ban is only phoneNumber = "BLOCKED".
+     */
+    private boolean isChatBlocked(Long chatId) {
+        return blockedUserRepository.findByChatId(chatId)
+                .map(u -> "BLOCKED".equals(u.getPhoneNumber()))
+                .orElse(false);
+    }
 
     private UserBalance getOrCreateUserBalance(Long chatId) {
         return userBalanceRepository.findById(chatId).orElseGet(() -> {

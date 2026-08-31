@@ -59,6 +59,7 @@ class TicketMarketplaceServiceTest {
         when(lotteryConfigService.getP2pMinPricePerTicket()).thenReturn(1000L);
         when(lotteryConfigService.getP2pFeePercentage()).thenReturn(new BigDecimal("0.05"));
         when(blockedUserRepository.existsByChatId(anyLong())).thenReturn(false);
+        when(blockedUserRepository.findByChatId(anyLong())).thenReturn(Optional.empty());
     }
 
     @Test

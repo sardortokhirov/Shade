@@ -392,8 +392,7 @@ public class TicketMarketplaceService {
                     languageSessionService.getTranslation(buyerChatId, "lottery.trade.cannot_buy_own"));
             return;
         }
-        if (blockedUserRepository.existsByChatId(buyerChatId)
-                || blockedUserRepository.existsByChatId(sellerChatId)) {
+        if (isChatBlocked(buyerChatId) || isChatBlocked(sellerChatId)) {
             messageSender.sendMessage(buyerChatId,
                     languageSessionService.getTranslation(buyerChatId, "lottery.trade.blocked"));
             return;
@@ -557,6 +556,12 @@ public class TicketMarketplaceService {
         m.enableMarkdown(true);
         messageSender.sendMessage(m, chatId);
         sendMyListings(chatId);
+    }
+
+    private boolean isChatBlocked(Long chatId) {
+        return blockedUserRepository.findByChatId(chatId)
+                .map(u -> "BLOCKED".equals(u.getPhoneNumber()))
+                .orElse(false);
     }
 
     private UserBalance getOrCreateBalance(Long chatId) {

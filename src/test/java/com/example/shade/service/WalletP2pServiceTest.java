@@ -64,6 +64,7 @@ class WalletP2pServiceTest {
         when(languageSessionService.getTranslation(anyLong(), anyString())).thenReturn("ok");
         when(configurationService.getWalletToWalletFeePercentage()).thenReturn(new BigDecimal("0.05"));
         when(blockedUserRepository.existsByChatId(anyLong())).thenReturn(false);
+        when(blockedUserRepository.findByChatId(anyLong())).thenReturn(Optional.empty());
         when(sessionService.compareAndSetState(anyLong(), eq("WALLET_P2P_CONFIRM"), eq("WALLET_P2P_PROCESSING")))
                 .thenReturn(true);
         when(configurationService.getWalletTransferMinAmount()).thenReturn(1L);
@@ -126,7 +127,11 @@ class WalletP2pServiceTest {
     void processWalletToWalletRejectsBlockedRecipient() {
         when(sessionService.getUserData(1L, "p2pRecipientId")).thenReturn("2");
         when(sessionService.consumeUserData(1L, "p2pAmount")).thenReturn("5000");
-        when(blockedUserRepository.existsByChatId(2L)).thenReturn(true);
+        when(blockedUserRepository.findByChatId(2L)).thenReturn(Optional.of(
+                com.example.shade.model.BlockedUser.builder()
+                        .chatId(2L)
+                        .phoneNumber("BLOCKED")
+                        .build()));
 
         walletService.processWalletToWallet(1L);
 
