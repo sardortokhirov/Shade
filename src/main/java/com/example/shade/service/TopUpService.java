@@ -2514,25 +2514,14 @@ public class TopUpService {
     }
 
     private InlineKeyboardMarkup createMainMenuKeyboard(Long chatId) {
-        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-        rows.add(List.of(
-                createButton(languageSessionService.getTranslation(chatId, "topup.button.topup_account"), "TOPUP")));
-        rows.add(List
-                .of(createButton(languageSessionService.getTranslation(chatId, "topup.button.withdraw"), "WITHDRAW")));
-        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.wallet"), "WALLET")));
-        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "topup.button.bonus"), "BONUS")));
-        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.bozor"), "BOZOR")));
-        rows.add(List
-                .of(createButton(languageSessionService.getTranslation(chatId, "topup.button.contact"), "CONTACT")));
-
-        InlineKeyboardButton instructionButton = new InlineKeyboardButton();
-        instructionButton.setText(languageSessionService.getTranslation(chatId, "button.instruction"));
-        instructionButton.setUrl("https://t.me/BaronPeyInfo");
-        rows.add(List.of(instructionButton));
-
-        markup.setKeyboard(rows);
-        return markup;
+        return com.example.shade.bot.MainMenuKeyboard.build(
+                languageSessionService.getTranslation(chatId, "topup.button.topup_account"),
+                languageSessionService.getTranslation(chatId, "topup.button.withdraw"),
+                languageSessionService.getTranslation(chatId, "button.wallet"),
+                languageSessionService.getTranslation(chatId, "topup.button.bonus"),
+                languageSessionService.getTranslation(chatId, "button.bozor"),
+                languageSessionService.getTranslation(chatId, "topup.button.contact"),
+                languageSessionService.getTranslation(chatId, "button.instruction"));
     }
 
     private List<InlineKeyboardButton> createNavigationButtons(Long chatId) {

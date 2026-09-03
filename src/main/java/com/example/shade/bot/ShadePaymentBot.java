@@ -661,23 +661,7 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
     }
 
     private InlineKeyboardMarkup createMainMenuKeyboard(Long chatId) {
-        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.topup"), "TOPUP")));
-        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.withdraw"), "WITHDRAW")));
-        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.wallet"), "WALLET")));
-        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.bonus"), "BONUS")));
-        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.bozor"), "BOZOR")));
-
-        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.contact"), "CONTACT")));
-
-        InlineKeyboardButton instructionButton = new InlineKeyboardButton();
-        instructionButton.setText(languageSessionService.getTranslation(chatId, "button.instruction"));
-        instructionButton.setUrl("https://t.me/BaronPeyInfo");
-        rows.add(List.of(instructionButton));
-
-        markup.setKeyboard(rows);
-        return markup;
+        return MainMenuKeyboard.build(languageSessionService::getTranslation, chatId);
     }
 
     private InlineKeyboardMarkup createBonusMenuKeyboard(Long chatId) {

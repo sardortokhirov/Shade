@@ -1843,19 +1843,8 @@ public class WalletService {
         SendMessage message = new SendMessage();
         message.setChatId(chatId);
         message.setText(languageSessionService.getTranslation(chatId, "message.main_menu_welcome"));
-
-        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.topup"), "TOPUP")));
-        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.withdraw"), "WITHDRAW")));
-        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.bonus"), "BONUS")));
-        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.wallet"), "WALLET")));
-        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.bozor"), "BOZOR")));
-        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.contact"), "CONTACT")));
-        rows.add(List.of(createUrlButton(languageSessionService.getTranslation(chatId, "button.instruction"), "https://t.me/BaronPeyInfo")));
-        markup.setKeyboard(rows);
-
-        message.setReplyMarkup(markup);
+        message.setReplyMarkup(com.example.shade.bot.MainMenuKeyboard.build(
+                languageSessionService::getTranslation, chatId));
         messageSender.sendMessage(message, chatId);
     }
 
