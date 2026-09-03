@@ -36,7 +36,7 @@ public class EarlySchemaFixer implements BeanPostProcessor, PriorityOrdered {
         return bean;
     }
 
-    static void ensureTicketListingSide(DataSource dataSource) {
+    private void ensureTicketListingSide(DataSource dataSource) {
         try (Connection connection = dataSource.getConnection();
              Statement statement = connection.createStatement()) {
             statement.execute(
