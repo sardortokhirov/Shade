@@ -57,6 +57,7 @@ class TicketMarketplaceServiceTest {
 
         when(languageSessionService.getTranslation(anyLong(), anyString())).thenReturn("ok");
         when(lotteryConfigService.getP2pMinPricePerTicket()).thenReturn(1000L);
+        when(lotteryConfigService.getP2pBuyOfferMinPricePerTicket()).thenReturn(900L);
         when(lotteryConfigService.getP2pFeePercentage()).thenReturn(new BigDecimal("0.05"));
         when(blockedUserRepository.existsByChatId(anyLong())).thenReturn(false);
         when(blockedUserRepository.findByChatId(anyLong())).thenReturn(Optional.empty());
@@ -231,6 +232,50 @@ class TicketMarketplaceServiceTest {
                         && l.getTotalPrice() == 12_000L
                         && l.getStatus() == TicketListingStatus.ACTIVE
                         && buyerId.equals(l.getSellerChatId())));
+    }
+
+    @Test
+    void createBuyOfferAllowsTenPercentBelowSellMin() {
+        Long buyerId = 20L;
+        when(lotteryConfigService.getP2pMinPricePerTicket()).thenReturn(1000L);
+        when(lotteryConfigService.getP2pBuyOfferMinPricePerTicket()).thenReturn(900L);
+        UserBalance buyer = UserBalance.builder()
+                .chatId(buyerId)
+                .tickets(0L)
+                .balance(BigDecimal.ZERO)
+                .walletBalance(50_000L)
+                .build();
+        when(userBalanceRepository.findByIdWithLock(buyerId)).thenReturn(Optional.of(buyer));
+        when(ticketListingRepository.save(any(TicketListing.class))).thenAnswer(inv -> {
+            TicketListing listing = inv.getArgument(0);
+            listing.setId(15L);
+            return listing;
+        });
+
+        service.createBuyOffer(buyerId, 2L, 1_800L);
+
+        assertEquals(48_200L, buyer.getWalletBalance());
+        verify(ticketListingRepository).save(argThat(l ->
+                l.getSide() == TicketListingSide.BUY_OFFER && l.getTotalPrice() == 1_800L));
+    }
+
+    @Test
+    void createBuyOfferRejectsBelowTenPercentDiscountedMin() {
+        Long buyerId = 20L;
+        when(lotteryConfigService.getP2pMinPricePerTicket()).thenReturn(1000L);
+        when(lotteryConfigService.getP2pBuyOfferMinPricePerTicket()).thenReturn(900L);
+        UserBalance buyer = UserBalance.builder()
+                .chatId(buyerId)
+                .tickets(0L)
+                .balance(BigDecimal.ZERO)
+                .walletBalance(50_000L)
+                .build();
+        when(userBalanceRepository.findByIdWithLock(buyerId)).thenReturn(Optional.of(buyer));
+
+        service.createBuyOffer(buyerId, 2L, 1_799L);
+
+        assertEquals(50_000L, buyer.getWalletBalance());
+        verify(ticketListingRepository, never()).save(any());
     }
 
     @Test

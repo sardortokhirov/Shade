@@ -357,7 +357,7 @@ public class TicketMarketplaceService {
     private void sendOfferQuantityPrompt(Long chatId) {
         UserBalance balance = getOrCreateBalance(chatId);
         long wallet = balance.getWalletBalance() != null ? balance.getWalletBalance() : 0L;
-        long minPrice = lotteryConfigService.getP2pMinPricePerTicket();
+        long minPrice = lotteryConfigService.getP2pBuyOfferMinPricePerTicket();
         SendMessage m = new SendMessage();
         m.setChatId(chatId.toString());
         m.setText(String.format(
@@ -407,7 +407,8 @@ public class TicketMarketplaceService {
             sessionService.setUserData(chatId, "tradeSellQty", String.valueOf(qty));
             sessionService.setUserState(chatId, "LOTTERY_TRADE_SELL_PRICE");
             sessionService.addNavigationState(chatId, "LOTTERY_TRADE_SELL_QTY");
-            sendPricePrompt(chatId, qty, "lottery.trade.sell_enter_price", "LOTTERY_TRADE_SELL_PRICE:");
+            sendPricePrompt(chatId, qty, "lottery.trade.sell_enter_price", "LOTTERY_TRADE_SELL_PRICE:",
+                    lotteryConfigService.getP2pMinPricePerTicket());
         } catch (NumberFormatException e) {
             messageSender.sendMessage(chatId,
                     languageSessionService.getTranslation(chatId, "lottery.trade.invalid_qty"));
@@ -425,15 +426,16 @@ public class TicketMarketplaceService {
             sessionService.setUserData(chatId, "tradeOfferQty", String.valueOf(qty));
             sessionService.setUserState(chatId, "LOTTERY_TRADE_OFFER_PRICE");
             sessionService.addNavigationState(chatId, "LOTTERY_TRADE_OFFER_QTY");
-            sendPricePrompt(chatId, qty, "lottery.trade.offer_enter_price", "LOTTERY_TRADE_OFFER_PRICE:");
+            sendPricePrompt(chatId, qty, "lottery.trade.offer_enter_price", "LOTTERY_TRADE_OFFER_PRICE:",
+                    lotteryConfigService.getP2pBuyOfferMinPricePerTicket());
         } catch (NumberFormatException e) {
             messageSender.sendMessage(chatId,
                     languageSessionService.getTranslation(chatId, "lottery.trade.invalid_qty"));
         }
     }
 
-    private void sendPricePrompt(Long chatId, long qty, String textKey, String priceCallbackPrefix) {
-        long minTotal = qty * lotteryConfigService.getP2pMinPricePerTicket();
+    private void sendPricePrompt(Long chatId, long qty, String textKey, String priceCallbackPrefix, long minPerTicket) {
+        long minTotal = Math.multiplyExact(qty, minPerTicket);
         SendMessage m = new SendMessage();
         m.setChatId(chatId.toString());
         m.setText(String.format(
@@ -442,7 +444,7 @@ public class TicketMarketplaceService {
         m.enableMarkdown(true);
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-        for (long price : suggestedTotals(qty, lotteryConfigService.getP2pMinPricePerTicket())) {
+        for (long price : suggestedTotals(qty, minPerTicket)) {
             rows.add(List.of(createButton(
                     String.format(languageSessionService.getTranslation(chatId, "lottery.trade.button.price"), price),
                     priceCallbackPrefix + price)));
@@ -525,7 +527,7 @@ public class TicketMarketplaceService {
             }
             String qtyStr = qtyOpt.get();
             long qty = Long.parseLong(qtyStr);
-            long minPerTicket = lotteryConfigService.getP2pMinPricePerTicket();
+            long minPerTicket = lotteryConfigService.getP2pBuyOfferMinPricePerTicket();
             long minTotal = Math.multiplyExact(qty, minPerTicket);
             if (price < minTotal) {
                 sessionService.setUserData(chatId, "tradeOfferQty", qtyStr);
@@ -606,7 +608,7 @@ public class TicketMarketplaceService {
 
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public boolean createBuyOffer(Long chatId, long quantity, long totalPrice) {
-        long minPerTicket = lotteryConfigService.getP2pMinPricePerTicket();
+        long minPerTicket = lotteryConfigService.getP2pBuyOfferMinPricePerTicket();
         if (quantity < 1 || minPerTicket < 1
                 || quantity > Long.MAX_VALUE / minPerTicket
                 || totalPrice < quantity * minPerTicket) {

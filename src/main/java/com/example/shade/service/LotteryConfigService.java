@@ -23,6 +23,8 @@ public class LotteryConfigService {
     private static final BigDecimal DEFAULT_WINNINGS_PERCENTAGE = BigDecimal.ZERO;
     private static final Long DEFAULT_P2P_MIN_PRICE_PER_TICKET = 1L;
     private static final BigDecimal DEFAULT_P2P_FEE_PERCENTAGE = BigDecimal.ZERO;
+    /** Buy offers may start 10% below the sell-side min price per ticket. */
+    private static final BigDecimal BUY_OFFER_PRICE_DISCOUNT = new BigDecimal("0.10");
 
     @PostConstruct
     public void init() {
@@ -109,6 +111,22 @@ public class LotteryConfigService {
         return config.getP2pMinPricePerTicket() != null
                 ? config.getP2pMinPricePerTicket()
                 : DEFAULT_P2P_MIN_PRICE_PER_TICKET;
+    }
+
+    /**
+     * Minimum UZS per ticket for buy offers: 10% below sell-side min (floor), at least 1.
+     * Example: sell min 10_000 → buy-offer min 9_000.
+     */
+    public long getP2pBuyOfferMinPricePerTicket() {
+        long sellMin = getP2pMinPricePerTicket();
+        if (sellMin <= 1L) {
+            return 1L;
+        }
+        long discount = BigDecimal.valueOf(sellMin)
+                .multiply(BUY_OFFER_PRICE_DISCOUNT)
+                .setScale(0, java.math.RoundingMode.DOWN)
+                .longValue();
+        return Math.max(1L, sellMin - discount);
     }
 
     public BigDecimal getP2pFeePercentage() {
