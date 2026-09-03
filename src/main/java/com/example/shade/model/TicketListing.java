@@ -19,8 +19,14 @@ public class TicketListing {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** Listing owner: ticket seller for SELL, money poster for BUY_OFFER. */
     @Column(name = "seller_chat_id", nullable = false)
     private Long sellerChatId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "side", nullable = false, length = 16)
+    @Builder.Default
+    private TicketListingSide side = TicketListingSide.SELL;
 
     @Column(name = "ticket_quantity", nullable = false)
     private Long ticketQuantity;

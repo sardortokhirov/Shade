@@ -2522,6 +2522,7 @@ public class TopUpService {
                 .of(createButton(languageSessionService.getTranslation(chatId, "topup.button.withdraw"), "WITHDRAW")));
         rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.wallet"), "WALLET")));
         rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "topup.button.bonus"), "BONUS")));
+        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.bozor"), "BOZOR")));
         rows.add(List
                 .of(createButton(languageSessionService.getTranslation(chatId, "topup.button.contact"), "CONTACT")));
 

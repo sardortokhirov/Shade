@@ -498,6 +498,14 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                     }
                     walletService.startWallet(chatId, "MAIN");
                 }
+                case "BOZOR" -> {
+                    if (!featureService.canPerformBonus()) {
+                        messageSender.sendMessage(chatId,
+                                languageSessionService.getTranslation(chatId, "message.feature_unavailable"));
+                        return;
+                    }
+                    ticketMarketplaceService.handleCallback(chatId, "LOTTERY_TRADE_MENU:HOME");
+                }
                 case "CONTACT" -> {
                     // messageSender.animateAndDeleteMessages(chatId,
                     // sessionService.getMessageIds(chatId), "OPEN");
@@ -515,7 +523,9 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
                     } else if (state != null && state.startsWith("BONUS_")) {
                         bonusService.handleBack(chatId);
                     } else if (state != null && state.startsWith("LOTTERY_TRADE_")) {
-                        ticketMarketplaceService.handleBack(chatId);
+                        if (ticketMarketplaceService.handleBack(chatId)) {
+                            sendMainMenu(chatId, true);
+                        }
                     } else if (state != null && state.startsWith("WALLET_")) {
                         if (walletService.handleBack(chatId)) {
                             sessionService.removeUserData(chatId, "returnToMainMenu");
@@ -657,6 +667,7 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
         rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.withdraw"), "WITHDRAW")));
         rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.wallet"), "WALLET")));
         rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.bonus"), "BONUS")));
+        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.bozor"), "BOZOR")));
 
         rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.contact"), "CONTACT")));
 

@@ -43,6 +43,37 @@ public class UserSessionService {
         }
     }
 
+    /**
+     * One-shot action: only the first caller that sees {@code expected} state wins.
+     * Advances state to {@code next} and consumes {@code dataKey} under the same lock
+     * so a double-tap cannot start two money/ticket mutations.
+     *
+     * @return consumed value, or empty if state mismatch or key already consumed
+     */
+    public Optional<String> beginOneShot(Long chatId, String expected, String next, String dataKey) {
+        if (chatId == null || expected == null || dataKey == null) {
+            return Optional.empty();
+        }
+        UserSession session = sessionStore.computeIfAbsent(chatId, k -> new UserSession());
+        synchronized (session) {
+            if (!expected.equals(session.getState())) {
+                return Optional.empty();
+            }
+            Map<String, String> data = sessionDataStore.get(chatId);
+            String value = data != null ? data.get(dataKey) : null;
+            if (value == null) {
+                return Optional.empty();
+            }
+            data.remove(dataKey);
+            if (data.isEmpty()) {
+                sessionDataStore.remove(chatId);
+            }
+            session.setChatId(chatId);
+            session.setState(next);
+            return Optional.of(value);
+        }
+    }
+
     public String getUserState(Long chatId) {
         return Optional.ofNullable(sessionStore.get(chatId))
                 .map(UserSession::getState)

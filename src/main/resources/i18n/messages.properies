@@ -14,9 +14,10 @@ message.invalid_command=Iltimos, menyudan operatsiyani tanlang.
 message.unknown_callback=Noto‘g‘ri buyruq. Iltimos, qayta urinib ko‘ring.
 message.callback_error=Xatolik yuz berdi. Iltimos, qayta urinib ko‘ring.
 message.main_menu_welcome=Xush kelibsiz! Operatsiyani tanlang:
-button.topup=🏦 Hisob To'ldirish
-button.withdraw=💸 Pul Chiqarish
-button.bonus=🎁 Bonus
+button.topup=🟢 Hisob To'ldirish
+button.withdraw=🔴 Pul Chiqarish
+button.bonus=🟣 Bonus
+button.bozor=🔵 Bozor
 button.contact=ℹ️ Aloqa
 button.back=🔙 Orqaga
 button.home=🏠 Bosh sahifa
@@ -229,7 +230,7 @@ contact.button.chat=💬 Chat
 contact.button.back=🔙 Orqaga
 contact.button.home=🏠 Bosh sahifa
 
-button.wallet=💰 Hamyon
+button.wallet=🟡 Hamyon
 
 # Wallet
 wallet.message.menu=💳 Hamyon:\n🆔 Telegram ID: `%d`\nBalans: %,d so'm\n\nBoshqa foydalanuvchi shu ID orqali sizga pul o'tkazishi mumkin.\n\nQuyidagi amallardan birini tanlang:

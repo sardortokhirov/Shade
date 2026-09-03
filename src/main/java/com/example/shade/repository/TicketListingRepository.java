@@ -1,6 +1,7 @@
 package com.example.shade.repository;
 
 import com.example.shade.model.TicketListing;
+import com.example.shade.model.TicketListingSide;
 import com.example.shade.model.TicketListingStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
@@ -20,6 +21,9 @@ public interface TicketListingRepository extends JpaRepository<TicketListing, Lo
     Optional<TicketListing> findByIdWithLock(@Param("id") Long id);
 
     Page<TicketListing> findByStatusOrderByCreatedAtDesc(TicketListingStatus status, Pageable pageable);
+
+    Page<TicketListing> findByStatusAndSideOrderByCreatedAtDesc(
+            TicketListingStatus status, TicketListingSide side, Pageable pageable);
 
     List<TicketListing> findBySellerChatIdAndStatusOrderByCreatedAtDesc(Long sellerChatId, TicketListingStatus status);
 

@@ -970,6 +970,7 @@ public class WithdrawService {
         rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.wallet"), "WALLET")));
         rows.add(
                 List.of(createButton(languageSessionService.getTranslation(chatId, "withdraw.button.bonus"), "BONUS")));
+        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.bozor"), "BOZOR")));
         rows.add(List
                 .of(createButton(languageSessionService.getTranslation(chatId, "withdraw.button.contact"), "CONTACT")));
         InlineKeyboardButton instructionButton = new InlineKeyboardButton();

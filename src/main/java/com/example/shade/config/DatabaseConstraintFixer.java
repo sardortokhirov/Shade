@@ -57,6 +57,7 @@ public class DatabaseConstraintFixer {
                     "CREATE TABLE IF NOT EXISTS ticket_listing ("
                             + "id BIGSERIAL PRIMARY KEY, "
                             + "seller_chat_id BIGINT NOT NULL, "
+                            + "side VARCHAR(16) NOT NULL DEFAULT 'SELL', "
                             + "ticket_quantity BIGINT NOT NULL, "
                             + "total_price BIGINT NOT NULL, "
                             + "status VARCHAR(32) NOT NULL, "
@@ -65,6 +66,8 @@ public class DatabaseConstraintFixer {
                             + "net_amount BIGINT, "
                             + "created_at TIMESTAMP NOT NULL, "
                             + "sold_at TIMESTAMP)");
+            jdbcTemplate.execute(
+                    "ALTER TABLE ticket_listing ADD COLUMN IF NOT EXISTS side VARCHAR(16) NOT NULL DEFAULT 'SELL'");
             logger.info("Ensured wallet P2P / lottery trade columns and ticket_listing table exist");
         } catch (Exception e) {
             logger.warn("Could not ensure wallet P2P / lottery trade schema: {}", e.getMessage());
