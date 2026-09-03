@@ -136,7 +136,7 @@ class TicketMarketplaceServiceTest {
         when(ticketListingRepository.findByIdWithLock(7L)).thenReturn(Optional.of(listing));
         when(userBalanceRepository.findByIdWithLock(sellerId)).thenReturn(Optional.of(seller));
         when(userBalanceRepository.findByIdWithLock(buyerId)).thenReturn(Optional.of(buyer));
-        when(ticketListingRepository.findByStatusAndSideOrderByCreatedAtDesc(any(), any(), any()))
+        when(ticketListingRepository.findByStatusAndSideOrderByTotalPriceAscCreatedAtAsc(any(), any(), any()))
                 .thenReturn(org.springframework.data.domain.Page.empty());
 
         service.buyListing(buyerId, 7L);
@@ -279,7 +279,7 @@ class TicketMarketplaceServiceTest {
         when(ticketListingRepository.findByIdWithLock(9L)).thenReturn(Optional.of(listing));
         when(userBalanceRepository.findByIdWithLock(sellerId)).thenReturn(Optional.of(seller));
         when(userBalanceRepository.findByIdWithLock(buyerId)).thenReturn(Optional.of(buyer));
-        when(ticketListingRepository.findByStatusAndSideOrderByCreatedAtDesc(any(), any(), any()))
+        when(ticketListingRepository.findByStatusAndSideOrderByTotalPriceAscCreatedAtAsc(any(), any(), any()))
                 .thenReturn(org.springframework.data.domain.Page.empty());
 
         service.fulfillOffer(sellerId, 9L);

@@ -1,6 +1,7 @@
 package com.example.shade.service;
 
 import com.example.shade.bot.MessageSender;
+import com.example.shade.bot.StyledInlineKeyboardButton;
 import com.example.shade.model.*;
 import com.example.shade.repository.BlockedUserRepository;
 import com.example.shade.repository.HizmatRequestRepository;
@@ -195,18 +196,18 @@ public class TicketMarketplaceService {
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         rows.add(List.of(createButton(
                 languageSessionService.getTranslation(chatId, "lottery.trade.button.browse"),
-                "LOTTERY_TRADE_BROWSE:0")));
+                "LOTTERY_TRADE_BROWSE:0", StyledInlineKeyboardButton.STYLE_PRIMARY)));
         rows.add(List.of(createButton(
                 languageSessionService.getTranslation(chatId, "lottery.trade.button.browse_offers"),
-                "LOTTERY_TRADE_OFFERS:0")));
+                "LOTTERY_TRADE_OFFERS:0", StyledInlineKeyboardButton.STYLE_PRIMARY)));
         rows.add(List.of(
                 createButton(languageSessionService.getTranslation(chatId, "lottery.trade.button.sell"),
-                        "LOTTERY_TRADE_SELL"),
+                        "LOTTERY_TRADE_SELL", StyledInlineKeyboardButton.STYLE_DANGER),
                 createButton(languageSessionService.getTranslation(chatId, "lottery.trade.button.offer"),
-                        "LOTTERY_TRADE_OFFER")));
+                        "LOTTERY_TRADE_OFFER", StyledInlineKeyboardButton.STYLE_SUCCESS)));
         rows.add(List.of(createButton(
                 languageSessionService.getTranslation(chatId, "lottery.trade.button.my"),
-                "LOTTERY_TRADE_MY")));
+                "LOTTERY_TRADE_MY", StyledInlineKeyboardButton.STYLE_PRIMARY)));
         rows.add(navRow(chatId));
         markup.setKeyboard(rows);
         m.setReplyMarkup(markup);
@@ -218,7 +219,7 @@ public class TicketMarketplaceService {
             page = 0;
         }
         boolean offers = isBuyOfferSide(side);
-        Page<TicketListing> listings = ticketListingRepository.findByStatusAndSideOrderByCreatedAtDesc(
+        Page<TicketListing> listings = ticketListingRepository.findByStatusAndSideOrderByTotalPriceAscCreatedAtAsc(
                 TicketListingStatus.ACTIVE, offers ? TicketListingSide.BUY_OFFER : TicketListingSide.SELL,
                 PageRequest.of(page, PAGE_SIZE));
         if (listings.isEmpty() && page > 0) {
@@ -255,17 +256,20 @@ public class TicketMarketplaceService {
                     rows.add(List.of(createButton(
                             String.format(languageSessionService.getTranslation(chatId, "lottery.trade.button.cancel_item"),
                                     listing.getId()),
-                            "LOTTERY_TRADE_CANCEL:" + listing.getId())));
+                            "LOTTERY_TRADE_CANCEL:" + listing.getId(),
+                            StyledInlineKeyboardButton.STYLE_DANGER)));
                 } else if (offers) {
                     rows.add(List.of(createButton(
                             String.format(languageSessionService.getTranslation(chatId, "lottery.trade.button.fulfill_item"),
                                     listing.getId(), listing.getTotalPrice()),
-                            "LOTTERY_TRADE_FULFILL:" + listing.getId())));
+                            "LOTTERY_TRADE_FULFILL:" + listing.getId(),
+                            StyledInlineKeyboardButton.STYLE_SUCCESS)));
                 } else {
                     rows.add(List.of(createButton(
                             String.format(languageSessionService.getTranslation(chatId, "lottery.trade.button.buy_item"),
                                     listing.getId(), listing.getTotalPrice()),
-                            "LOTTERY_TRADE_BUY:" + listing.getId())));
+                            "LOTTERY_TRADE_BUY:" + listing.getId(),
+                            StyledInlineKeyboardButton.STYLE_SUCCESS)));
                 }
             }
             m.setText(sb.toString());
@@ -314,7 +318,8 @@ public class TicketMarketplaceService {
                 rows.add(List.of(createButton(
                         String.format(languageSessionService.getTranslation(chatId, "lottery.trade.button.cancel_item"),
                                 listing.getId()),
-                        "LOTTERY_TRADE_CANCEL:" + listing.getId())));
+                        "LOTTERY_TRADE_CANCEL:" + listing.getId(),
+                        StyledInlineKeyboardButton.STYLE_DANGER)));
             }
             m.setText(sb.toString());
         }
@@ -1010,15 +1015,18 @@ public class TicketMarketplaceService {
     }
 
     private InlineKeyboardButton createButton(String text, String callback) {
-        InlineKeyboardButton button = new InlineKeyboardButton();
-        button.setText(text);
-        button.setCallbackData(callback);
-        return button;
+        return createButton(text, callback, null);
+    }
+
+    private InlineKeyboardButton createButton(String text, String callback, String style) {
+        return StyledInlineKeyboardButton.callback(text, callback, style);
     }
 
     private List<InlineKeyboardButton> navRow(Long chatId) {
         return List.of(
-                createButton(languageSessionService.getTranslation(chatId, "button.back"), "BACK"),
-                createButton(languageSessionService.getTranslation(chatId, "button.home"), "HOME"));
+                createButton(languageSessionService.getTranslation(chatId, "button.back"), "BACK",
+                        StyledInlineKeyboardButton.STYLE_PRIMARY),
+                createButton(languageSessionService.getTranslation(chatId, "button.home"), "HOME",
+                        StyledInlineKeyboardButton.STYLE_SUCCESS));
     }
 }

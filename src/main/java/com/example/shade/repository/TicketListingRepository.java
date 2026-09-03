@@ -22,7 +22,7 @@ public interface TicketListingRepository extends JpaRepository<TicketListing, Lo
 
     Page<TicketListing> findByStatusOrderByCreatedAtDesc(TicketListingStatus status, Pageable pageable);
 
-    Page<TicketListing> findByStatusAndSideOrderByCreatedAtDesc(
+    Page<TicketListing> findByStatusAndSideOrderByTotalPriceAscCreatedAtAsc(
             TicketListingStatus status, TicketListingSide side, Pageable pageable);
 
     List<TicketListing> findBySellerChatIdAndStatusOrderByCreatedAtDesc(Long sellerChatId, TicketListingStatus status);

@@ -18,5 +18,7 @@ class MainMenuKeyboardTest {
         assertTrue(json.contains("\"style\":\"primary\""), json);
         assertTrue(json.contains("\"callback_data\":\"TOPUP\""), json);
         assertTrue(json.contains("\"callback_data\":\"BOZOR\""), json);
+        assertTrue(json.contains("\"callback_data\":\"CONTACT\""), json);
+        assertTrue(json.contains("\"url\":\"https://t.me/BaronPeyInfo\""), json);
     }
 }

@@ -45,11 +45,13 @@ public final class MainMenuKeyboard {
         rows.add(List.of(StyledInlineKeyboardButton.callback(
                 wallet, "WALLET", StyledInlineKeyboardButton.STYLE_PRIMARY)));
         rows.add(List.of(StyledInlineKeyboardButton.callback(
-                bonus, "BONUS", StyledInlineKeyboardButton.STYLE_PRIMARY)));
+                bonus, "BONUS", StyledInlineKeyboardButton.STYLE_SUCCESS)));
         rows.add(List.of(StyledInlineKeyboardButton.callback(
-                bozor, "BOZOR", StyledInlineKeyboardButton.STYLE_PRIMARY)));
-        rows.add(List.of(StyledInlineKeyboardButton.callback(contact, "CONTACT")));
-        rows.add(List.of(StyledInlineKeyboardButton.url(instruction, INSTRUCTION_URL, null)));
+                bozor, "BOZOR", StyledInlineKeyboardButton.STYLE_DANGER)));
+        rows.add(List.of(StyledInlineKeyboardButton.callback(
+                contact, "CONTACT", StyledInlineKeyboardButton.STYLE_PRIMARY)));
+        rows.add(List.of(StyledInlineKeyboardButton.url(
+                instruction, INSTRUCTION_URL, StyledInlineKeyboardButton.STYLE_PRIMARY)));
         markup.setKeyboard(rows);
         return markup;
     }
