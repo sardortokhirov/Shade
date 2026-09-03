@@ -24,7 +24,8 @@ public class TicketListing {
     private Long sellerChatId;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "side", nullable = false, length = 16)
+    @Column(name = "side", nullable = false, length = 16,
+            columnDefinition = "varchar(16) default 'SELL'")
     @Builder.Default
     private TicketListingSide side = TicketListingSide.SELL;
 
