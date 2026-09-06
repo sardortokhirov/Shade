@@ -27,5 +27,8 @@ public interface TicketListingRepository extends JpaRepository<TicketListing, Lo
 
     List<TicketListing> findBySellerChatIdAndStatusOrderByCreatedAtDesc(Long sellerChatId, TicketListingStatus status);
 
+    Page<TicketListing> findBySellerChatIdAndStatusOrderByCreatedAtDesc(
+            Long sellerChatId, TicketListingStatus status, Pageable pageable);
+
     long countBySellerChatIdAndStatus(Long sellerChatId, TicketListingStatus status);
 }

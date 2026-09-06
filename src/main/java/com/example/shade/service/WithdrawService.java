@@ -804,14 +804,14 @@ public class WithdrawService {
         if (!recentRequests.isEmpty() && recentRequests.get(0).getCardNumber() != null) {
             HizmatRequest latestRequest = recentRequests.get(0);
             sessionService.setUserData(chatId, "cardNumber", latestRequest.getCardNumber());
-            message.setText(String.format(
+            message.setText(withCardWarning(chatId, String.format(
                     languageSessionService.getTranslation(chatId, "withdraw.message.card_input_with_recent"),
-                    fullName, platformUserIdDisplay));
+                    fullName, platformUserIdDisplay)));
             message.setReplyMarkup(createSavedCardKeyboard(chatId, recentRequests));
         } else {
-            message.setText(String.format(
+            message.setText(withCardWarning(chatId, String.format(
                     languageSessionService.getTranslation(chatId, "withdraw.message.card_input"),
-                    fullName, platformUserIdDisplay));
+                    fullName, platformUserIdDisplay)));
             message.setReplyMarkup(createNavigationKeyboard(chatId));
         }
         messageSender.sendMessage(message, chatId);
@@ -984,6 +984,10 @@ public class WithdrawService {
         buttons.add(createButton(languageSessionService.getTranslation(chatId, "withdraw.button.back"), "BACK"));
         buttons.add(createButton(languageSessionService.getTranslation(chatId, "withdraw.button.home"), "HOME"));
         return buttons;
+    }
+
+    private String withCardWarning(Long chatId, String text) {
+        return text + "\n\n" + languageSessionService.getTranslation(chatId, "message.card_entry_warning");
     }
 
     private InlineKeyboardButton createButton(String text, String callback) {

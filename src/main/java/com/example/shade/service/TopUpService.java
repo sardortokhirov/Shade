@@ -2285,14 +2285,14 @@ public class TopUpService {
         if (!recentRequests.isEmpty() && recentRequests.get(0).getCardNumber() != null) {
             HizmatRequest latestRequest = recentRequests.get(0);
             sessionService.setUserData(chatId, "cardNumber", latestRequest.getCardNumber());
-            message.setText(String.format(
+            message.setText(withCardWarning(chatId, String.format(
                     languageSessionService.getTranslation(chatId, "topup.message.enter_card_with_history"),
-                    fullName, platformUserIdDisplay));
+                    fullName, platformUserIdDisplay)));
             message.setReplyMarkup(createSavedCardKeyboard(recentRequests, chatId));
         } else {
-            message.setText(String.format(
+            message.setText(withCardWarning(chatId, String.format(
                     languageSessionService.getTranslation(chatId, "topup.message.enter_card"),
-                    fullName, platformUserIdDisplay));
+                    fullName, platformUserIdDisplay)));
             message.setReplyMarkup(createNavigationKeyboard(chatId));
         }
         messageSender.sendMessage(message, chatId);
@@ -2537,6 +2537,10 @@ public class TopUpService {
         rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "topup.button.home"), "HOME")));
         markup.setKeyboard(rows);
         return markup;
+    }
+
+    private String withCardWarning(Long chatId, String text) {
+        return text + "\n\n" + languageSessionService.getTranslation(chatId, "message.card_entry_warning");
     }
 
     private InlineKeyboardButton createButton(String text, String callback) {

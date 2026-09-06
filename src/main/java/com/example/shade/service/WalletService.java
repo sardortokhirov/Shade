@@ -342,9 +342,9 @@ public class WalletService {
     private void sendWithdrawCardInput(Long chatId, Long amount) {
         SendMessage message = new SendMessage();
         message.setChatId(chatId.toString());
-        message.setText(String.format(
+        message.setText(withCardWarning(chatId, String.format(
                 languageSessionService.getTranslation(chatId, "wallet.message.withdraw_enter_card"),
-                amount));
+                amount)));
 
         List<HizmatRequest> recentRequests = requestRepository.findLatestUniqueCardNumbersByChatId(chatId);
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
@@ -1818,6 +1818,10 @@ public class WalletService {
                     .build();
             return userBalanceRepository.save(b);
         });
+    }
+
+    private String withCardWarning(Long chatId, String text) {
+        return text + "\n\n" + languageSessionService.getTranslation(chatId, "message.card_entry_warning");
     }
 
     private InlineKeyboardButton createButton(String text, String callback) {

@@ -94,10 +94,13 @@ public class CommonService {
         if (!recentRequests.isEmpty() && recentRequests.get(0).getCardNumber() != null) {
             HizmatRequest latestRequest = recentRequests.get(0);
             sessionService.setUserData(chatId, "cardNumber", latestRequest.getCardNumber());
-            message.setText("F.I.O: " + fullName + "\nSo‘nggi karta: " + latestRequest.getCardNumber() + "\nShu kartani ishlatasizmi yoki yangi karta raqamini kiriting:");
+            message.setText("F.I.O: " + fullName + "\nSo‘nggi karta: " + latestRequest.getCardNumber()
+                    + "\nShu kartani ishlatasizmi yoki yangi karta raqamini kiriting:\n\n"
+                    + "⚠️ Diqqat!\nFaqat o'zingizning karta raqamingizni kiriting.\nPIN, SMS-kod yoki ilova parolini hech kimga yubormang.\nNoto'g'ri kartaga o'tkazma qaytarilmaydi.");
             message.setReplyMarkup(createSavedCardKeyboard(recentRequests, prefix));
         } else {
-            message.setText("F.I.O: " + fullName + "\nKarta raqamini kiriting:");
+            message.setText("F.I.O: " + fullName + "\nKarta raqamini kiriting:\n\n"
+                    + "⚠️ Diqqat!\nFaqat o'zingizning karta raqamingizni kiriting.\nPIN, SMS-kod yoki ilova parolini hech kimga yubormang.\nNoto'g'ri kartaga o'tkazma qaytarilmaydi.");
             message.setReplyMarkup(createNavigationKeyboard());
         }
         messageSender.sendMessage(message, chatId);

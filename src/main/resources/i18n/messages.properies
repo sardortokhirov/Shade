@@ -14,6 +14,7 @@ message.invalid_command=Iltimos, menyudan operatsiyani tanlang.
 message.unknown_callback=Noto‘g‘ri buyruq. Iltimos, qayta urinib ko‘ring.
 message.callback_error=Xatolik yuz berdi. Iltimos, qayta urinib ko‘ring.
 message.main_menu_welcome=Xush kelibsiz! Operatsiyani tanlang:
+message.card_entry_warning=⚠️ Diqqat!\nFaqat o'zingizning karta raqamingizni kiriting.\nPIN, SMS-kod yoki ilova parolini hech kimga yubormang.\nNoto'g'ri kartaga o'tkazma qaytarilmaydi.
 button.topup=🏦 Hisob To'ldirish
 button.withdraw=💸 Pul Chiqarish
 button.bonus=🎁 Bonus

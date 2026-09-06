@@ -178,8 +178,8 @@ class TicketMarketplaceServiceTest {
                 .build();
         when(ticketListingRepository.findByIdWithLock(3L)).thenReturn(Optional.of(listing));
         when(userBalanceRepository.findByIdWithLock(sellerId)).thenReturn(Optional.of(seller));
-        when(ticketListingRepository.findBySellerChatIdAndStatusOrderByCreatedAtDesc(eq(sellerId), any()))
-                .thenReturn(java.util.List.of());
+        when(ticketListingRepository.findBySellerChatIdAndStatusOrderByCreatedAtDesc(eq(sellerId), any(), any()))
+                .thenReturn(org.springframework.data.domain.Page.empty());
 
         service.cancelListing(sellerId, 3L);
 
@@ -385,8 +385,8 @@ class TicketMarketplaceServiceTest {
                 .build();
         when(ticketListingRepository.findByIdWithLock(12L)).thenReturn(Optional.of(listing));
         when(userBalanceRepository.findByIdWithLock(buyerId)).thenReturn(Optional.of(buyer));
-        when(ticketListingRepository.findBySellerChatIdAndStatusOrderByCreatedAtDesc(eq(buyerId), any()))
-                .thenReturn(java.util.List.of());
+        when(ticketListingRepository.findBySellerChatIdAndStatusOrderByCreatedAtDesc(eq(buyerId), any(), any()))
+                .thenReturn(org.springframework.data.domain.Page.empty());
 
         service.cancelListing(buyerId, 12L);
 

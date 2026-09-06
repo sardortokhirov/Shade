@@ -38,6 +38,7 @@ import java.util.Set;
 public class TicketMarketplaceService {
     private static final Logger logger = LoggerFactory.getLogger(TicketMarketplaceService.class);
     private static final int PAGE_SIZE = 5;
+    private static final int MY_PAGE_SIZE = 10;
     private static final long[] QTY_PRESETS = {1L, 5L, 10L};
 
     private final MessageSender messageSender;
@@ -91,10 +92,15 @@ public class TicketMarketplaceService {
                 || callback.startsWith("LOTTERY_TRADE_OFFERS_REFRESH:")) {
             int page = callback.contains(":") ? Integer.parseInt(callback.split(":")[1]) : 0;
             sendBrowseListings(chatId, page, TicketListingSide.BUY_OFFER);
-        } else if (callback.equals("LOTTERY_TRADE_MY")) {
+        } else if (callback.equals("LOTTERY_TRADE_MY") || callback.startsWith("LOTTERY_TRADE_MY:")) {
+            int page = callback.contains(":") ? Integer.parseInt(callback.split(":")[1]) : 0;
             sessionService.setUserState(chatId, "LOTTERY_TRADE_MY");
             sessionService.addNavigationState(chatId, "LOTTERY_TRADE_MENU");
-            sendMyListings(chatId);
+            sendMyListings(chatId, page);
+        } else if (callback.equals("LOTTERY_TRADE_MY_REFRESH")
+                || callback.startsWith("LOTTERY_TRADE_MY_REFRESH:")) {
+            int page = callback.contains(":") ? Integer.parseInt(callback.split(":")[1]) : 0;
+            sendMyListings(chatId, page);
         } else if (callback.equals("LOTTERY_TRADE_SELL")) {
             sessionService.setUserState(chatId, "LOTTERY_TRADE_SELL_QTY");
             sessionService.addNavigationState(chatId, "LOTTERY_TRADE_MENU");
@@ -294,8 +300,20 @@ public class TicketMarketplaceService {
     }
 
     private void sendMyListings(Long chatId) {
-        List<TicketListing> mine = ticketListingRepository
-                .findBySellerChatIdAndStatusOrderByCreatedAtDesc(chatId, TicketListingStatus.ACTIVE);
+        sendMyListings(chatId, 0);
+    }
+
+    private void sendMyListings(Long chatId, int page) {
+        if (page < 0) {
+            page = 0;
+        }
+        Page<TicketListing> mine = ticketListingRepository.findBySellerChatIdAndStatusOrderByCreatedAtDesc(
+                chatId, TicketListingStatus.ACTIVE, PageRequest.of(page, MY_PAGE_SIZE));
+        if (mine.isEmpty() && page > 0) {
+            sendMyListings(chatId, page - 1);
+            return;
+        }
+
         SendMessage m = new SendMessage();
         m.setChatId(chatId.toString());
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
@@ -304,9 +322,11 @@ public class TicketMarketplaceService {
         if (mine.isEmpty()) {
             m.setText(languageSessionService.getTranslation(chatId, "lottery.trade.my_empty"));
         } else {
-            StringBuilder sb = new StringBuilder(
-                    languageSessionService.getTranslation(chatId, "lottery.trade.my_title"));
-            for (TicketListing listing : mine) {
+            StringBuilder sb = new StringBuilder();
+            sb.append(String.format(
+                    languageSessionService.getTranslation(chatId, "lottery.trade.my_title"),
+                    page + 1, Math.max(mine.getTotalPages(), 1)));
+            for (TicketListing listing : mine.getContent()) {
                 String itemKey = isBuyOffer(listing)
                         ? "lottery.trade.my_item_offer"
                         : "lottery.trade.my_item_sell";
@@ -324,6 +344,18 @@ public class TicketMarketplaceService {
             m.setText(sb.toString());
         }
         m.enableMarkdown(true);
+
+        List<InlineKeyboardButton> pageRow = new ArrayList<>();
+        if (page > 0) {
+            pageRow.add(createButton("◀️", "LOTTERY_TRADE_MY:" + (page - 1)));
+        }
+        pageRow.add(createButton(
+                languageSessionService.getTranslation(chatId, "lottery.trade.button.refresh"),
+                "LOTTERY_TRADE_MY_REFRESH:" + page));
+        if (page + 1 < mine.getTotalPages()) {
+            pageRow.add(createButton("▶️", "LOTTERY_TRADE_MY:" + (page + 1)));
+        }
+        rows.add(pageRow);
         rows.add(navRow(chatId));
         markup.setKeyboard(rows);
         m.setReplyMarkup(markup);
