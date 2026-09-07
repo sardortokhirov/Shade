@@ -57,6 +57,21 @@ public class HumoService {
         }
     }
 
+    public boolean verifyCardXabarOnly(Long uniqueAmount) {
+        String targetUrl = "http://localhost:2805/last_transactions?amount=" + uniqueAmount + "&source_bot=CardXabar";
+        try {
+            ResponseEntity<Map> response = restTemplate.getForEntity(targetUrl, Map.class);
+            Map<String, Object> body = response.getBody();
+            if (body != null && body.containsKey("transactions")) {
+                List<?> transactions = (List<?>) body.get("transactions");
+                return !transactions.isEmpty();
+            }
+            return false;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     public boolean verifyPaymentAmount(Long uniqueAmount) {
         String targetUrl = "http://localhost:2806/last_transactions?amount=" + uniqueAmount;
         try {

@@ -15,7 +15,9 @@ import org.telegram.telegrambots.meta.api.methods.GetFile;
 import org.telegram.telegrambots.meta.api.methods.send.*;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageReplyMarkup;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.File;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboard;
@@ -250,6 +252,27 @@ public class MessageSender {
     }
 
     // ========== EXISTING METHODS ==========
+
+    public void editMessageText(Long chatId, Integer messageId, String newText) {
+        editMessageText(chatId, messageId, newText, null);
+    }
+
+    public void editMessageText(Long chatId, Integer messageId, String newText, InlineKeyboardMarkup replyMarkup) {
+        EditMessageText edit = new EditMessageText();
+        edit.setChatId(chatId.toString());
+        edit.setMessageId(messageId);
+        edit.setText(newText);
+        edit.setParseMode("Markdown");
+        if (replyMarkup != null) {
+            edit.setReplyMarkup(replyMarkup);
+        }
+        try {
+            bot.execute(edit);
+            logger.info("Edited text of message {} in chat {}", messageId, chatId);
+        } catch (TelegramApiException e) {
+            logger.error("Failed to edit text of message {} in chat {}: {}", messageId, chatId, e.getMessage());
+        }
+    }
 
     public void editMessageToRemoveButtons(Long chatId, Integer messageId) {
         EditMessageReplyMarkup editMessage = new EditMessageReplyMarkup();

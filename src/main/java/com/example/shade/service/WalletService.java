@@ -48,6 +48,9 @@ public class WalletService {
     private final ExchangeRateRepository exchangeRateRepository;
     private final BlockedUserRepository blockedUserRepository;
     private final BonusService bonusService;
+    private final BotTipConfigurationService botTipConfigurationService;
+    private final UserLimitIncreaseService userLimitIncreaseService;
+    private final DailyStatsService dailyStatsService;
 
     @Autowired
     @org.springframework.context.annotation.Lazy
@@ -93,12 +96,61 @@ public class WalletService {
         rows.add(List.of(
                 createButton(languageSessionService.getTranslation(chatId, "wallet.button.p2p"),
                         "WALLET_P2P")));
-
-        // History button
         rows.add(List.of(
+                createButton(languageSessionService.getTranslation(chatId, "wallet.button.tip"),
+                        "WALLET_TIP_MENU"),
                 createButton(languageSessionService.getTranslation(chatId, "wallet.button.history"),
                         "WALLET_HISTORY:0")));
 
+        rows.add(createNavigationButtons(chatId));
+        markup.setKeyboard(rows);
+        message.setReplyMarkup(markup);
+        message.enableMarkdown(true);
+
+        messageSender.sendMessage(message, chatId);
+    }
+
+    private void sendTipMenu(Long chatId) {
+        SendMessage message = new SendMessage();
+        message.setChatId(chatId.toString());
+        message.setText(languageSessionService.getTranslation(chatId, "wallet.message.tip_choose"));
+
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        String presetsStr = botTipConfigurationService.getPresets();
+        String[] presets = presetsStr.split(",");
+        for (String preset : presets) {
+            try {
+                long amounts = Long.parseLong(preset.trim());
+                String btnText = String.format("%,d UZS", amounts);
+                rows.add(List.of(createButton(btnText, "WALLET_TIP_PAY:" + amounts)));
+            } catch (Exception ignored) {
+            }
+        }
+
+        rows.add(List.of(createButton(
+                languageSessionService.getTranslation(chatId, "wallet.button.tip_other"),
+                "WALLET_TIP_OTHER")));
+
+        rows.add(createNavigationButtons(chatId));
+        markup.setKeyboard(rows);
+        message.setReplyMarkup(markup);
+        message.enableMarkdown(true);
+
+        messageSender.sendMessage(message, chatId);
+    }
+
+    private void sendTipAmountInput(Long chatId) {
+        Long minAmount = botTipConfigurationService.getMinAmount();
+        SendMessage message = new SendMessage();
+        message.setChatId(chatId.toString());
+        message.setText(String.format(
+                languageSessionService.getTranslation(chatId, "wallet.message.tip_enter"),
+                minAmount));
+
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         rows.add(createNavigationButtons(chatId));
         markup.setKeyboard(rows);
         message.setReplyMarkup(markup);
@@ -288,7 +340,8 @@ public class WalletService {
     private void sendWithdrawCardInput(Long chatId, Long amount) {
         SendMessage message = new SendMessage();
         message.setChatId(chatId.toString());
-        message.setText(String.format(
+        message.setText(languageSessionService.getTranslation(chatId, "message.card_entry_warning") + "\n\n"
+                + String.format(
                 languageSessionService.getTranslation(chatId, "wallet.message.withdraw_enter_card"),
                 amount));
 
@@ -352,6 +405,7 @@ public class WalletService {
             case "WALLET_WITHDRAW_CARD" -> handleWithdrawCard(chatId, text);
             case "WALLET_P2P_RECIPIENT" -> handleP2pRecipient(chatId, text);
             case "WALLET_P2P_AMOUNT" -> handleP2pAmount(chatId, text);
+            case "WALLET_TIP_AMOUNT" -> handleTipAmount(chatId, text);
             case "WALLET_P2P_PROCESSING" -> {
             }
             default -> sendWalletMenu(chatId);
@@ -421,6 +475,21 @@ public class WalletService {
             sendP2pRecipientPrompt(chatId);
         } else if (callback.equals("WALLET_P2P_CONFIRM")) {
             self.processWalletToWallet(chatId);
+        } else if (callback.equals("WALLET_TIP_MENU")) {
+            sessionService.setUserState(chatId, "WALLET_TIP_MENU");
+            sessionService.addNavigationState(chatId, "WALLET_MENU");
+            sendTipMenu(chatId);
+        } else if (callback.startsWith("WALLET_TIP_PAY:")) {
+            long amount = Long.parseLong(callback.split(":")[1]);
+            if (sessionService.compareAndSetState(chatId, "WALLET_TIP_MENU", "WALLET_TIP_PROCESSING")) {
+                self.processTip(chatId, amount);
+            } else {
+                logger.info("Ignoring duplicate or stale tip callback for chatId {}", chatId);
+            }
+        } else if (callback.equals("WALLET_TIP_OTHER")) {
+            sessionService.setUserState(chatId, "WALLET_TIP_AMOUNT");
+            sessionService.addNavigationState(chatId, "WALLET_TIP_MENU");
+            sendTipAmountInput(chatId);
         } else if (callback.startsWith("WALLET_HISTORY:")) {
             int page = Integer.parseInt(callback.split(":")[1]);
             sessionService.setUserState(chatId, "WALLET_HISTORY");
@@ -493,6 +562,14 @@ public class WalletService {
             case "WALLET_P2P_PROCESSING" -> {
                 sessionService.setUserState(chatId, "WALLET_MENU");
                 sendWalletMenu(chatId);
+            }
+            case "WALLET_TIP_MENU" -> {
+                sessionService.setUserState(chatId, "WALLET_TIP_MENU");
+                sendTipMenu(chatId);
+            }
+            case "WALLET_TIP_AMOUNT" -> {
+                sessionService.setUserState(chatId, "WALLET_TIP_AMOUNT");
+                sendTipAmountInput(chatId);
             }
             default -> sendWalletMenu(chatId);
         }
@@ -892,6 +969,13 @@ public class WalletService {
                 adminLogBotService.sendLog(adminLog);
             } catch (Exception e) {
                 logger.error("Wallet transfer {} approved, but admin log failed: {}", requestId, e.getMessage(), e);
+            }
+
+            try {
+                dailyStatsService.addTopUpAmount(chatId, amount, platformUserId);
+            } catch (Exception e) {
+                logger.error("Wallet transfer {} approved, but daily stats failed for chatId {}: {}",
+                        requestId, chatId, e.getMessage(), e);
             }
         } else {
             // Transfer reported as failed - do NOT refund. Platform may process with delay;
@@ -1564,6 +1648,121 @@ public class WalletService {
         }
     }
 
+    private void handleTipAmount(Long chatId, String text) {
+        try {
+            long amount = Long.parseLong(text.replaceAll("[^\\d]", ""));
+            if (sessionService.compareAndSetState(chatId, "WALLET_TIP_AMOUNT", "WALLET_TIP_PROCESSING")) {
+                self.processTip(chatId, amount);
+            } else {
+                logger.info("Ignoring duplicate or stale custom tip amount for chatId {}", chatId);
+            }
+        } catch (NumberFormatException e) {
+            logger.warn("Invalid tip amount format for chatId {}: {}", chatId, text);
+            SendMessage m = new SendMessage();
+            m.setChatId(chatId.toString());
+            m.setText(languageSessionService.getTranslation(chatId, "wallet.message.invalid_amount"));
+            m.enableMarkdown(true);
+            m.setReplyMarkup(createMainMenuOnlyMarkup(chatId));
+            messageSender.sendMessage(m, chatId);
+        }
+    }
+
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public void processTip(Long chatId, Long amount) {
+        Long minAmount = botTipConfigurationService.getMinAmount();
+        if (amount < minAmount) {
+            sessionService.setUserState(chatId, "WALLET_TIP_MENU");
+            SendMessage m = new SendMessage();
+            m.setChatId(chatId.toString());
+            m.setText(String.format(
+                    languageSessionService.getTranslation(chatId, "wallet.message.tip_invalid"),
+                    minAmount));
+            m.enableMarkdown(true);
+            m.setReplyMarkup(createMainMenuOnlyMarkup(chatId));
+            messageSender.sendMessage(m, chatId);
+            return;
+        }
+
+        UserBalance balance = userBalanceRepository.findByIdWithLock(chatId).orElse(null);
+        if (balance == null || balance.getWalletBalance() == null || balance.getWalletBalance() < amount) {
+            sessionService.setUserState(chatId, "WALLET_MENU");
+            SendMessage m = new SendMessage();
+            m.setChatId(chatId.toString());
+            m.setText(String.format(
+                    languageSessionService.getTranslation(chatId, "wallet.message.insufficient_funds"),
+                    (balance != null && balance.getWalletBalance() != null) ? balance.getWalletBalance() : 0));
+            m.enableMarkdown(true);
+            m.setReplyMarkup(createTopUpAndHomeMarkup(chatId));
+            messageSender.sendMessage(m, chatId);
+            return;
+        }
+
+        balance.setWalletBalance(balance.getWalletBalance() - amount);
+        userBalanceRepository.save(balance);
+
+        HizmatRequest request = new HizmatRequest();
+        request.setChatId(chatId);
+        request.setAmount(amount);
+        request.setUniqueAmount(amount);
+        request.setPlatform("Tip");
+        request.setFullName("BOT_TIP");
+        request.setType(RequestType.TIP);
+        request.setStatus(RequestStatus.APPROVED);
+        request.setCurrency(Currency.UZS);
+        request.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
+        request.setWalletBalanceAtTime(balance.getWalletBalance() != null ? balance.getWalletBalance() : 0L);
+        requestRepository.save(request);
+
+        long bonusTickets = botTipConfigurationService.getRandomBonusTickets();
+        if (bonusTickets > 0) {
+            lotteryService.awardTickets(chatId, bonusTickets);
+        }
+
+        long limitIncrease = botTipConfigurationService.computeTipPermanentLimitIncrease(amount);
+        if (limitIncrease > 0) {
+            userLimitIncreaseService.addPermanentLimitIncrease(chatId, BigDecimal.valueOf(limitIncrease));
+        }
+        String limitIncreaseStr = BigDecimal.valueOf(limitIncrease).setScale(5, RoundingMode.DOWN).toPlainString();
+
+        SendMessage m = new SendMessage();
+        m.setChatId(chatId.toString());
+        String tipDate = LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+        String messageKey = bonusTickets > 0 ? "wallet.message.tip_success_with_bonus" : "wallet.message.tip_success";
+        String messageText = bonusTickets > 0
+                ? String.format(languageSessionService.getTranslation(chatId, messageKey), request.getId(), chatId, amount, bonusTickets, tipDate)
+                : String.format(languageSessionService.getTranslation(chatId, messageKey), request.getId(), chatId, amount, tipDate);
+        if (limitIncrease > 0) {
+            messageText += "\n\n" + String.format(
+                    languageSessionService.getTranslation(chatId, "wallet.message.tip_limit_earned"),
+                    limitIncreaseStr);
+        }
+        m.setText(messageText);
+        m.enableMarkdown(true);
+        m.setReplyMarkup(createMainMenuOnlyMarkup(chatId));
+        messageSender.sendMessage(m, chatId);
+
+        var balanceOpt = userBalanceRepository.findById(chatId);
+        long walletLeft = balanceOpt
+                .map(ub -> ub.getWalletBalance() != null ? ub.getWalletBalance() : 0L)
+                .orElse(0L);
+        String adminLog = String.format(
+                "🎁 #Akkaunt rivoji uchun\n🆔: `%d`\n👤: `%d`\n💸 Summa: %,d UZS\n🎟️ Bonus chiptalar: %d\n📈 Doimiy limit: +%s so'm\n🏧 Qoldi: `%,d UZS`\n\n📅 %s",
+                request.getId(), chatId, amount, bonusTickets, limitIncreaseStr, walletLeft,
+                LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        try {
+            adminLogBotService.sendLog(adminLog);
+        } catch (Exception e) {
+            logger.error("Tip {} completed, but admin log failed: {}", request.getId(), e.getMessage(), e);
+        }
+
+        try {
+            sendPaymentMainMenu(chatId, true);
+        } catch (Exception e) {
+            logger.error("Tip {} completed, but main menu send failed for chatId {}: {}",
+                    request.getId(), chatId, e.getMessage(), e);
+        }
+    }
+
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public void processWalletToWallet(Long chatId) {
         // Single-JVM one-shot: state flip + amount/recipient consume under one lock (blocks double Confirm).
@@ -1849,7 +2048,7 @@ public class WalletService {
         rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.bonus"), "BONUS")));
         rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.wallet"), "WALLET")));
         rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "button.contact"), "CONTACT")));
-        rows.add(List.of(createUrlButton(languageSessionService.getTranslation(chatId, "button.instruction"), "https://t.me/BaronPeyInfo")));
+        rows.add(List.of(createUrlButton(languageSessionService.getTranslation(chatId, "button.instruction"), "https://t.me/misterpays")));
         markup.setKeyboard(rows);
 
         message.setReplyMarkup(markup);
@@ -1952,6 +2151,23 @@ public class WalletService {
                         escapeMarkdown(req.getPlatformUserId() != null ? req.getPlatformUserId() : "-"),
                         req.getUniqueAmount() != null ? req.getUniqueAmount() : amount,
                         escapeMarkdown(date), escapeMarkdown(status)));
+                case TIP -> sb.append(String.format(
+                        languageSessionService.getTranslation(chatId, "wallet.message.history_item_tip"),
+                        req.getId(), amount, escapeMarkdown(date), escapeMarkdown(status)));
+                case TICKET_TRADE -> {
+                    boolean isBuyer = chatId.equals(req.getRecipientChatId());
+                    long shownAmount = isBuyer
+                            ? (req.getNetAmount() != null ? req.getNetAmount() : amount)
+                            : amount;
+                    String key = isBuyer
+                            ? "wallet.message.history_item_ticket_buy"
+                            : "wallet.message.history_item_ticket_sell";
+                    sb.append(String.format(
+                            languageSessionService.getTranslation(chatId, key),
+                            req.getId(), shownAmount,
+                            req.getFeeAmount() != null ? req.getFeeAmount() : 0L,
+                            escapeMarkdown(date), escapeMarkdown(status)));
+                }
                 case WALLET_TO_WALLET -> {
                     boolean isSender = chatId.equals(req.getChatId());
                     long shownAmount = isSender ? amount

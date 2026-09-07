@@ -199,7 +199,9 @@ public class WithdrawService {
         String cardNumber = request.getCardNumber();
         String code = request.getTransactionId();
         Long chatId = request.getChatId();
-        String number = blockedUserRepository.findByChatId(chatId).get().getPhoneNumber();
+        String number = blockedUserRepository.findByChatId(chatId)
+                .map(BlockedUser::getPhoneNumber)
+                .orElse("N/A");
 
         if (approve) {
             request.setStatus(RequestStatus.APPROVED);
@@ -618,7 +620,9 @@ public class WithdrawService {
             if (paidAmount.longValue() < 0) {
                 paidAmount = paidAmount.multiply(BigDecimal.valueOf(-1));
             }
-            String number = blockedUserRepository.findByChatId(chatId).get().getPhoneNumber();
+            String number = blockedUserRepository.findByChatId(chatId)
+                    .map(BlockedUser::getPhoneNumber)
+                    .orElse("N/A");
 
             BigDecimal netMultiplier = systemConfigurationService.getWithdrawNetMultiplier();
 
@@ -767,15 +771,16 @@ public class WithdrawService {
         List<HizmatRequest> recentRequests = requestRepository.findLatestUniqueCardNumbersByChatId(chatId);
         SendMessage message = new SendMessage();
         message.setChatId(chatId.toString());
+        String warning = languageSessionService.getTranslation(chatId, "message.card_entry_warning");
         if (!recentRequests.isEmpty() && recentRequests.get(0).getCardNumber() != null) {
             HizmatRequest latestRequest = recentRequests.get(0);
             sessionService.setUserData(chatId, "cardNumber", latestRequest.getCardNumber());
-            message.setText(String.format(
+            message.setText(warning + "\n\n" + String.format(
                     languageSessionService.getTranslation(chatId, "withdraw.message.card_input_with_recent"),
                     sessionService.getUserData(chatId, "platform")));
             message.setReplyMarkup(createSavedCardKeyboard(chatId, recentRequests));
         } else {
-            message.setText(String.format(
+            message.setText(warning + "\n\n" + String.format(
                     languageSessionService.getTranslation(chatId, "withdraw.message.card_input"),
                     sessionService.getUserData(chatId, "platform"), fullName));
             message.setReplyMarkup(createNavigationKeyboard(chatId));
@@ -798,8 +803,10 @@ public class WithdrawService {
         sessionService.setUserState(chatId, "MAIN_MENU");
         SendMessage message = new SendMessage();
         message.setChatId(chatId.toString());
-        message.setText(languageSessionService.getTranslation(chatId, "withdraw.message.main_menu_welcome"));
-        message.setReplyMarkup(createMainMenuKeyboard(chatId));
+        message.setText(languageSessionService.getTranslation(chatId, "message.main_menu_welcome"));
+        message.enableMarkdown(true);
+        message.setReplyMarkup(com.example.shade.bot.MainMenuKeyboard.build(
+                languageSessionService::getTranslation, chatId));
         messageSender.sendMessage(message, chatId);
     }
 
@@ -915,17 +922,6 @@ public class WithdrawService {
         return markup;
     }
 
-    private InlineKeyboardMarkup createMainMenuKeyboard(Long chatId) {
-        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "withdraw.button.topup"), "TOPUP")));
-        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "withdraw.button.withdraw"), "WITHDRAW")));
-        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "withdraw.button.bonus"), "BONUS")));
-        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "withdraw.button.contact"), "CONTACT")));
-        markup.setKeyboard(rows);
-        return markup;
-    }
-
     private InlineKeyboardMarkup createNavigationKeyboard(Long chatId) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
@@ -936,8 +932,8 @@ public class WithdrawService {
 
     private List<InlineKeyboardButton> createNavigationButtons(Long chatId) {
         List<InlineKeyboardButton> buttons = new ArrayList<>();
-        buttons.add(createButton(languageSessionService.getTranslation(chatId, "withdraw.button.back"), "BACK"));
-        buttons.add(createButton(languageSessionService.getTranslation(chatId, "withdraw.button.home"), "HOME"));
+        buttons.add(createButton(languageSessionService.getTranslation(chatId, "button.back"), "BACK"));
+        buttons.add(createButton(languageSessionService.getTranslation(chatId, "button.home"), "HOME"));
         return buttons;
     }
 

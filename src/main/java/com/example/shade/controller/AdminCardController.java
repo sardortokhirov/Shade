@@ -26,6 +26,7 @@ public class AdminCardController {
     private static final Logger logger = LoggerFactory.getLogger(AdminCardController.class);
     private final AdminCardRepository adminCardRepository;
     private final OsonConfigRepository osonConfigRepository;
+    private final com.example.shade.service.AdminCardService adminCardService;
 
     private boolean authenticate(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
@@ -100,13 +101,7 @@ public class AdminCardController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
         }
         return osonConfigRepository.findById(osonConfigId)
-                .map(osonConfig -> {
-                    card.setCardNumber(card.getCardNumber().replaceAll("\\s+", ""));
-                    card.setOsonConfig(osonConfig);
-                    logger.info("Adding new admin card for OsonConfig ID: {}: {}", osonConfigId, card.getCardNumber());
-                    AdminCard savedCard = adminCardRepository.save(card);
-                    return ResponseEntity.ok(savedCard);
-                })
+                .map(osonConfig -> saveNewCard(osonConfig, card, osonConfigId))
                 .orElseGet(() -> {
                     logger.warn("OsonConfig not found for ID: {}", osonConfigId);
                     return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
@@ -124,22 +119,48 @@ public class AdminCardController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
         }
         return adminCardRepository.findById(id)
-                .map(existing -> {
-                    existing.setCardNumber(card.getCardNumber().replaceAll("\\s+", ""));
-                    existing.setOwnerName(card.getOwnerName());
-                    existing.setLastUsed(card.getLastUsed());
-                    existing.setBalance(card.getBalance());
-                    if (card.getOsonConfig() != null && card.getOsonConfig().getId() != null) {
-                        osonConfigRepository.findById(card.getOsonConfig().getId())
-                                .ifPresent(existing::setOsonConfig);
-                    }
-                    logger.info("Updating card ID: {}, new card number: {}", id, card.getCardNumber());
-                    return ResponseEntity.ok(adminCardRepository.save(existing));
-                })
+                .map(existing -> applyCardUpdate(existing, card, id))
                 .orElseGet(() -> {
                     logger.warn("Card not found for update, ID: {}", id);
                     return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
                 });
+    }
+
+    private ResponseEntity<AdminCard> saveNewCard(OsonConfig osonConfig, AdminCard card, Long osonConfigId) {
+        card.setOsonConfig(osonConfig);
+        adminCardService.prepareForSave(card);
+        try {
+            adminCardService.assertUnique(card, null);
+        } catch (IllegalStateException e) {
+            logger.warn("Admin card uniqueness failed: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(null);
+        }
+        logger.info("Adding new admin card for OsonConfig ID: {}: {}", osonConfigId, card.getCardNumber());
+        return ResponseEntity.ok(adminCardRepository.save(card));
+    }
+
+    private ResponseEntity<AdminCard> applyCardUpdate(AdminCard existing, AdminCard card, Long id) {
+        existing.setCardNumber(card.getCardNumber().replaceAll("\\s+", ""));
+        existing.setOwnerName(card.getOwnerName());
+        existing.setLastUsed(card.getLastUsed());
+        existing.setBalance(card.getBalance());
+        if (card.getPaymentSystem() != null) {
+            existing.setPaymentSystem(card.getPaymentSystem());
+        }
+        existing.setUzcardRail(card.getUzcardRail());
+        if (card.getOsonConfig() != null && card.getOsonConfig().getId() != null) {
+            osonConfigRepository.findById(card.getOsonConfig().getId())
+                    .ifPresent(existing::setOsonConfig);
+        }
+        adminCardService.prepareForSave(existing);
+        try {
+            adminCardService.assertUnique(existing, id);
+        } catch (IllegalStateException e) {
+            logger.warn("Admin card uniqueness failed on update {}: {}", id, e.getMessage());
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(null);
+        }
+        logger.info("Updating card ID: {}, new card number: {}", id, card.getCardNumber());
+        return ResponseEntity.ok(adminCardRepository.save(existing));
     }
 
     @DeleteMapping("/cards/{id}")

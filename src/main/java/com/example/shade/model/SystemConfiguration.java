@@ -1,9 +1,12 @@
 package com.example.shade.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import jakarta.persistence.*;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
 
 @Entity
@@ -65,9 +68,43 @@ public class SystemConfiguration {
      * Wallet→wallet fee as a fraction (0.05 = 5%). Sender pays gross; receiver gets net.
      * Nullable for legacy rows; service treats null as 0.
      */
-    @Column(name = "wallet_to_wallet_fee_percentage", precision = 5, scale = 4)
+    @Column(name = "wallet_to_wallet_fee_percentage", precision = 9, scale = 8)
+    @JsonSerialize(using = BigDecimalPlainSerializer.class)
     private BigDecimal walletToWalletFeePercentage;
+
+    @Column(name = "daily_bonus_transfer_limit")
+    private Long dailyBonusTransferLimit;
+
+    @Column(name = "top_up_daily_limit_increase_percentage", precision = 9, scale = 8)
+    @JsonSerialize(using = BigDecimalPlainSerializer.class)
+    private BigDecimal topUpDailyLimitIncreasePercentage;
+
+    @Column(name = "deposit_daily_limit_increase_percentage", precision = 9, scale = 8)
+    @JsonSerialize(using = BigDecimalPlainSerializer.class)
+    private BigDecimal depositDailyLimitIncreasePercentage;
+
+    @Column(name = "humo_enabled")
+    private Boolean humoEnabled;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "uzcard_rail", length = 32)
+    private UzcardRail uzcardRail;
+
+    @JsonIgnore
+    @Column(name = "humo_legacy_dual_check_end")
+    private Instant humoLegacyDualCheckEnd;
+
+    /** Stored for admin/API parity with xonpey. Mrpey lottery play does not read this. */
+    @Column(name = "lottery_cooldown_seconds")
+    private Long lotteryCooldownSeconds;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
+
+    @PostLoad
+    void normalizeUzcardRailDefault() {
+        if (uzcardRail == null) {
+            uzcardRail = UzcardRail.OSON;
+        }
+    }
 }

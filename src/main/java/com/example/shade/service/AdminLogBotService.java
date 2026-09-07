@@ -65,7 +65,9 @@ public class AdminLogBotService {
                         .multiply(latest.getUzsToRub())
                         .longValue() / 1000;
         // Format log message as photo caption
-        String number = blockedUserRepository.findByChatId(userChatId).get().getPhoneNumber();
+        String number = blockedUserRepository.findByChatId(userChatId)
+                .map(BlockedUser::getPhoneNumber)
+                .orElse("N/A");
 
         String logMessage = String.format(
                 "\uD83C\uDD94: %d To‘lov skrinshoti keldi 📷\n" +

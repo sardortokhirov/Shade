@@ -31,6 +31,23 @@ public class FeatureSettings {
     @Column(name = "wallet_enabled")
     private Boolean walletEnabled = true;
 
+    @Column(name = "promo_enabled")
+    private Boolean promoEnabled = false;
+
+    @Column(name = "bonus_limit_enabled")
+    private Boolean bonusLimitEnabled = true;
+
+    @Column(name = "pay_toggle_enabled")
+    private Boolean payToggleEnabled = false;
+
+    /** Null treated as disabled. */
+    @Column(name = "bonus_auto_approve_enabled")
+    private Boolean bonusAutoApproveEnabled = false;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
+
+    /** Not persisted; filled from {@code SystemConfiguration.humoEnabled} for admin GET /features. */
+    @Transient
+    private Boolean humoEnabled;
 }

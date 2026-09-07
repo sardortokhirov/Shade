@@ -39,8 +39,27 @@ public class DatabaseConstraintMigration implements ApplicationRunner {
         jdbcTemplate.execute("ALTER TABLE hizmat_request ADD COLUMN IF NOT EXISTS recipient_chat_id BIGINT");
         jdbcTemplate.execute("ALTER TABLE hizmat_request ADD COLUMN IF NOT EXISTS fee_amount BIGINT");
         jdbcTemplate.execute("ALTER TABLE hizmat_request ADD COLUMN IF NOT EXISTS net_amount BIGINT");
-        jdbcTemplate.execute("ALTER TABLE system_configuration ADD COLUMN IF NOT EXISTS wallet_to_wallet_fee_percentage NUMERIC(5,4)");
-        logger.info("Ensured wallet P2P columns exist on hizmat_request and system_configuration");
+        jdbcTemplate.execute("ALTER TABLE system_configuration ADD COLUMN IF NOT EXISTS wallet_to_wallet_fee_percentage NUMERIC(9,8)");
+        jdbcTemplate.execute("ALTER TABLE lottery_configuration ADD COLUMN IF NOT EXISTS p2p_min_price_per_ticket BIGINT NOT NULL DEFAULT 1");
+        jdbcTemplate.execute("ALTER TABLE lottery_configuration ADD COLUMN IF NOT EXISTS p2p_fee_percentage NUMERIC(9,8) NOT NULL DEFAULT 0");
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS ticket_listing ("
+                        + "id BIGSERIAL PRIMARY KEY, "
+                        + "seller_chat_id BIGINT NOT NULL, "
+                        + "side VARCHAR(16) NOT NULL DEFAULT 'SELL', "
+                        + "ticket_quantity BIGINT NOT NULL, "
+                        + "total_price BIGINT NOT NULL, "
+                        + "status VARCHAR(32) NOT NULL, "
+                        + "buyer_chat_id BIGINT, "
+                        + "fee_amount BIGINT, "
+                        + "net_amount BIGINT, "
+                        + "created_at TIMESTAMP NOT NULL, "
+                        + "sold_at TIMESTAMP)");
+        jdbcTemplate.execute("ALTER TABLE ticket_listing ADD COLUMN IF NOT EXISTS side VARCHAR(16)");
+        jdbcTemplate.execute("UPDATE ticket_listing SET side = 'SELL' WHERE side IS NULL");
+        jdbcTemplate.execute("ALTER TABLE ticket_listing ALTER COLUMN side SET DEFAULT 'SELL'");
+        jdbcTemplate.execute("ALTER TABLE ticket_listing ALTER COLUMN side SET NOT NULL");
+        logger.info("Ensured wallet P2P / ticket marketplace columns exist");
     }
 
     private void migrateHizmatRequestEnumChecks() {

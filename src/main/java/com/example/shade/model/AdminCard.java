@@ -35,4 +35,9 @@ public class AdminCard {
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_system", nullable = false)
     private PaymentSystem paymentSystem;
+
+    /** UZCARD verification path. Must be set for UZCARD; must be null for HUMO. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "uzcard_rail", length = 32)
+    private UzcardRail uzcardRail;
 }

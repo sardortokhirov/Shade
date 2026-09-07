@@ -8,7 +8,9 @@ import com.example.shade.repository.BlockedUserRepository;
 import com.example.shade.repository.LotteryPrizeRepository;
 import com.example.shade.service.AdminLogBotService;
 import com.example.shade.service.LanguageSessionService;
+import com.example.shade.service.LotteryConfigService;
 import com.example.shade.service.LotteryService;
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 
 import jakarta.servlet.http.HttpServletRequest;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -33,6 +36,7 @@ public class LotteryController {
     private final AdminBotMessageSender messageSender;
     private final LanguageSessionService languageSessionService;
     private final AdminLogBotService adminLogBotService;
+    private final LotteryConfigService lotteryConfigService;
 
     private boolean authenticate(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
@@ -206,6 +210,50 @@ public class LotteryController {
         } catch (IllegalArgumentException e) {
             // Catches invalid sortDirection value (e.g., if it's not "ASC" or "DESC")
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+        }
+    }
+
+    @GetMapping("/lottery/p2p-settings")
+    public ResponseEntity<P2pSettingsResponse> getP2pSettings(HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+        return ResponseEntity.ok(new P2pSettingsResponse(
+                lotteryConfigService.getP2pMinPricePerTicket(),
+                lotteryConfigService.getP2pFeePercentage()));
+    }
+
+    @PutMapping("/lottery/p2p-settings")
+    public ResponseEntity<?> setP2pSettings(
+            @RequestBody P2pSettingsRequest requestBody,
+            HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+        try {
+            lotteryConfigService.setP2pSettings(requestBody.getMinPricePerTicket(), requestBody.getFeePercentage());
+            return ResponseEntity.ok(new P2pSettingsResponse(
+                    lotteryConfigService.getP2pMinPricePerTicket(),
+                    lotteryConfigService.getP2pFeePercentage()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @Data
+    public static class P2pSettingsRequest {
+        private Long minPricePerTicket;
+        private BigDecimal feePercentage;
+    }
+
+    @Data
+    public static class P2pSettingsResponse {
+        private Long minPricePerTicket;
+        private BigDecimal feePercentage;
+
+        public P2pSettingsResponse(Long minPricePerTicket, BigDecimal feePercentage) {
+            this.minPricePerTicket = minPricePerTicket;
+            this.feePercentage = feePercentage;
         }
     }
 }

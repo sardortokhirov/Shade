@@ -5,6 +5,7 @@ import com.example.shade.model.RequestStatus;
 import com.example.shade.model.RequestType;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -22,7 +23,7 @@ import java.util.Optional;
  * Time-7:56 AM (GMT+5)
  */
 @Repository
-public interface HizmatRequestRepository extends JpaRepository<HizmatRequest, Long> {
+public interface HizmatRequestRepository extends JpaRepository<HizmatRequest, Long>, JpaSpecificationExecutor<HizmatRequest> {
     @Query("SELECT r FROM HizmatRequest r WHERE " +
             "(:cardId IS NULL OR r.adminCardId = :cardId) AND " +
             "(:platformId IS NULL OR r.platform IN (SELECT p.name FROM Platform p WHERE p.id = :platformId)) AND " +
@@ -123,10 +124,13 @@ public interface HizmatRequestRepository extends JpaRepository<HizmatRequest, Lo
             + "    OR (h.type = com.example.shade.model.RequestType.WALLET_WITHDRAWAL) "
             + "    OR h.type = com.example.shade.model.RequestType.WALLET_TO_PLATFORM "
             + "    OR h.type = com.example.shade.model.RequestType.WALLET_TO_WALLET "
+            + "    OR h.type = com.example.shade.model.RequestType.TIP "
+            + "    OR h.type = com.example.shade.model.RequestType.TICKET_TRADE "
             + "    OR (h.type = com.example.shade.model.RequestType.WITHDRAWAL AND h.cardNumber = 'WALLET') "
             + "  )"
             + ") OR ("
-            + "  h.type = com.example.shade.model.RequestType.WALLET_TO_WALLET "
+            + "  (h.type = com.example.shade.model.RequestType.WALLET_TO_WALLET "
+            + "    OR h.type = com.example.shade.model.RequestType.TICKET_TRADE) "
             + "  AND h.recipientChatId = :chatId "
             + "  AND h.status IN :successStatuses"
             + ") "
@@ -148,10 +152,13 @@ public interface HizmatRequestRepository extends JpaRepository<HizmatRequest, Lo
             + "    OR (h.type = com.example.shade.model.RequestType.WALLET_WITHDRAWAL) "
             + "    OR h.type = com.example.shade.model.RequestType.WALLET_TO_PLATFORM "
             + "    OR h.type = com.example.shade.model.RequestType.WALLET_TO_WALLET "
+            + "    OR h.type = com.example.shade.model.RequestType.TIP "
+            + "    OR h.type = com.example.shade.model.RequestType.TICKET_TRADE "
             + "    OR (h.type = com.example.shade.model.RequestType.WITHDRAWAL AND h.cardNumber = 'WALLET') "
             + "  )"
             + ") OR ("
-            + "  h.type = com.example.shade.model.RequestType.WALLET_TO_WALLET "
+            + "  (h.type = com.example.shade.model.RequestType.WALLET_TO_WALLET "
+            + "    OR h.type = com.example.shade.model.RequestType.TICKET_TRADE) "
             + "  AND h.recipientChatId = :chatId "
             + "  AND h.status IN :successStatuses"
             + ")")
@@ -159,4 +166,51 @@ public interface HizmatRequestRepository extends JpaRepository<HizmatRequest, Lo
             @Param("chatId") Long chatId,
             @Param("successStatuses") List<RequestStatus> successStatuses,
             @Param("withdrawalStatuses") List<RequestStatus> withdrawalStatuses);
+
+    @Query("SELECT MIN(h.createdAt) FROM HizmatRequest h WHERE h.chatId = :chatId")
+    Optional<LocalDateTime> findEarliestByChatId(@Param("chatId") Long chatId);
+
+    @Query("SELECT DISTINCT h.platform FROM HizmatRequest h WHERE h.chatId = :chatId")
+    List<String> findDistinctPlatformsByChatId(@Param("chatId") Long chatId);
+
+    @Query("SELECT h FROM HizmatRequest h WHERE h.chatId = :chatId "
+            + "AND (:status IS NULL OR h.status = :status) "
+            + "AND (:platform IS NULL OR h.platform = :platform) "
+            + "AND (:type IS NULL OR h.type = :type) "
+            + "AND (:startDate IS NULL OR h.createdAt >= :startDate) "
+            + "AND (:endDate IS NULL OR h.createdAt <= :endDate) "
+            + "ORDER BY h.createdAt DESC")
+    Page<HizmatRequest> findByChatIdAndFilters(
+            @Param("chatId") Long chatId,
+            @Param("status") RequestStatus status,
+            @Param("platform") String platform,
+            @Param("type") RequestType type,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate,
+            Pageable pageable);
+
+    @Query("SELECT COALESCE(SUM(h.amount), 0) FROM HizmatRequest h WHERE h.chatId = :chatId AND h.type = 'TOP_UP' AND h.status = 'APPROVED'")
+    Long sumTopUpAmountByChatId(@Param("chatId") Long chatId);
+
+    @Query("SELECT COALESCE(SUM(h.amount), 0) FROM HizmatRequest h WHERE h.chatId = :chatId AND h.type = 'WITHDRAWAL' AND h.status = 'APPROVED'")
+    Long sumTransferAmountByChatId(@Param("chatId") Long chatId);
+
+    @Query("SELECT COALESCE(SUM(h.amount), 0) FROM HizmatRequest h WHERE h.chatId = :chatId AND h.type = 'TIP' AND h.status = 'APPROVED'")
+    Long sumTipAmountByChatId(@Param("chatId") Long chatId);
+
+    @Query("SELECT COUNT(h) FROM HizmatRequest h WHERE h.chatId = :chatId AND h.status = :status")
+    Long countByChatIdAndStatus(@Param("chatId") Long chatId, @Param("status") RequestStatus status);
+
+    @Query("SELECT COUNT(h) FROM HizmatRequest h WHERE h.chatId = :chatId")
+    Long countByChatId(@Param("chatId") Long chatId);
+
+    @Query("SELECT MIN(h.createdAt) FROM HizmatRequest h WHERE h.chatId = :chatId")
+    Optional<LocalDateTime> findFirstRequestDateByChatId(@Param("chatId") Long chatId);
+
+    @Query("SELECT MAX(h.createdAt) FROM HizmatRequest h WHERE h.chatId = :chatId")
+    Optional<LocalDateTime> findLastRequestDateByChatId(@Param("chatId") Long chatId);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @jakarta.transaction.Transactional
+    void deleteByChatId(Long chatId);
 }

@@ -24,6 +24,9 @@ public class DashboardStats {
     private final double totalApprovedTopUpAmount;
     private final double totalApprovedBonusAmount;
     private final Map<String, Map<String, Double>> platformGraphData;
+    private final double totalApprovedTipAmount;
+    private final double totalWalletToWalletFees;
+    private final double totalTicketTradeFees;
 
     public DashboardStats(long totalRequests, long approvedRequests, long pendingRequests, long pendingAdminRequests,
                           long canceledRequests, long failedRequests, double totalApprovedWithdrawalAmount,
@@ -31,7 +34,9 @@ public class DashboardStats {
                           Map<String, Long> requestsByDate, Map<String, Double> amountByPlatform,
                           double averageApprovedAmount, Map<Long, Long> topUsers, List<Map<String, Object>> recentRequests,
                           double totalApprovedTopUpAmount, double totalApprovedBonusAmount,
-                          Map<String, Map<String, Double>> platformGraphData) {
+                          Map<String, Map<String, Double>> platformGraphData,
+                          double totalApprovedTipAmount, double totalWalletToWalletFees,
+                          double totalTicketTradeFees) {
         this.totalRequests = totalRequests;
         this.approvedRequests = approvedRequests;
         this.pendingRequests = pendingRequests;
@@ -49,6 +54,9 @@ public class DashboardStats {
         this.totalApprovedTopUpAmount = totalApprovedTopUpAmount;
         this.totalApprovedBonusAmount = totalApprovedBonusAmount;
         this.platformGraphData = platformGraphData;
+        this.totalApprovedTipAmount = totalApprovedTipAmount;
+        this.totalWalletToWalletFees = totalWalletToWalletFees;
+        this.totalTicketTradeFees = totalTicketTradeFees;
     }
 
     public long getTotalRequests() {
@@ -117,5 +125,17 @@ public class DashboardStats {
 
     public Map<String, Map<String, Double>> getPlatformGraphData() {
         return platformGraphData;
+    }
+
+    public double getTotalApprovedTipAmount() {
+        return totalApprovedTipAmount;
+    }
+
+    public double getTotalWalletToWalletFees() {
+        return totalWalletToWalletFees;
+    }
+
+    public double getTotalTicketTradeFees() {
+        return totalTicketTradeFees;
     }
 }

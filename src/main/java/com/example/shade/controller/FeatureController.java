@@ -2,6 +2,7 @@ package com.example.shade.controller;
 
 import com.example.shade.model.FeatureSettings;
 import com.example.shade.service.FeatureService;
+import com.example.shade.service.SystemConfigurationService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -24,6 +25,7 @@ import java.util.Base64;
 public class FeatureController {
     private static final Logger logger = LoggerFactory.getLogger(FeatureController.class);
     private final FeatureService featureService;
+    private final SystemConfigurationService systemConfigurationService;
 
     private boolean authenticate(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
@@ -41,7 +43,9 @@ public class FeatureController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         logger.info("Fetching global feature settings");
-        return ResponseEntity.ok(featureService.getGlobalSettings());
+        FeatureSettings settings = featureService.getGlobalSettings();
+        settings.setHumoEnabled(systemConfigurationService.getHumoEnabled());
+        return ResponseEntity.ok(settings);
     }
 
     @PostMapping("/toggle/topup")
@@ -85,5 +89,55 @@ public class FeatureController {
         featureService.toggleWallet(enabled);
         logger.info("Wallet set to {}", enabled);
         return ResponseEntity.ok("Hamyon " + (enabled ? "yoqildi" : "o‘chirildi"));
+    }
+
+    @PostMapping("/toggle/promo")
+    public ResponseEntity<String> togglePromo(@RequestParam boolean enabled, HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        featureService.togglePromo(enabled);
+        logger.info("Promo set to {}", enabled);
+        return ResponseEntity.ok("Promo " + (enabled ? "yoqildi" : "o'chirildi"));
+    }
+
+    @PostMapping("/toggle/bonus-limit")
+    public ResponseEntity<String> toggleBonusLimit(@RequestParam boolean enabled, HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        featureService.toggleBonusLimit(enabled);
+        logger.info("Bonus limit set to {}", enabled);
+        return ResponseEntity.ok("Bonus limiti " + (enabled ? "yoqildi" : "o'chirildi"));
+    }
+
+    @PostMapping("/toggle/bonus-auto-approve")
+    public ResponseEntity<String> toggleBonusAutoApprove(@RequestParam boolean enabled, HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        featureService.toggleBonusAutoApprove(enabled);
+        logger.info("Bonus auto-approve set to {}", enabled);
+        return ResponseEntity.ok("Bonus avto tasdiq " + (enabled ? "yoqildi" : "o'chirildi"));
+    }
+
+    @PostMapping("/toggle/pay")
+    public ResponseEntity<String> togglePay(@RequestParam boolean enabled, HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        featureService.togglePayToggle(enabled);
+        logger.info("Pay toggle set to {}", enabled);
+        return ResponseEntity.ok("Pay toggle " + (enabled ? "yoqildi" : "o'chirildi"));
+    }
+
+    @PostMapping("/toggle/humo")
+    public ResponseEntity<String> toggleHumo(@RequestParam boolean enabled, HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        systemConfigurationService.setHumoEnabled(enabled);
+        logger.info("HUMO set to {}", enabled);
+        return ResponseEntity.ok("HUMO " + (enabled ? "yoqildi" : "o'chirildi"));
     }
 }

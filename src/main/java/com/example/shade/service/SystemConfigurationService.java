@@ -1,6 +1,7 @@
 package com.example.shade.service;
 
 import com.example.shade.model.SystemConfiguration;
+import com.example.shade.model.UzcardRail;
 import com.example.shade.repository.SystemConfigurationRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,12 @@ public class SystemConfigurationService {
     private static final Long DEFAULT_WALLET_TRANSFER_MIN = 5_000L;
     private static final Long DEFAULT_WALLET_TRANSFER_MAX = 10_000_000L;
     private static final BigDecimal DEFAULT_WALLET_TO_WALLET_FEE = BigDecimal.ZERO;
+    private static final Long DEFAULT_DAILY_BONUS_TRANSFER_LIMIT = 100_000L;
+    private static final BigDecimal DEFAULT_TOP_UP_DAILY_LIMIT_INCREASE_PERCENTAGE = BigDecimal.ZERO;
+    private static final BigDecimal DEFAULT_DEPOSIT_DAILY_LIMIT_INCREASE_PERCENTAGE = BigDecimal.ZERO;
+    private static final Boolean DEFAULT_HUMO_ENABLED = true;
+    private static final UzcardRail DEFAULT_UZCARD_RAIL = UzcardRail.OSON;
+    private static final Long DEFAULT_LOTTERY_COOLDOWN_SECONDS = 300L;
 
     @Transactional
     public SystemConfiguration getConfiguration() {
@@ -62,6 +69,12 @@ public class SystemConfigurationService {
                     config.setWithdrawFeePercentage(DEFAULT_WITHDRAW_FEE_PERCENTAGE);
                     config.setTicketCalculationAmount(DEFAULT_TICKET_CALCULATION);
                     config.setWalletToWalletFeePercentage(DEFAULT_WALLET_TO_WALLET_FEE);
+                    config.setDailyBonusTransferLimit(DEFAULT_DAILY_BONUS_TRANSFER_LIMIT);
+                    config.setTopUpDailyLimitIncreasePercentage(DEFAULT_TOP_UP_DAILY_LIMIT_INCREASE_PERCENTAGE);
+                    config.setDepositDailyLimitIncreasePercentage(DEFAULT_DEPOSIT_DAILY_LIMIT_INCREASE_PERCENTAGE);
+                    config.setHumoEnabled(DEFAULT_HUMO_ENABLED);
+                    config.setUzcardRail(DEFAULT_UZCARD_RAIL);
+                    config.setLotteryCooldownSeconds(DEFAULT_LOTTERY_COOLDOWN_SECONDS);
                     config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
                     return configurationRepository.save(config);
                 });
@@ -79,6 +92,13 @@ public class SystemConfigurationService {
                 throw new IllegalArgumentException("Wallet-to-wallet fee must be between 0 and 1");
             }
         }
+        if (config.getHumoEnabled() == null) {
+            config.setHumoEnabled(getHumoEnabled());
+        }
+        if (config.getUzcardRail() == null) {
+            config.setUzcardRail(getUzcardRail());
+        }
+        config.setHumoLegacyDualCheckEnd(null);
         config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
         SystemConfiguration saved = configurationRepository.save(config);
         invalidateCache();
@@ -250,5 +270,64 @@ public class SystemConfigurationService {
         invalidateCache();
         logger.info("Wallet-to-wallet fee percentage updated to {}", percentage);
         return saved;
+    }
+
+    public Long getDailyBonusTransferLimit() {
+        SystemConfiguration config = getConfiguration();
+        return config.getDailyBonusTransferLimit() != null
+                ? config.getDailyBonusTransferLimit()
+                : DEFAULT_DAILY_BONUS_TRANSFER_LIMIT;
+    }
+
+    public BigDecimal getTopUpDailyLimitIncreasePercentage() {
+        SystemConfiguration config = getConfiguration();
+        return config.getTopUpDailyLimitIncreasePercentage() != null
+                ? config.getTopUpDailyLimitIncreasePercentage()
+                : DEFAULT_TOP_UP_DAILY_LIMIT_INCREASE_PERCENTAGE;
+    }
+
+    public BigDecimal getDepositDailyLimitIncreasePercentage() {
+        SystemConfiguration config = getConfiguration();
+        return config.getDepositDailyLimitIncreasePercentage() != null
+                ? config.getDepositDailyLimitIncreasePercentage()
+                : DEFAULT_DEPOSIT_DAILY_LIMIT_INCREASE_PERCENTAGE;
+    }
+
+    public Boolean getHumoEnabled() {
+        SystemConfiguration config = getConfiguration();
+        return config.getHumoEnabled() != null ? config.getHumoEnabled() : DEFAULT_HUMO_ENABLED;
+    }
+
+    public UzcardRail getUzcardRail() {
+        SystemConfiguration config = getConfiguration();
+        return config.getUzcardRail() != null ? config.getUzcardRail() : DEFAULT_UZCARD_RAIL;
+    }
+
+    public Long getLotteryCooldownSeconds() {
+        SystemConfiguration config = getConfiguration();
+        return config.getLotteryCooldownSeconds() != null
+                ? config.getLotteryCooldownSeconds()
+                : DEFAULT_LOTTERY_COOLDOWN_SECONDS;
+    }
+
+    @Transactional
+    public void setHumoEnabled(boolean enabled) {
+        SystemConfiguration config = getConfiguration();
+        config.setHumoEnabled(enabled);
+        configurationRepository.save(config);
+        invalidateCache();
+        logger.info("HUMO enabled set to {}", enabled);
+    }
+
+    @Transactional
+    public void setUzcardRail(UzcardRail rail) {
+        if (rail == null) {
+            rail = DEFAULT_UZCARD_RAIL;
+        }
+        SystemConfiguration config = getConfiguration();
+        config.setUzcardRail(rail);
+        configurationRepository.save(config);
+        invalidateCache();
+        logger.info("UZCARD rail set to {}", rail);
     }
 }

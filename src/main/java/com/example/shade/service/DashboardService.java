@@ -86,11 +86,45 @@ public class DashboardService {
         Map<String, Map<String, Double>> platformGraphData = getPlatformGraphData(new RequestFilter(
                 filter.getCardId(), filter.getPlatformId(), RequestStatus.APPROVED, null,
                 filter.getStartDate(), filter.getEndDate()));
+        double totalApprovedTipAmount = getTotalApprovedAmountByType(filter, RequestType.TIP);
+        double totalWalletToWalletFees = getTotalApprovedFeesByType(filter, RequestType.WALLET_TO_WALLET);
+        double totalTicketTradeFees = getTotalApprovedFeesByType(filter, RequestType.TICKET_TRADE);
 
         return new DashboardStats(totalRequests, approvedRequests, pendingRequests, pendingAdminRequests,
                 canceledRequests, failedRequests, totalApprovedWithdrawalAmount, statusDistribution, requestsByPlatform,
                 requestsByDate, amountByPlatform, averageApprovedAmount, topUsers, recentRequests,
-                totalApprovedTopUpAmount, totalApprovedBonusAmount, platformGraphData);
+                totalApprovedTopUpAmount, totalApprovedBonusAmount, platformGraphData,
+                totalApprovedTipAmount, totalWalletToWalletFees, totalTicketTradeFees);
+    }
+
+    private double getTotalApprovedAmountByType(RequestFilter filter, RequestType type) {
+        List<HizmatRequest> requests = requestRepository.findByFilters(
+                filter.getCardId(), filter.getPlatformId(), RequestStatus.APPROVED, type);
+        return filterByDate(requests, filter).stream()
+                .mapToDouble(r -> r.getUniqueAmount() != null ? r.getUniqueAmount() : 0.0)
+                .sum();
+    }
+
+    private double getTotalApprovedFeesByType(RequestFilter filter, RequestType type) {
+        List<HizmatRequest> requests = requestRepository.findByFilters(
+                filter.getCardId(), filter.getPlatformId(), RequestStatus.APPROVED, type);
+        return filterByDate(requests, filter).stream()
+                .mapToDouble(r -> r.getFeeAmount() != null ? r.getFeeAmount() : 0.0)
+                .sum();
+    }
+
+    private List<HizmatRequest> filterByDate(List<HizmatRequest> requests, RequestFilter filter) {
+        if (filter.getStartDate() != null) {
+            requests = requests.stream()
+                    .filter(r -> !r.getCreatedAt().isBefore(filter.getStartDate()))
+                    .collect(Collectors.toList());
+        }
+        if (filter.getEndDate() != null) {
+            requests = requests.stream()
+                    .filter(r -> !r.getCreatedAt().isAfter(filter.getEndDate()))
+                    .collect(Collectors.toList());
+        }
+        return requests;
     }
 
     public long getRequestCount(RequestFilter filter) {

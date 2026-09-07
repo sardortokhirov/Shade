@@ -54,7 +54,10 @@ class WalletP2pServiceTest {
                 mock(UserWalletQuotaRepository.class),
                 mock(ExchangeRateRepository.class),
                 blockedUserRepository,
-                mock(BonusService.class));
+                mock(BonusService.class),
+                mock(BotTipConfigurationService.class),
+                mock(UserLimitIncreaseService.class),
+                mock(DailyStatsService.class));
         ReflectionTestUtils.setField(walletService, "self", walletService);
 
         when(languageSessionService.getTranslation(anyLong(), anyString())).thenReturn("ok");
