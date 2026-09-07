@@ -2359,6 +2359,7 @@ public class TopUpService {
         SendMessage message = new SendMessage();
         message.setChatId(chatId);
         message.setText(languageSessionService.getTranslation(chatId, "topup.message.welcome"));
+        message.enableMarkdown(true);
         message.setReplyMarkup(createMainMenuKeyboard(chatId));
         messageSender.sendMessage(message, chatId);
     }

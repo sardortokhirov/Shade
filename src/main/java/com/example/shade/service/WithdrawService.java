@@ -846,6 +846,7 @@ public class WithdrawService {
         SendMessage message = new SendMessage();
         message.setChatId(chatId.toString());
         message.setText(languageSessionService.getTranslation(chatId, "withdraw.message.main_menu_welcome"));
+        message.enableMarkdown(true);
         message.setReplyMarkup(createMainMenuKeyboard(chatId));
         messageSender.sendMessage(message, chatId);
     }

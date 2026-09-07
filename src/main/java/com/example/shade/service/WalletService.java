@@ -1847,6 +1847,7 @@ public class WalletService {
         SendMessage message = new SendMessage();
         message.setChatId(chatId);
         message.setText(languageSessionService.getTranslation(chatId, "message.main_menu_welcome"));
+        message.enableMarkdown(true);
         message.setReplyMarkup(com.example.shade.bot.MainMenuKeyboard.build(
                 languageSessionService::getTranslation, chatId));
         messageSender.sendMessage(message, chatId);

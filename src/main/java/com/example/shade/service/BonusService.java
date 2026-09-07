@@ -1711,6 +1711,7 @@ public class BonusService {
         message.setChatId(chatId);
         message.setText(languageSessionService.getTranslation(chatId, "message.main_menu_welcome")); // From
                                                                                                      // ShadePaymentBot
+        message.enableMarkdown(true);
         message.setReplyMarkup(createMainMenuKeyboard(chatId));
         messageSender.sendMessage(message, chatId);
     }
