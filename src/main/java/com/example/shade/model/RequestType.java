@@ -9,5 +9,6 @@ public enum RequestType {
     TOP_UP,
     WITHDRAWAL,
     WALLET_WITHDRAWAL,
-    WALLET_TO_PLATFORM
+    WALLET_TO_PLATFORM,
+    WALLET_TO_WALLET
 }

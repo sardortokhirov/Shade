@@ -70,4 +70,16 @@ public class HizmatRequest {
     /** Wallet balance (UZS) snapshot at the time this request was processed, for history display. */
     @Column(name = "wallet_balance_at_time")
     private Long walletBalanceAtTime;
+
+    /** Receiver Telegram chat ID for wallet-to-wallet transfers. */
+    @Column(name = "recipient_chat_id")
+    private Long recipientChatId;
+
+    /** Recorded fee (not credited to a house wallet). */
+    @Column(name = "fee_amount")
+    private Long feeAmount;
+
+    /** Amount credited to the receiver after fee. */
+    @Column(name = "net_amount")
+    private Long netAmount;
 }

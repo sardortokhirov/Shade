@@ -137,4 +137,27 @@ public class SystemConfigurationController {
         }
         return ResponseEntity.ok(configurationService.setWalletTransferMaxAmount(amount));
     }
+
+    @GetMapping("/wallet-to-wallet-fee")
+    public ResponseEntity<?> getWalletToWalletFee(HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+        return ResponseEntity.ok(java.util.Map.of(
+                "walletToWalletFeePercentage", configurationService.getWalletToWalletFeePercentage()));
+    }
+
+    @PatchMapping("/wallet-to-wallet-fee")
+    public ResponseEntity<?> setWalletToWalletFee(
+            @RequestParam java.math.BigDecimal percentage,
+            HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+        try {
+            return ResponseEntity.ok(configurationService.setWalletToWalletFeePercentage(percentage));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
 }

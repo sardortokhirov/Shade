@@ -19,8 +19,8 @@ import java.util.stream.Collectors;
  *
  * Hibernate ddl-auto=update adds new columns, but it does not reliably update
  * existing enum CHECK constraints. Without this, new wallet request types like
- * WALLET_TO_PLATFORM can fail at insert time on production databases that were
- * created before the wallet feature.
+ * WALLET_TO_PLATFORM and WALLET_TO_WALLET can fail at insert time on production
+ * databases that were created before those features.
  */
 @Component
 @RequiredArgsConstructor
@@ -31,7 +31,16 @@ public class DatabaseConstraintMigration implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
+        ensureWalletP2pColumns();
         migrateHizmatRequestEnumChecks();
+    }
+
+    private void ensureWalletP2pColumns() {
+        jdbcTemplate.execute("ALTER TABLE hizmat_request ADD COLUMN IF NOT EXISTS recipient_chat_id BIGINT");
+        jdbcTemplate.execute("ALTER TABLE hizmat_request ADD COLUMN IF NOT EXISTS fee_amount BIGINT");
+        jdbcTemplate.execute("ALTER TABLE hizmat_request ADD COLUMN IF NOT EXISTS net_amount BIGINT");
+        jdbcTemplate.execute("ALTER TABLE system_configuration ADD COLUMN IF NOT EXISTS wallet_to_wallet_fee_percentage NUMERIC(5,4)");
+        logger.info("Ensured wallet P2P columns exist on hizmat_request and system_configuration");
     }
 
     private void migrateHizmatRequestEnumChecks() {

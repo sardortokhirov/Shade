@@ -61,6 +61,13 @@ public class SystemConfiguration {
     @Column(name = "wallet_transfer_max_amount")
     private Long walletTransferMaxAmount;
 
+    /**
+     * Wallet→wallet fee as a fraction (0.05 = 5%). Sender pays gross; receiver gets net.
+     * Nullable for legacy rows; service treats null as 0.
+     */
+    @Column(name = "wallet_to_wallet_fee_percentage", precision = 5, scale = 4)
+    private BigDecimal walletToWalletFeePercentage;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 }

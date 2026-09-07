@@ -112,15 +112,23 @@ public interface HizmatRequestRepository extends JpaRepository<HizmatRequest, Lo
     @Query("SELECT h FROM HizmatRequest h WHERE h.id = :id")
     Optional<HizmatRequest> findByIdWithLock(@Param("id") Long id);
 
-    @Query("SELECT h FROM HizmatRequest h WHERE h.chatId = :chatId "
-            + "AND ( (h.type <> com.example.shade.model.RequestType.WALLET_WITHDRAWAL AND h.type <> com.example.shade.model.RequestType.WITHDRAWAL AND h.status IN :successStatuses) "
-            + "OR (h.type = com.example.shade.model.RequestType.WALLET_WITHDRAWAL AND h.status IN :withdrawalStatuses) "
-            + "OR (h.type = com.example.shade.model.RequestType.WITHDRAWAL AND h.cardNumber = 'WALLET' AND h.status IN :successStatuses) ) "
-            + "AND ("
-            + "(h.type = com.example.shade.model.RequestType.TOP_UP AND h.platform = 'Wallet' AND h.cardNumber IS NOT NULL AND LENGTH(h.cardNumber) > 0) "
-            + "OR (h.type = com.example.shade.model.RequestType.WALLET_WITHDRAWAL) "
-            + "OR h.type = com.example.shade.model.RequestType.WALLET_TO_PLATFORM "
-            + "OR (h.type = com.example.shade.model.RequestType.WITHDRAWAL AND h.cardNumber = 'WALLET') "
+    @Query("SELECT h FROM HizmatRequest h WHERE "
+            + "("
+            + "  h.chatId = :chatId "
+            + "  AND ( (h.type <> com.example.shade.model.RequestType.WALLET_WITHDRAWAL AND h.type <> com.example.shade.model.RequestType.WITHDRAWAL AND h.status IN :successStatuses) "
+            + "  OR (h.type = com.example.shade.model.RequestType.WALLET_WITHDRAWAL AND h.status IN :withdrawalStatuses) "
+            + "  OR (h.type = com.example.shade.model.RequestType.WITHDRAWAL AND h.cardNumber = 'WALLET' AND h.status IN :successStatuses) ) "
+            + "  AND ("
+            + "    (h.type = com.example.shade.model.RequestType.TOP_UP AND h.platform = 'Wallet' AND h.cardNumber IS NOT NULL AND LENGTH(h.cardNumber) > 0) "
+            + "    OR (h.type = com.example.shade.model.RequestType.WALLET_WITHDRAWAL) "
+            + "    OR h.type = com.example.shade.model.RequestType.WALLET_TO_PLATFORM "
+            + "    OR h.type = com.example.shade.model.RequestType.WALLET_TO_WALLET "
+            + "    OR (h.type = com.example.shade.model.RequestType.WITHDRAWAL AND h.cardNumber = 'WALLET') "
+            + "  )"
+            + ") OR ("
+            + "  h.type = com.example.shade.model.RequestType.WALLET_TO_WALLET "
+            + "  AND h.recipientChatId = :chatId "
+            + "  AND h.status IN :successStatuses"
             + ") "
             + "ORDER BY h.createdAt DESC")
     Page<HizmatRequest> findWalletHistoryByChatId(
@@ -129,15 +137,23 @@ public interface HizmatRequestRepository extends JpaRepository<HizmatRequest, Lo
             @Param("withdrawalStatuses") List<RequestStatus> withdrawalStatuses,
             Pageable pageable);
 
-    @Query("SELECT COUNT(h) FROM HizmatRequest h WHERE h.chatId = :chatId "
-            + "AND ( (h.type <> com.example.shade.model.RequestType.WALLET_WITHDRAWAL AND h.type <> com.example.shade.model.RequestType.WITHDRAWAL AND h.status IN :successStatuses) "
-            + "OR (h.type = com.example.shade.model.RequestType.WALLET_WITHDRAWAL AND h.status IN :withdrawalStatuses) "
-            + "OR (h.type = com.example.shade.model.RequestType.WITHDRAWAL AND h.cardNumber = 'WALLET' AND h.status IN :successStatuses) ) "
-            + "AND ("
-            + "(h.type = com.example.shade.model.RequestType.TOP_UP AND h.platform = 'Wallet' AND h.cardNumber IS NOT NULL AND LENGTH(h.cardNumber) > 0) "
-            + "OR (h.type = com.example.shade.model.RequestType.WALLET_WITHDRAWAL) "
-            + "OR h.type = com.example.shade.model.RequestType.WALLET_TO_PLATFORM "
-            + "OR (h.type = com.example.shade.model.RequestType.WITHDRAWAL AND h.cardNumber = 'WALLET') "
+    @Query("SELECT COUNT(h) FROM HizmatRequest h WHERE "
+            + "("
+            + "  h.chatId = :chatId "
+            + "  AND ( (h.type <> com.example.shade.model.RequestType.WALLET_WITHDRAWAL AND h.type <> com.example.shade.model.RequestType.WITHDRAWAL AND h.status IN :successStatuses) "
+            + "  OR (h.type = com.example.shade.model.RequestType.WALLET_WITHDRAWAL AND h.status IN :withdrawalStatuses) "
+            + "  OR (h.type = com.example.shade.model.RequestType.WITHDRAWAL AND h.cardNumber = 'WALLET' AND h.status IN :successStatuses) ) "
+            + "  AND ("
+            + "    (h.type = com.example.shade.model.RequestType.TOP_UP AND h.platform = 'Wallet' AND h.cardNumber IS NOT NULL AND LENGTH(h.cardNumber) > 0) "
+            + "    OR (h.type = com.example.shade.model.RequestType.WALLET_WITHDRAWAL) "
+            + "    OR h.type = com.example.shade.model.RequestType.WALLET_TO_PLATFORM "
+            + "    OR h.type = com.example.shade.model.RequestType.WALLET_TO_WALLET "
+            + "    OR (h.type = com.example.shade.model.RequestType.WITHDRAWAL AND h.cardNumber = 'WALLET') "
+            + "  )"
+            + ") OR ("
+            + "  h.type = com.example.shade.model.RequestType.WALLET_TO_WALLET "
+            + "  AND h.recipientChatId = :chatId "
+            + "  AND h.status IN :successStatuses"
             + ")")
     long countWalletHistoryByChatId(
             @Param("chatId") Long chatId,

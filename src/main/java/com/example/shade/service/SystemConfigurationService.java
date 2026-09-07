@@ -35,6 +35,7 @@ public class SystemConfigurationService {
     private static final Long DEFAULT_WALLET_WITHDRAW_RATIO = 1L;
     private static final Long DEFAULT_WALLET_TRANSFER_MIN = 5_000L;
     private static final Long DEFAULT_WALLET_TRANSFER_MAX = 10_000_000L;
+    private static final BigDecimal DEFAULT_WALLET_TO_WALLET_FEE = BigDecimal.ZERO;
 
     @Transactional
     public SystemConfiguration getConfiguration() {
@@ -60,6 +61,7 @@ public class SystemConfigurationService {
                     config.setReferralCommissionPercentage(DEFAULT_REFERRAL_COMMISSION);
                     config.setWithdrawFeePercentage(DEFAULT_WITHDRAW_FEE_PERCENTAGE);
                     config.setTicketCalculationAmount(DEFAULT_TICKET_CALCULATION);
+                    config.setWalletToWalletFeePercentage(DEFAULT_WALLET_TO_WALLET_FEE);
                     config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
                     return configurationRepository.save(config);
                 });
@@ -214,6 +216,27 @@ public class SystemConfigurationService {
         config.setWalletTransferMaxAmount(amount);
         SystemConfiguration saved = configurationRepository.save(config);
         invalidateCache();
+        return saved;
+    }
+
+    public BigDecimal getWalletToWalletFeePercentage() {
+        SystemConfiguration config = getConfiguration();
+        return config.getWalletToWalletFeePercentage() != null
+                ? config.getWalletToWalletFeePercentage()
+                : DEFAULT_WALLET_TO_WALLET_FEE;
+    }
+
+    @Transactional
+    public SystemConfiguration setWalletToWalletFeePercentage(BigDecimal percentage) {
+        if (percentage == null || percentage.compareTo(BigDecimal.ZERO) < 0
+                || percentage.compareTo(BigDecimal.ONE) > 0) {
+            throw new IllegalArgumentException("Wallet-to-wallet fee must be between 0 and 1");
+        }
+        SystemConfiguration config = getConfiguration();
+        config.setWalletToWalletFeePercentage(percentage);
+        SystemConfiguration saved = configurationRepository.save(config);
+        invalidateCache();
+        logger.info("Wallet-to-wallet fee percentage updated to {}", percentage);
         return saved;
     }
 }
