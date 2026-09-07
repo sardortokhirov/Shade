@@ -1,17 +1,18 @@
 package com.example.shade.controller;
 
-import com.example.shade.bot.MessageSender;
 import com.example.shade.model.LoginEvent;
 import com.example.shade.repository.LoginEventRepository;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Base64;
 import java.util.List;
 
 @RestController
@@ -50,10 +51,24 @@ public class LoginController {
     }
 
     @GetMapping("/admin/login")
-    public ResponseEntity<List<LoginEvent>> getAllLoginEvents() {
+    public ResponseEntity<?> getAllLoginEvents(HttpServletRequest request) {
+        if (!authenticate(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body("❌ Autentifikatsiya xatosi: Noto‘g‘ri foydalanuvchi yoki parol");
+        }
         logger.info("Fetching all admin login events");
         List<LoginEvent> loginEvents = loginEventRepository.findAll();
         return ResponseEntity.ok(loginEvents);
+    }
+
+    private boolean authenticate(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Basic ")) {
+            String credentials = new String(Base64.getDecoder().decode(authHeader.substring(6)));
+            String[] parts = credentials.split(":", 2);
+            return parts.length == 2 && "MaxUp1000".equals(parts[0]) && "MaxUp1000".equals(parts[1]);
+        }
+        return false;
     }
 }
 
