@@ -8,8 +8,9 @@ import java.util.List;
 import java.util.function.BiFunction;
 
 /**
- * Shared payment-bot home keyboard with Telegram button styles
- * ({@code success}=green, {@code danger}=red, {@code primary}=blue).
+ * Shared payment-bot home keyboard. Buttons are stacked in a single full-width
+ * list. Telegram styles: {@code primary}=blue (core actions / info),
+ * {@code danger}=red (withdraw), {@code success}=green (bonus / market).
  */
 public final class MainMenuKeyboard {
     private static final String INSTRUCTION_URL = "https://t.me/misterpays";
@@ -38,24 +39,25 @@ public final class MainMenuKeyboard {
             String instruction) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-        rows.add(List.of(
-                StyledInlineKeyboardButton.callback(
-                        topup, "TOPUP", StyledInlineKeyboardButton.STYLE_SUCCESS),
-                StyledInlineKeyboardButton.callback(
-                        wallet, "WALLET", StyledInlineKeyboardButton.STYLE_PRIMARY)));
-        rows.add(List.of(StyledInlineKeyboardButton.callback(
+        rows.add(row(StyledInlineKeyboardButton.callback(
+                topup, "TOPUP", StyledInlineKeyboardButton.STYLE_PRIMARY)));
+        rows.add(row(StyledInlineKeyboardButton.callback(
+                wallet, "WALLET", StyledInlineKeyboardButton.STYLE_PRIMARY)));
+        rows.add(row(StyledInlineKeyboardButton.callback(
                 withdraw, "WITHDRAW", StyledInlineKeyboardButton.STYLE_DANGER)));
-        rows.add(List.of(
-                StyledInlineKeyboardButton.callback(
-                        bonus, "BONUS", StyledInlineKeyboardButton.STYLE_SUCCESS),
-                StyledInlineKeyboardButton.callback(
-                        bozor, "BOZOR", StyledInlineKeyboardButton.STYLE_DANGER)));
-        rows.add(List.of(
-                StyledInlineKeyboardButton.callback(
-                        contact, "CONTACT", StyledInlineKeyboardButton.STYLE_PRIMARY),
-                StyledInlineKeyboardButton.url(
-                        instruction, INSTRUCTION_URL, StyledInlineKeyboardButton.STYLE_PRIMARY)));
+        rows.add(row(StyledInlineKeyboardButton.callback(
+                bonus, "BONUS", StyledInlineKeyboardButton.STYLE_SUCCESS)));
+        rows.add(row(StyledInlineKeyboardButton.callback(
+                bozor, "BOZOR", StyledInlineKeyboardButton.STYLE_SUCCESS)));
+        rows.add(row(StyledInlineKeyboardButton.callback(
+                contact, "CONTACT", StyledInlineKeyboardButton.STYLE_PRIMARY)));
+        rows.add(row(StyledInlineKeyboardButton.url(
+                instruction, INSTRUCTION_URL, StyledInlineKeyboardButton.STYLE_PRIMARY)));
         markup.setKeyboard(rows);
         return markup;
+    }
+
+    private static List<InlineKeyboardButton> row(InlineKeyboardButton button) {
+        return List.of(button);
     }
 }
