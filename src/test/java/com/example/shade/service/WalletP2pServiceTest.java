@@ -190,4 +190,30 @@ class WalletP2pServiceTest {
         assertEquals(9_500L, receiver.getWalletBalance());
         verify(requestRepository).save(any());
     }
+
+    @Test
+    void notificationFailureDoesNotFailCommittedTransferOrLeaveProcessingSession() {
+        stubOneShot(1L, "10000", "2");
+        UserBalance sender = UserBalance.builder()
+                .chatId(1L).tickets(0L).balance(BigDecimal.ZERO).walletBalance(20_000L).build();
+        UserBalance receiver = UserBalance.builder()
+                .chatId(2L).tickets(0L).balance(BigDecimal.ZERO).walletBalance(0L).build();
+        when(userBalanceRepository.findByIdWithLock(1L)).thenReturn(Optional.of(sender));
+        when(userBalanceRepository.findByIdWithLock(2L)).thenReturn(Optional.of(receiver));
+        when(requestRepository.save(any())).thenAnswer(inv -> {
+            var req = inv.getArgument(0, com.example.shade.model.HizmatRequest.class);
+            req.setId(8L);
+            return req;
+        });
+        doThrow(new RuntimeException("Telegram unavailable"))
+                .when(messageSender).sendMessage(any(org.telegram.telegrambots.meta.api.methods.send.SendMessage.class), eq(1L));
+
+        walletService.processWalletToWallet(1L);
+
+        assertEquals(10_000L, sender.getWalletBalance());
+        assertEquals(9_500L, receiver.getWalletBalance());
+        verify(requestRepository).save(any());
+        verify(sessionService).clearSession(1L);
+        verify(sessionService, atLeastOnce()).setUserState(1L, "MAIN_MENU");
+    }
 }

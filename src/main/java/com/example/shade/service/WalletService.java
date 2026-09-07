@@ -1729,15 +1729,24 @@ public class WalletService {
 
     private void notifyWalletP2pSuccess(Long chatId, long recipientId, Long requestId,
             long amount, long fee, long net, long senderLeft, long receiverLeft) {
+        // The money transaction is already committed here. Notification failures must
+        // never leave the sender stuck in WALLET_P2P_PROCESSING or escape after commit.
+        sessionService.clearSession(chatId);
+        sessionService.setUserState(chatId, "MAIN_MENU");
+
         String date = LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
-        SendMessage senderMsg = new SendMessage();
-        senderMsg.setChatId(chatId.toString());
-        senderMsg.setText(String.format(
-                languageSessionService.getTranslation(chatId, "wallet.message.p2p_success_sender"),
-                requestId, recipientId, amount, fee, net, senderLeft, date));
-        senderMsg.enableMarkdown(true);
-        senderMsg.setReplyMarkup(createMainMenuOnlyMarkup(chatId));
-        messageSender.sendMessage(senderMsg, chatId);
+        try {
+            SendMessage senderMsg = new SendMessage();
+            senderMsg.setChatId(chatId.toString());
+            senderMsg.setText(String.format(
+                    languageSessionService.getTranslation(chatId, "wallet.message.p2p_success_sender"),
+                    requestId, recipientId, amount, fee, net, senderLeft, date));
+            senderMsg.enableMarkdown(true);
+            senderMsg.setReplyMarkup(createMainMenuOnlyMarkup(chatId));
+            messageSender.sendMessage(senderMsg, chatId);
+        } catch (RuntimeException e) {
+            logger.warn("Failed to notify P2P sender {} for request {}: {}", chatId, requestId, e.getMessage());
+        }
 
         try {
             SendMessage receiverMsg = new SendMessage();
@@ -1755,8 +1764,16 @@ public class WalletService {
                 "💸 #WalletP2P\n🆔: `%d`\n👤 From: `%d`\n👤 To: `%d`\n💵 Gross: %,d UZS\n🏛 Fee: %,d UZS\n✅ Net: %,d UZS\n📅 %s",
                 requestId, chatId, recipientId, amount, fee, net,
                 LocalDateTime.now(ZoneId.of("GMT+5")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-        adminLogBotService.sendLog(adminLog);
-        sendPaymentMainMenu(chatId, true);
+        try {
+            adminLogBotService.sendLog(adminLog);
+        } catch (RuntimeException e) {
+            logger.warn("Failed to send P2P admin log for request {}: {}", requestId, e.getMessage());
+        }
+        try {
+            sendPaymentMainMenu(chatId, false);
+        } catch (RuntimeException e) {
+            logger.warn("Failed to send main menu after P2P request {}: {}", requestId, e.getMessage());
+        }
     }
 
     private void runAfterCommit(Runnable action) {
