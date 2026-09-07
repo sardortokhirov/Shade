@@ -16,14 +16,19 @@ public final class FeeCalculator {
             throw new IllegalArgumentException("Amount must be non-negative");
         }
         BigDecimal pct = percentage != null ? percentage : BigDecimal.ZERO;
-        if (pct.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("Fee percentage must be non-negative");
+        if (pct.compareTo(BigDecimal.ZERO) < 0 || pct.compareTo(BigDecimal.ONE) > 0) {
+            throw new IllegalArgumentException("Fee percentage must be between 0 and 1");
         }
-        long fee = BigDecimal.valueOf(amount)
-                .multiply(pct)
-                .setScale(0, RoundingMode.DOWN)
-                .longValue();
-        if (fee > amount) {
+        long fee;
+        try {
+            fee = BigDecimal.valueOf(amount)
+                    .multiply(pct)
+                    .setScale(0, RoundingMode.DOWN)
+                    .longValueExact();
+        } catch (ArithmeticException e) {
+            throw new IllegalArgumentException("Fee overflow", e);
+        }
+        if (fee < 0 || fee > amount) {
             throw new IllegalArgumentException("Fee exceeds amount");
         }
         return fee;

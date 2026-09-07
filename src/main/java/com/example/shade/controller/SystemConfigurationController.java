@@ -51,8 +51,12 @@ public class SystemConfigurationController {
         if (!authenticate(request)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
         }
-        SystemConfiguration saved = configurationService.updateConfiguration(config);
-        return ResponseEntity.ok(saved);
+        try {
+            SystemConfiguration saved = configurationService.updateConfiguration(config);
+            return ResponseEntity.ok(saved);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(null);
+        }
     }
 
     @PutMapping("/{id}")
@@ -64,8 +68,12 @@ public class SystemConfigurationController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
         }
         config.setId(id);
-        SystemConfiguration saved = configurationService.updateConfiguration(config);
-        return ResponseEntity.ok(saved);
+        try {
+            SystemConfiguration saved = configurationService.updateConfiguration(config);
+            return ResponseEntity.ok(saved);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(null);
+        }
     }
 
     @GetMapping("/wallet-withdraw-ratio")

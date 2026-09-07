@@ -51,7 +51,15 @@ public class UserSessionService {
      * @return consumed value, or empty if state mismatch or key already consumed
      */
     public Optional<String> beginOneShot(Long chatId, String expected, String next, String dataKey) {
-        if (chatId == null || expected == null || dataKey == null) {
+        return beginOneShotKeys(chatId, expected, next, dataKey).map(values -> values.get(dataKey));
+    }
+
+    /**
+     * Same as {@link #beginOneShot} but consumes every key atomically.
+     * If any key is missing, nothing is consumed and state is unchanged.
+     */
+    public Optional<Map<String, String>> beginOneShotKeys(Long chatId, String expected, String next, String... dataKeys) {
+        if (chatId == null || expected == null || dataKeys == null || dataKeys.length == 0) {
             return Optional.empty();
         }
         UserSession session = sessionStore.computeIfAbsent(chatId, k -> new UserSession());
@@ -60,17 +68,26 @@ public class UserSessionService {
                 return Optional.empty();
             }
             Map<String, String> data = sessionDataStore.get(chatId);
-            String value = data != null ? data.get(dataKey) : null;
-            if (value == null) {
-                return Optional.empty();
+            Map<String, String> consumed = new java.util.LinkedHashMap<>();
+            for (String key : dataKeys) {
+                if (key == null) {
+                    return Optional.empty();
+                }
+                String value = data != null ? data.get(key) : null;
+                if (value == null) {
+                    return Optional.empty();
+                }
+                consumed.put(key, value);
             }
-            data.remove(dataKey);
+            for (String key : dataKeys) {
+                data.remove(key);
+            }
             if (data.isEmpty()) {
                 sessionDataStore.remove(chatId);
             }
             session.setChatId(chatId);
             session.setState(next);
-            return Optional.of(value);
+            return Optional.of(consumed);
         }
     }
 

@@ -30,5 +30,7 @@ class FeeCalculatorTest {
                 () -> FeeCalculator.feeAmount(-1L, BigDecimal.ZERO));
         assertThrows(IllegalArgumentException.class,
                 () -> FeeCalculator.feeAmount(100L, new BigDecimal("-0.01")));
+        assertThrows(IllegalArgumentException.class,
+                () -> FeeCalculator.feeAmount(100L, new BigDecimal("1.01")));
     }
 }

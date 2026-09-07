@@ -61,19 +61,22 @@ class WalletP2pServiceTest {
         when(configurationService.getWalletToWalletFeePercentage()).thenReturn(new BigDecimal("0.05"));
         when(blockedUserRepository.existsByChatId(anyLong())).thenReturn(false);
         when(blockedUserRepository.findByChatId(anyLong())).thenReturn(Optional.empty());
-        when(sessionService.beginOneShot(anyLong(), eq("WALLET_P2P_CONFIRM"), eq("WALLET_P2P_PROCESSING"), eq("p2pAmount")))
-                .thenAnswer(inv -> Optional.of("10000"));
+        when(sessionService.beginOneShotKeys(eq(1L), eq("WALLET_P2P_CONFIRM"), eq("WALLET_P2P_PROCESSING"), eq("p2pAmount"), eq("p2pRecipientId")))
+                .thenReturn(Optional.of(java.util.Map.of("p2pAmount", "10000", "p2pRecipientId", "2")));
         when(configurationService.getWalletTransferMinAmount()).thenReturn(1L);
         when(configurationService.getWalletTransferMaxAmount()).thenReturn(100_000_000L);
+    }
+
+    private void stubOneShot(long senderId, String amount, String recipient) {
+        when(sessionService.beginOneShotKeys(eq(senderId), eq("WALLET_P2P_CONFIRM"), eq("WALLET_P2P_PROCESSING"), eq("p2pAmount"), eq("p2pRecipientId")))
+                .thenReturn(Optional.of(java.util.Map.of("p2pAmount", amount, "p2pRecipientId", recipient)));
     }
 
     @Test
     void processWalletToWalletDebitsSenderCreditsNetToReceiver() {
         Long senderId = 1L;
         Long receiverId = 2L;
-        when(sessionService.getUserData(senderId, "p2pRecipientId")).thenReturn(String.valueOf(receiverId));
-        when(sessionService.beginOneShot(eq(senderId), eq("WALLET_P2P_CONFIRM"), eq("WALLET_P2P_PROCESSING"), eq("p2pAmount")))
-                .thenReturn(Optional.of("10000"));
+        stubOneShot(senderId, "10000", String.valueOf(receiverId));
 
         UserBalance sender = UserBalance.builder()
                 .chatId(senderId)
@@ -111,9 +114,7 @@ class WalletP2pServiceTest {
 
     @Test
     void processWalletToWalletRejectsSelfTransfer() {
-        when(sessionService.getUserData(1L, "p2pRecipientId")).thenReturn("1");
-        when(sessionService.beginOneShot(eq(1L), eq("WALLET_P2P_CONFIRM"), eq("WALLET_P2P_PROCESSING"), eq("p2pAmount")))
-                .thenReturn(Optional.of("5000"));
+        stubOneShot(1L, "5000", "1");
 
         walletService.processWalletToWallet(1L);
 
@@ -123,9 +124,7 @@ class WalletP2pServiceTest {
 
     @Test
     void processWalletToWalletRejectsBlockedRecipient() {
-        when(sessionService.getUserData(1L, "p2pRecipientId")).thenReturn("2");
-        when(sessionService.beginOneShot(eq(1L), eq("WALLET_P2P_CONFIRM"), eq("WALLET_P2P_PROCESSING"), eq("p2pAmount")))
-                .thenReturn(Optional.of("5000"));
+        stubOneShot(1L, "5000", "2");
         when(blockedUserRepository.findByChatId(2L)).thenReturn(Optional.of(
                 com.example.shade.model.BlockedUser.builder()
                         .chatId(2L)
@@ -140,9 +139,7 @@ class WalletP2pServiceTest {
 
     @Test
     void processWalletToWalletRejectsInsufficientBalance() {
-        when(sessionService.getUserData(1L, "p2pRecipientId")).thenReturn("2");
-        when(sessionService.beginOneShot(eq(1L), eq("WALLET_P2P_CONFIRM"), eq("WALLET_P2P_PROCESSING"), eq("p2pAmount")))
-                .thenReturn(Optional.of("5000"));
+        stubOneShot(1L, "5000", "2");
         UserBalance sender = UserBalance.builder()
                 .chatId(1L).tickets(0L).balance(BigDecimal.ZERO).walletBalance(100L).build();
         UserBalance receiver = UserBalance.builder()
@@ -156,18 +153,41 @@ class WalletP2pServiceTest {
         assertEquals(0L, receiver.getWalletBalance());
         verify(requestRepository, never()).save(any());
         verify(sessionService).setUserData(1L, "p2pAmount", "5000");
+        verify(sessionService).setUserData(1L, "p2pRecipientId", "2");
         verify(sessionService).setUserState(1L, "WALLET_P2P_CONFIRM");
     }
 
     @Test
     void processWalletToWalletIgnoresDuplicateConfirm() {
-        when(sessionService.beginOneShot(eq(1L), eq("WALLET_P2P_CONFIRM"), eq("WALLET_P2P_PROCESSING"), eq("p2pAmount")))
+        when(sessionService.beginOneShotKeys(eq(1L), eq("WALLET_P2P_CONFIRM"), eq("WALLET_P2P_PROCESSING"), eq("p2pAmount"), eq("p2pRecipientId")))
                 .thenReturn(Optional.empty());
 
         walletService.processWalletToWallet(1L);
 
-        verify(sessionService, never()).getUserData(anyLong(), eq("p2pRecipientId"));
         verify(userBalanceRepository, never()).findByIdWithLock(anyLong());
         verify(requestRepository, never()).save(any());
+    }
+
+    @Test
+    void processWalletToWalletAllowsWhenMaxIsZeroUnlimited() {
+        when(configurationService.getWalletTransferMaxAmount()).thenReturn(0L);
+        stubOneShot(1L, "10000", "2");
+        UserBalance sender = UserBalance.builder()
+                .chatId(1L).tickets(0L).balance(BigDecimal.ZERO).walletBalance(20_000L).build();
+        UserBalance receiver = UserBalance.builder()
+                .chatId(2L).tickets(0L).balance(BigDecimal.ZERO).walletBalance(0L).build();
+        when(userBalanceRepository.findByIdWithLock(1L)).thenReturn(Optional.of(sender));
+        when(userBalanceRepository.findByIdWithLock(2L)).thenReturn(Optional.of(receiver));
+        when(requestRepository.save(any())).thenAnswer(inv -> {
+            var req = inv.getArgument(0, com.example.shade.model.HizmatRequest.class);
+            req.setId(7L);
+            return req;
+        });
+
+        walletService.processWalletToWallet(1L);
+
+        assertEquals(10_000L, sender.getWalletBalance());
+        assertEquals(9_500L, receiver.getWalletBalance());
+        verify(requestRepository).save(any());
     }
 }

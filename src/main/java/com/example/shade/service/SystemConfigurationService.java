@@ -73,6 +73,12 @@ public class SystemConfigurationService {
 
     @Transactional
     public SystemConfiguration updateConfiguration(SystemConfiguration config) {
+        if (config.getWalletToWalletFeePercentage() != null) {
+            BigDecimal fee = config.getWalletToWalletFeePercentage();
+            if (fee.compareTo(BigDecimal.ZERO) < 0 || fee.compareTo(BigDecimal.ONE) > 0) {
+                throw new IllegalArgumentException("Wallet-to-wallet fee must be between 0 and 1");
+            }
+        }
         config.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
         SystemConfiguration saved = configurationRepository.save(config);
         invalidateCache();
@@ -221,9 +227,15 @@ public class SystemConfigurationService {
 
     public BigDecimal getWalletToWalletFeePercentage() {
         SystemConfiguration config = getConfiguration();
-        return config.getWalletToWalletFeePercentage() != null
-                ? config.getWalletToWalletFeePercentage()
-                : DEFAULT_WALLET_TO_WALLET_FEE;
+        BigDecimal pct = config.getWalletToWalletFeePercentage();
+        if (pct == null) {
+            return DEFAULT_WALLET_TO_WALLET_FEE;
+        }
+        if (pct.compareTo(BigDecimal.ZERO) < 0 || pct.compareTo(BigDecimal.ONE) > 0) {
+            logger.warn("Ignoring invalid wallet-to-wallet fee {} (must be 0..1); using 0", pct);
+            return DEFAULT_WALLET_TO_WALLET_FEE;
+        }
+        return pct;
     }
 
     @Transactional

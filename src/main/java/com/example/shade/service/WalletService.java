@@ -340,6 +340,10 @@ public class WalletService {
     public void handleTextInput(Long chatId, String text) {
         String state = sessionService.getUserState(chatId);
         logger.info("Wallet text input from {}: '{}', state={}", chatId, text, state);
+        if (state == null) {
+            sendWalletMenu(chatId);
+            return;
+        }
 
         switch (state) {
             case "WALLET_DEPOSIT_ID_INPUT" -> handleDepositId(chatId, text);
@@ -1492,12 +1496,12 @@ public class WalletService {
             long amount = Long.parseLong(digits);
             long min = configurationService.getWalletTransferMinAmount();
             long max = configurationService.getWalletTransferMaxAmount();
-            if (amount <= 0 || amount < min || amount > max) {
+            if (isP2pAmountOutOfLimits(amount, min, max)) {
                 SendMessage m = new SendMessage();
                 m.setChatId(chatId.toString());
                 m.setText(String.format(
                         languageSessionService.getTranslation(chatId, "wallet.message.p2p_amount_limits"),
-                        min, max));
+                        min, max > 0 ? max : Long.MAX_VALUE));
                 m.enableMarkdown(true);
                 m.setReplyMarkup(createMainMenuOnlyMarkup(chatId));
                 messageSender.sendMessage(m, chatId);
@@ -1562,20 +1566,15 @@ public class WalletService {
 
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public void processWalletToWallet(Long chatId) {
-        // Single-JVM one-shot: state flip + amount consume under one lock (blocks double Confirm).
-        Optional<String> amountOpt = sessionService.beginOneShot(
-                chatId, "WALLET_P2P_CONFIRM", "WALLET_P2P_PROCESSING", "p2pAmount");
-        if (amountOpt.isEmpty()) {
+        // Single-JVM one-shot: state flip + amount/recipient consume under one lock (blocks double Confirm).
+        Optional<java.util.Map<String, String>> oneShot = sessionService.beginOneShotKeys(
+                chatId, "WALLET_P2P_CONFIRM", "WALLET_P2P_PROCESSING", "p2pAmount", "p2pRecipientId");
+        if (oneShot.isEmpty()) {
             logger.info("Ignoring duplicate or stale wallet P2P confirm for chatId {}", chatId);
             return;
         }
-        String amountStr = amountOpt.get();
-        String recipientStr = sessionService.getUserData(chatId, "p2pRecipientId");
-        if (recipientStr == null) {
-            abortP2pToMenu(chatId);
-            sendWalletMenu(chatId);
-            return;
-        }
+        String amountStr = oneShot.get().get("p2pAmount");
+        String recipientStr = oneShot.get().get("p2pRecipientId");
 
         long recipientId;
         long amount;
@@ -1588,62 +1587,78 @@ public class WalletService {
             return;
         }
 
+        if (recipientId == chatId) {
+            abortP2pToMenu(chatId);
+            messageSender.sendMessage(chatId,
+                    languageSessionService.getTranslation(chatId, "wallet.message.p2p_self"));
+            return;
+        }
+        if (amount <= 0) {
+            abortP2pToMenu(chatId);
+            messageSender.sendMessage(chatId,
+                    languageSessionService.getTranslation(chatId, "wallet.message.invalid_amount"));
+            return;
+        }
+        if (isChatBlocked(recipientId) || isChatBlocked(chatId)) {
+            abortP2pToMenu(chatId);
+            messageSender.sendMessage(chatId,
+                    languageSessionService.getTranslation(chatId, "wallet.message.p2p_recipient_blocked"));
+            return;
+        }
+
+        long min = configurationService.getWalletTransferMinAmount();
+        long max = configurationService.getWalletTransferMaxAmount();
+        if (isP2pAmountOutOfLimits(amount, min, max)) {
+            restoreP2pConfirm(chatId, amountStr, recipientStr);
+            messageSender.sendMessage(chatId, String.format(
+                    languageSessionService.getTranslation(chatId, "wallet.message.p2p_amount_limits"),
+                    min, max > 0 ? max : Long.MAX_VALUE));
+            return;
+        }
+
+        final long fee;
+        final long net;
         try {
-            if (recipientId == chatId) {
-                abortP2pToMenu(chatId);
-                messageSender.sendMessage(chatId,
-                        languageSessionService.getTranslation(chatId, "wallet.message.p2p_self"));
-                return;
-            }
-            if (amount <= 0) {
-                abortP2pToMenu(chatId);
-                messageSender.sendMessage(chatId,
-                        languageSessionService.getTranslation(chatId, "wallet.message.invalid_amount"));
-                return;
-            }
-            if (isChatBlocked(recipientId) || isChatBlocked(chatId)) {
-                abortP2pToMenu(chatId);
-                messageSender.sendMessage(chatId,
-                        languageSessionService.getTranslation(chatId, "wallet.message.p2p_recipient_blocked"));
-                return;
-            }
-
-            long min = configurationService.getWalletTransferMinAmount();
-            long max = configurationService.getWalletTransferMaxAmount();
-            if (amount < min || amount > max) {
-                restoreP2pConfirm(chatId, amountStr);
-                messageSender.sendMessage(chatId, String.format(
-                        languageSessionService.getTranslation(chatId, "wallet.message.p2p_amount_limits"),
-                        min, max));
-                return;
-            }
-
             BigDecimal feePct = configurationService.getWalletToWalletFeePercentage();
-            long fee = FeeCalculator.feeAmount(amount, feePct);
-            long net = amount - fee;
+            fee = FeeCalculator.feeAmount(amount, feePct);
+            net = amount - fee;
             if (net < 0) {
-                abortP2pToMenu(chatId);
-                messageSender.sendMessage(chatId,
-                        languageSessionService.getTranslation(chatId, "wallet.message.p2p_fee_invalid"));
-                return;
+                throw new IllegalArgumentException("net negative");
             }
+        } catch (IllegalArgumentException e) {
+            abortP2pToMenu(chatId);
+            messageSender.sendMessage(chatId,
+                    languageSessionService.getTranslation(chatId, "wallet.message.p2p_fee_invalid"));
+            return;
+        }
 
+        try {
             long firstLockId = Math.min(chatId, recipientId);
             long secondLockId = Math.max(chatId, recipientId);
             UserBalance first = userBalanceRepository.findByIdWithLock(firstLockId).orElse(null);
             UserBalance second = userBalanceRepository.findByIdWithLock(secondLockId).orElse(null);
             if (first == null || second == null) {
-                restoreP2pConfirm(chatId, amountStr);
+                restoreP2pConfirm(chatId, amountStr, recipientStr);
                 messageSender.sendMessage(chatId,
                         languageSessionService.getTranslation(chatId, "wallet.message.p2p_recipient_not_found"));
                 return;
             }
             UserBalance sender = chatId.equals(first.getChatId()) ? first : second;
-            UserBalance receiver = recipientId == first.getChatId() ? first : second;
+            UserBalance receiver = recipientId == first.getChatId().longValue() ? first : second;
+            if (sender == receiver
+                    || sender.getChatId() == null
+                    || receiver.getChatId() == null
+                    || !chatId.equals(sender.getChatId())
+                    || receiver.getChatId() != recipientId) {
+                abortP2pToMenu(chatId);
+                logger.error("P2P lock mapping mismatch sender={} receiver={} chatId={} recipient={}",
+                        sender.getChatId(), receiver.getChatId(), chatId, recipientId);
+                return;
+            }
 
             long senderBal = sender.getWalletBalance() != null ? sender.getWalletBalance() : 0L;
             if (senderBal < amount) {
-                restoreP2pConfirm(chatId, amountStr);
+                restoreP2pConfirm(chatId, amountStr, recipientStr);
                 SendMessage m = new SendMessage();
                 m.setChatId(chatId.toString());
                 m.setText(String.format(
@@ -1676,31 +1691,33 @@ public class WalletService {
             request.setCreatedAt(LocalDateTime.now(ZoneId.of("GMT+5")));
             request.setWalletBalanceAtTime(sender.getWalletBalance());
             requestRepository.save(request);
-            sessionService.removeUserData(chatId, "p2pRecipientId");
 
             final long senderLeft = sender.getWalletBalance();
             final long receiverLeft = receiver.getWalletBalance();
-            final long feeFinal = fee;
-            final long netFinal = net;
-            final long amountFinal = amount;
             final long recipientFinal = recipientId;
             final Long requestId = request.getId();
             runAfterCommit(() -> notifyWalletP2pSuccess(
-                    chatId, recipientFinal, requestId, amountFinal, feeFinal, netFinal, senderLeft, receiverLeft));
-        } catch (IllegalArgumentException | ArithmeticException e) {
-            restoreP2pConfirm(chatId, amountStr);
-            messageSender.sendMessage(chatId,
-                    languageSessionService.getTranslation(chatId, "wallet.message.p2p_fee_invalid"));
+                    chatId, recipientFinal, requestId, amount, fee, net, senderLeft, receiverLeft));
         } catch (RuntimeException e) {
-            restoreP2pConfirm(chatId, amountStr);
+            restoreP2pConfirm(chatId, amountStr, recipientStr);
             logger.error("Wallet P2P transfer failed for {} -> {}, rolling back: {}",
                     chatId, recipientStr, e.getMessage(), e);
             throw e;
         }
     }
 
-    private void restoreP2pConfirm(Long chatId, String amountStr) {
+    private static boolean isP2pAmountOutOfLimits(long amount, long min, long max) {
+        if (amount <= 0 || amount < min) {
+            return true;
+        }
+        return max > 0 && amount > max;
+    }
+
+    private void restoreP2pConfirm(Long chatId, String amountStr, String recipientStr) {
         sessionService.setUserData(chatId, "p2pAmount", amountStr);
+        if (recipientStr != null) {
+            sessionService.setUserData(chatId, "p2pRecipientId", recipientStr);
+        }
         sessionService.setUserState(chatId, "WALLET_P2P_CONFIRM");
     }
 
