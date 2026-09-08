@@ -32,7 +32,7 @@ public class ContactService {
         rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "contact.button.admin"), "https://t.me/MisterPay1")));
 
         // 2 - Chat button
-        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "contact.button.chat"), "https://t.me/misterpays")));
+        rows.add(List.of(createButton(languageSessionService.getTranslation(chatId, "contact.button.chat"), "https://t.me/misterkassa")));
         rows.add(createNavigationButtons(chatId));
         markup.setKeyboard(rows);
         return markup;
