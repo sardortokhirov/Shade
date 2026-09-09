@@ -41,4 +41,6 @@ public interface AdminCardRepository extends JpaRepository<AdminCard, Long> {
     Optional<AdminCard> findLeastRecentlyUsedByPaymentSystem(@Param("paymentSystem") PaymentSystem paymentSystem);
 
     List<AdminCard> findAllByOsonConfigPrimaryConfigTrue();
+
+    void deleteAllByOsonConfig_Id(Long osonConfigId);
 }

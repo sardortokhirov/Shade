@@ -1,12 +1,14 @@
 package com.example.shade.controller;
 
 import com.example.shade.model.OsonConfig;
+import com.example.shade.repository.AdminCardRepository;
 import com.example.shade.repository.OsonConfigRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Base64;
@@ -19,6 +21,7 @@ import java.util.List;
 public class OsonConfigController {
     private static final Logger logger = LoggerFactory.getLogger(OsonConfigController.class);
     private final OsonConfigRepository osonConfigRepository;
+    private final AdminCardRepository adminCardRepository;
 
     private boolean authenticate(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
@@ -156,6 +159,7 @@ public class OsonConfigController {
     }
 
     @DeleteMapping("/{id}")
+    @Transactional
     public ResponseEntity<String> deleteOsonConfig(HttpServletRequest request, @PathVariable Long id) {
         if (!authenticate(request)) {
             logger.warn("Unauthorized attempt to delete Oson config ID: {}", id);
@@ -169,6 +173,7 @@ public class OsonConfigController {
                 logger.error("Cannot delete primary Oson config ID: {}", id);
                 return ResponseEntity.status(400).body("Cannot delete primary Oson config");
             }
+            adminCardRepository.deleteAllByOsonConfig_Id(id);
             osonConfigRepository.deleteById(id);
             logger.info("Oson config deleted successfully ID: {}", id);
             return ResponseEntity.ok("Oson config deleted successfully");

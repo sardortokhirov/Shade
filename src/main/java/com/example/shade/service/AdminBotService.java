@@ -517,6 +517,16 @@ public class AdminBotService {
     public void deleteOsonConfig(Long chatId, String osonIdStr) {
         try {
             Long osonId = Long.parseLong(osonIdStr);
+            OsonConfig config = osonConfigRepository.findById(osonId).orElse(null);
+            if (config == null) {
+                messageSender.sendTextMessage(chatId, "❌ OsonConfig topilmadi");
+                return;
+            }
+            if (config.isPrimaryConfig()) {
+                messageSender.sendTextMessage(chatId, "❌ Primary OsonConfig o'chirib bo'lmaydi");
+                return;
+            }
+            adminCardRepository.deleteAllByOsonConfig_Id(osonId);
             osonConfigRepository.deleteById(osonId);
             messageSender.sendTextMessage(chatId, "✅ OsonConfig muvaffaqiyatli o'chirildi!");
             sendOsonConfigMenu(chatId);
