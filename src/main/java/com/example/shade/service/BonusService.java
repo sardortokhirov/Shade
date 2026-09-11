@@ -1038,23 +1038,13 @@ public class BonusService {
                         logger.warn("Failed to retrieve balance for mostbet platform: {}", e.getMessage());
                     }
                     
-                    String message = String.format(
-                            "🆔: `%d` Bonus To'lov yakunlandi ✅\n" +
-                                    "👤: [%d] %s\n" +
-                                    "🌐 #%s: %s\n" +
-                                    "💸 Miqdor: %,d UZS\n" +
-                                    "\n🏦: %,d %s\n" +
-                                    "\n📊 Limit: %,d / %,d so'm\n" +
-                                    "📅 [%s]",
-                            request.getId(), request.getChatId(), number,
-                            request.getPlatform(), request.getPlatformUserId(),
-                            request.getAmount(),
-                            cashdeskBalance != null && cashdeskBalance.getBalance() != null 
+                    String message = formatBonusCompletedAdminLog(
+                            request, number,
+                            cashdeskBalance != null && cashdeskBalance.getBalance() != null
                                     ? cashdeskBalance.getBalance().longValue() : 0L,
                             request.getCurrency().toString(),
                             totalLimit, availableLimit,
-                            LocalDateTime.now(ZoneId.of("GMT+5"))
-                                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                            LocalDateTime.now(ZoneId.of("GMT+5")));
                     String bonusMessage = String.format(
                             languageSessionService.getTranslation(request.getChatId(), "message.bonus_approved"),
                             request.getId(), request.getPlatform(), request.getPlatformUserId(), request.getAmount(),
@@ -1073,20 +1063,10 @@ public class BonusService {
                     BigDecimal permanentIncrease = userLimitIncreaseService.getPermanentLimitIncrease(request.getChatId());
                     Long permanentLimitIncrease = permanentIncrease.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
                     
-                    String message = String.format(
-                            "🆔: `%d` Bonus To'lov yakunlandi ✅\n" +
-                                    "👤: [%d] %s\n" +
-                                    "🌐 #%s: %s\n" +
-                                    "💸 Miqdor: %,d UZS\n" +
-                                    "\n🏦: %,d %s\n" +
-                                    "\n📊 Limit: %,d / %,d so'm\n" +
-                                    "📅 [%s]",
-                            request.getId(), request.getChatId(), number,
-                            request.getPlatform(), request.getPlatformUserId(),
-                            request.getAmount(),
+                    String message = formatBonusCompletedAdminLog(
+                            request, number,
                             transferSuccessful.getLimit().longValue(), platformData.getCurrency().toString(),
-                            totalLimit, availableLimit,
-                            timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                            totalLimit, availableLimit, timestamp);
                     String bonusMessage = String.format(
                             languageSessionService.getTranslation(request.getChatId(), "message.bonus_approved"),
                             request.getId(), request.getPlatform(), request.getPlatformUserId(), request.getAmount(),
@@ -1178,18 +1158,8 @@ public class BonusService {
                         BigDecimal permanentIncrease = userLimitIncreaseService.getPermanentLimitIncrease(request.getChatId());
                         Long permanentLimitIncrease = permanentIncrease.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
                         
-                        String message = String.format(
-                                "🆔: `%d` Bonus To'lov yakunlandi ✅\n" +
-                                        "👤: [%d] %s\n" +
-                                        "🌐 #%s: %s\n" +
-                                        "💸 Miqdor: %,d UZS\n" +
-                                        "\n📊 Limit: %,d / %,d so'm\n" +
-                                        "📅 [%s]",
-                                request.getId(), request.getChatId(), number,
-                                request.getPlatform(), request.getPlatformUserId(),
-                                request.getAmount(),
-                                totalLimit, availableLimit,
-                                timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                        String message = formatBonusCompletedAdminLog(
+                                request, number, null, null, totalLimit, availableLimit, timestamp);
                         String bonusMessage = String.format(
                                 languageSessionService.getTranslation(request.getChatId(), "message.bonus_approved"),
                                 request.getId(), request.getPlatform(), request.getPlatformUserId(),
@@ -1208,20 +1178,10 @@ public class BonusService {
                         BigDecimal permanentIncrease = userLimitIncreaseService.getPermanentLimitIncrease(request.getChatId());
                         Long permanentLimitIncrease = permanentIncrease.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
                         
-                        String message = String.format(
-                                "🆔: `%d` Bonus To'lov yakunlandi ✅\n" +
-                                        "👤: [%d] %s\n" +
-                                        "🌐 #%s: %s\n" +
-                                        "💸 Miqdor: %,d UZS\n" +
-                                        "\n🏦: %,d %s\n" +
-                                        "\n📊 Limit: %,d / %,d so'm\n" +
-                                        "📅 [%s]",
-                                request.getId(), request.getChatId(), number,
-                                request.getPlatform(), request.getPlatformUserId(),
-                                request.getAmount(),
+                        String message = formatBonusCompletedAdminLog(
+                                request, number,
                                 cashdeskBalance.getLimit().longValue(), platformData.getCurrency().toString(),
-                                totalLimit, availableLimit,
-                                timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                                totalLimit, availableLimit, timestamp);
                         String bonusMessage = String.format(
                                 languageSessionService.getTranslation(request.getChatId(), "message.bonus_approved"),
                                 request.getId(), request.getPlatform(), request.getPlatformUserId(),
@@ -1266,8 +1226,8 @@ public class BonusService {
         String cardDisplay = request.getCardNumber() != null ? request.getCardNumber() : "—";
         String errorLogMessage = String.format(
                 "🆔: `%d` Transfer ❌\n" +
-                        "👤: [%d] %s\n" +
-                        "🌐 #%s %s🇺🇿:%s\n" +
+                        "👤: `%d` %s\n" +
+                        "🌐 #%s %s🇺🇿:`%s`\n" +
                         "💸 Miqdor: %,d UZS\n" +
                         "💸 Miqdor: %,d RUB\n" +
                         "💳 Karta: %s\n" +
@@ -1859,6 +1819,25 @@ public class BonusService {
         rows.add(createNavigationButtons(chatId));
         markup.setKeyboard(rows);
         return markup;
+    }
+
+    private String formatBonusCompletedAdminLog(HizmatRequest request, String phone,
+            Long bankAmount, String bankCurrency, Long totalLimit, Long availableLimit, LocalDateTime timestamp) {
+        String header = String.format(
+                "🆔: `%d` #Bonus To'lov yakunlandi ✅\n" +
+                        "👤: `%d` %s\n" +
+                        "🌐 #%s: `%s`\n" +
+                        "💸 Miqdor: %,d UZS\n",
+                request.getId(), request.getChatId(), phone,
+                request.getPlatform(), request.getPlatformUserId(),
+                request.getAmount());
+        String bank = (bankAmount != null && bankCurrency != null)
+                ? String.format("\n🏦: %,d %s\n", bankAmount, bankCurrency)
+                : "";
+        return header + bank + String.format(
+                "\n📊 Limit: %,d / %,d so'm\n📅 [%s]",
+                totalLimit, availableLimit,
+                timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
     }
 
     private InlineKeyboardMarkup createAdminApprovalKeyboard(Long chatId, Long requestId, Long userChatId) {
