@@ -1,5 +1,6 @@
 package com.example.shade.service;
 
+import com.example.shade.bot.MainMenuKeyboard;
 import com.example.shade.bot.MessageSender;
 import com.example.shade.bot.StyledInlineKeyboardButton;
 import com.example.shade.model.*;
@@ -918,6 +919,7 @@ public class TicketMarketplaceService {
                     languageSessionService.getTranslation(sellerChatId, "lottery.trade.sold_notify"),
                     requestId, listingId, qty, net, fee, date));
             sellerMsg.enableMarkdown(true);
+            attachMainMenu(sellerMsg, sellerChatId);
             messageSender.sendMessage(sellerMsg, sellerChatId);
         } catch (Exception e) {
             logger.warn("Failed to notify ticket seller {}: {}", sellerChatId, e.getMessage());
@@ -937,6 +939,7 @@ public class TicketMarketplaceService {
                     languageSessionService.getTranslation(buyerChatId, "lottery.trade.offer_filled_notify"),
                     requestId, listingId, qty, price, buyerTickets, date));
             buyerMsg.enableMarkdown(true);
+            attachMainMenu(buyerMsg, buyerChatId);
             messageSender.sendMessage(buyerMsg, buyerChatId);
         } catch (Exception e) {
             logger.warn("Failed to notify offer owner {}: {}", buyerChatId, e.getMessage());
@@ -1054,6 +1057,11 @@ public class TicketMarketplaceService {
 
     private InlineKeyboardButton createButton(String text, String callback, String style) {
         return StyledInlineKeyboardButton.callback(text, callback, style);
+    }
+
+    private void attachMainMenu(SendMessage message, Long chatId) {
+        sessionService.setUserState(chatId, "START");
+        message.setReplyMarkup(MainMenuKeyboard.build(languageSessionService::getTranslation, chatId));
     }
 
     private List<InlineKeyboardButton> navRow(Long chatId) {
