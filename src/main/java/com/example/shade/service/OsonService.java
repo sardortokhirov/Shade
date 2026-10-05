@@ -15,6 +15,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
@@ -27,7 +28,7 @@ public class OsonService {
     private final RestTemplate restTemplate;
     private final OsonConfigRepository osonConfigRepository;
     private static final DateTimeFormatter OSON_TIMESTAMP_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ssXXX");
-    private volatile String authToken;
+    private String authToken;
 
     private OsonConfig getConfig() {
         return osonConfigRepository.findByPrimaryConfigTrue()
@@ -35,9 +36,6 @@ public class OsonService {
     }
 
     private synchronized String login() {
-        if (authToken != null && !authToken.isBlank()) {
-            return authToken;
-        }
         OsonConfig config = getConfig();
         String url = config.getApiUrl() + "/api/user/login";
         HttpHeaders headers = new HttpHeaders();
@@ -80,8 +78,10 @@ public class OsonService {
     }
 
     private String getAuthToken() {
-        String token = authToken;
-        return token != null && !token.isBlank() ? token : login();
+        // Oson's working flow authenticates separately before each endpoint call.
+        // Reusing one token for card lookup and history caused valid payments to
+        // return no match and fall through to manual screenshot approval.
+        return login();
     }
 
     private Long getCardIdByNumber(String cardNumber) {
@@ -180,7 +180,7 @@ public class OsonService {
                 if (apiResponse.getStatusCode().is2xxSuccessful() && responseBody != null
                         && "0".equals(String.valueOf(responseBody.get("errno")))) {
                     List<Map<String, Object>> transactions = (List<Map<String, Object>>) responseBody.get("array");
-                    OffsetDateTime now = OffsetDateTime.now();
+                    OffsetDateTime now = OffsetDateTime.now(ZoneId.of("GMT+5"));
 
                     if (transactions != null) {
                         for (Map<String, Object> transaction : transactions) {
