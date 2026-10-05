@@ -55,7 +55,7 @@ public class BonusService {
     private final DailyStatsService dailyStatsService;
     private final PromoWhitelistService promoWhitelistService;
     private final UserPlatformPermissionRepository permissionRepository;
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
 
     @Autowired
     @Lazy
@@ -1215,7 +1215,6 @@ public class BonusService {
     }
 
     public BalanceLimit getCashdeskBalance(String hash, String cashierPass, String cashdeskId) {
-        RestTemplate restTemplate = new RestTemplate();
         String baseUrl = "https://partners.servcul.com/CashdeskBotAPI";
         String dt = ZonedDateTime.now(ZoneOffset.UTC)
                 .format(DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm:ss"));

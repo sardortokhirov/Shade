@@ -47,7 +47,7 @@ public class TopUpService {
     private final MessageSender messageSender;
     private final AdminLogBotService adminLogBotService;
     private final SystemConfigurationService systemConfigurationService;
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     private static final String PAYMENT_MESSAGE_KEY = "payment_message_id";
     private static final String PAYMENT_ATTEMPTS_KEY = "payment_attempts";
     /** Session: {@link HizmatRequest} id for the payment row expecting a manual screenshot (see {@code TOPUP_AWAITING_SCREENSHOT}). */
@@ -1108,7 +1108,6 @@ public class TopUpService {
     }
 
     public BalanceLimit getCashdeskBalance(String hash, String cashierPass, String cashdeskId) {
-        RestTemplate restTemplate = new RestTemplate();
         String baseUrl = "https://partners.servcul.com/CashdeskBotAPI";
         String dt = ZonedDateTime.now(ZoneOffset.UTC)
                 .format(DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm:ss"));

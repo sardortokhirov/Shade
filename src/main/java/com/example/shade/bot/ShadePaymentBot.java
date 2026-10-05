@@ -32,8 +32,10 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 @Component
 @RequiredArgsConstructor
@@ -58,7 +60,10 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
     private final AdminBotService adminBotService;
     private final CallbackDeduplicationService callbackDeduplicationService;
     private final TicketMarketplaceService ticketMarketplaceService;
-    private final ExecutorService updateExecutor = Executors.newFixedThreadPool(10);
+    private final ThreadPoolExecutor updateExecutor = new ThreadPoolExecutor(
+            10, 10, 0L, TimeUnit.MILLISECONDS,
+            new ArrayBlockingQueue<>(500),
+            new ThreadPoolExecutor.AbortPolicy());
 
     @Value("${telegram.bot.token}")
     private String botToken;
@@ -107,7 +112,12 @@ public class ShadePaymentBot extends TelegramLongPollingBot {
             logger.warn("Received null update");
             return;
         }
-        updateExecutor.submit(() -> processUpdate(update));
+        try {
+            updateExecutor.execute(() -> processUpdate(update));
+        } catch (RejectedExecutionException e) {
+            logger.error("Payment bot update queue is full; dropping update {} (active={}, queued={})",
+                    update.getUpdateId(), updateExecutor.getActiveCount(), updateExecutor.getQueue().size());
+        }
     }
 
     private void processUpdate(Update update) {

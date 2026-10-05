@@ -13,7 +13,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
-import org.springframework.web.client.RestTemplate;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
@@ -30,7 +29,6 @@ public class CommonService {
     private final HizmatRequestRepository requestRepository;
     private final PlatformRepository platformRepository;
     private final MessageSender messageSender;
-    private final RestTemplate restTemplate = new RestTemplate() ;
 
     public void sendPlatformSelection(Long chatId, String prefix) {
         SendMessage message = new SendMessage();

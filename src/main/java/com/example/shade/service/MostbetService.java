@@ -4,7 +4,7 @@ import com.example.shade.dto.BalanceLimit;
 import com.example.shade.model.*;
 import com.example.shade.repository.ExchangeRateRepository;
 import com.example.shade.repository.PlatformRepository;
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.http.*;
 import org.springframework.web.client.RestTemplate;
@@ -20,7 +20,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @Service
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class MostbetService {
 
     private static final String BASE_URL = "https://apimb.com";
@@ -31,7 +31,7 @@ public class MostbetService {
     private static final String DATE_FORMAT = "yyyy-MM-dd HH:mm:ss";
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern(DATE_FORMAT);
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     private final ObjectMapper mapper = new ObjectMapper();
 
     // Credentials and constants from your code

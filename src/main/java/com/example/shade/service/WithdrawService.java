@@ -46,7 +46,7 @@ public class WithdrawService {
     private final MessageSender messageSender;
     private final AdminLogBotService adminLogBotService;
     private final LanguageSessionService languageSessionService;
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     private final BlockedUserRepository blockedUserRepository;
     private final MostbetService mostbetService;
     private final SystemConfigurationService systemConfigurationService;

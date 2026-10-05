@@ -1,8 +1,6 @@
 package com.example.shade.service;
 
 import jakarta.servlet.http.HttpServletRequest;
-import lombok.AllArgsConstructor;
-import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
@@ -22,7 +20,7 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class HumoService {
-    private final RestTemplate restTemplate  = new RestTemplate();
+    private final RestTemplate restTemplate;
 
     public ResponseEntity<Object> forwardRequest(String path, HttpMethod method, HttpServletRequest request) {
         String targetUrl = "http://localhost:2806" + path;

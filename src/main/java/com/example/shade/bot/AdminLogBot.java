@@ -5,6 +5,7 @@ import com.example.shade.repository.AdminChatRepository;
 import com.example.shade.repository.BlockedUserRepository;
 import com.example.shade.service.AdminLogBotService;
 import com.example.shade.service.BonusService;
+import com.example.shade.service.CallbackDeduplicationService;
 import com.example.shade.service.TopUpService;
 import com.example.shade.service.WalletService;
 import com.example.shade.service.WithdrawService;
@@ -24,9 +25,14 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.Keyboard
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 @Component
 @RequiredArgsConstructor
@@ -40,6 +46,11 @@ public class AdminLogBot extends TelegramLongPollingBot {
     private final TopUpService topUpService;
     private final WalletService walletService;
     private final BlockedUserRepository blockedUserRepository;
+    private final CallbackDeduplicationService callbackDeduplicationService;
+    private final ThreadPoolExecutor updateExecutor = new ThreadPoolExecutor(
+            8, 8, 0L, TimeUnit.MILLISECONDS,
+            new ArrayBlockingQueue<>(200),
+            new ThreadPoolExecutor.AbortPolicy());
 
     @Value("${telegram.admin.log.bot.token}")
     private String botToken;
@@ -80,6 +91,11 @@ public class AdminLogBot extends TelegramLongPollingBot {
         }
     }
 
+    @PreDestroy
+    public void shutdownUpdateExecutor() {
+        updateExecutor.shutdown();
+    }
+
     @Override
     public String getBotUsername() {
         return botUsername;
@@ -96,15 +112,27 @@ public class AdminLogBot extends TelegramLongPollingBot {
 
     @Override
     public void onUpdateReceived(Update update) {
+        if (update == null) {
+            logger.warn("Received null admin update");
+            return;
+        }
         try {
-            if (update == null) {
-                logger.warn("Received null update");
-                return;
-            }
+            updateExecutor.execute(() -> processUpdate(update));
+        } catch (RejectedExecutionException e) {
+            logger.error("Admin bot update queue is full; dropping update {}", update.getUpdateId());
+        }
+    }
+
+    private void processUpdate(Update update) {
+        try {
             if (update.hasMessage() && update.getMessage().hasText()) {
                 handleTextMessage(update.getMessage().getText(), update.getMessage().getChatId(), update.getMessage().getMessageId());
             } else if (update.hasCallbackQuery()) {
                 CallbackQuery callbackQuery = update.getCallbackQuery();
+                if (!callbackDeduplicationService.tryProcess(callbackQuery.getId())) {
+                    logger.debug("Duplicate admin callback ignored: {}", callbackQuery.getId());
+                    return;
+                }
                 try {
                     execute(new AnswerCallbackQuery(callbackQuery.getId()));
                 } catch (Exception e) {
@@ -117,7 +145,7 @@ public class AdminLogBot extends TelegramLongPollingBot {
                         callbackQuery.getMessage().getText());
             }
         } catch (Exception e) {
-            logger.error("Error processing update: {}", update, e);
+            logger.error("Error processing admin update: {}", update, e);
         }
     }
 
