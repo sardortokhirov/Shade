@@ -308,7 +308,9 @@ public class AdminBotService {
                     card.setUzcardRail(UzcardRail.valueOf(railStr));
                 }
             }
-            card.setLastUsed(LocalDateTime.now(ZoneId.of("GMT+5")));
+            // A newly configured card has not been offered to a user yet.
+            // Marking it as used here can keep a new HUMO card behind every older UZCARD row.
+            card.setLastUsed(null);
 
             adminCardService.prepareForSave(card);
             adminCardService.assertUnique(card, null);

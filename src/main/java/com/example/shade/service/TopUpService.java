@@ -2197,21 +2197,20 @@ public class TopUpService {
         return grouped.toString();
     }
 
-    /**
-     * Primary Oson pool cards eligible under {@code humoEnabled} and global {@link UzcardRail}
-     * ({@link UzcardRail#OFF} excludes all UZCARD from rotation).
-     * UZCARD matches global mode, {@code null} rail, or (when global is {@link UzcardRail#OSON}) legacy
-     * {@link UzcardRail#CARDXABAR} rows so rotation is not reduced to a single OSON-tagged card after a global switch.
-     * Among eligible cards, choose the least recently used by {@link AdminCard#getLastUsed},
-     * treating {@code null} as "never used" (older than any timestamp).
-     * When several cards tie for the same minimum (e.g. all {@code null} or same timestamp),
-     * {@code stream().min} would always return the same list position; we pick uniformly at random among ties.
-     */
     private Optional<AdminCard> pickLeastRecentlyUsedTopUpAdminCard() {
         boolean humoEnabled = configurationService.getHumoEnabled();
         UzcardRail uzMode = configurationService.getUzcardRail();
-        boolean uzOn = uzMode != UzcardRail.OFF;
         List<AdminCard> primary = adminCardRepository.findAllByOsonConfigPrimaryConfigTrue();
+        return selectFairTopUpAdminCard(primary, humoEnabled, uzMode);
+    }
+
+    /**
+     * Rotate fairly between enabled payment systems, then use LRU inside the chosen system.
+     * A global per-card LRU can starve a small HUMO pool when many older UZCARD rows exist.
+     */
+    static Optional<AdminCard> selectFairTopUpAdminCard(
+            List<AdminCard> primary, boolean humoEnabled, UzcardRail uzMode) {
+        boolean uzOn = uzMode != UzcardRail.OFF;
         List<AdminCard> eligible = primary.stream()
                 .filter(a -> {
                     if (a.getPaymentSystem() == PaymentSystem.HUMO) {
@@ -2234,15 +2233,38 @@ public class TopUpService {
         if (eligible.isEmpty()) {
             return Optional.empty();
         }
+
+        Map<PaymentSystem, List<AdminCard>> byPaymentSystem =
+                eligible.stream().collect(Collectors.groupingBy(AdminCard::getPaymentSystem));
+        List<PaymentSystem> systems = new ArrayList<>(byPaymentSystem.keySet());
+        LocalDateTime oldestSystemUse = systems.stream()
+                .map(system -> mostRecentUseOrMinimum(byPaymentSystem.get(system)))
+                .min(Comparator.naturalOrder())
+                .orElse(LocalDateTime.MIN);
+        List<PaymentSystem> tiedSystems = systems.stream()
+                .filter(system -> Objects.equals(
+                        mostRecentUseOrMinimum(byPaymentSystem.get(system)), oldestSystemUse))
+                .collect(Collectors.toList());
+        Collections.shuffle(tiedSystems, ThreadLocalRandom.current());
+
+        List<AdminCard> selectedPool = byPaymentSystem.get(tiedSystems.get(0));
         Comparator<AdminCard> lruComparator =
                 Comparator.comparing(AdminCard::getLastUsed, Comparator.nullsFirst(Comparator.naturalOrder()));
-        AdminCard minCard = eligible.stream().min(lruComparator).orElseThrow();
+        AdminCard minCard = selectedPool.stream().min(lruComparator).orElseThrow();
         LocalDateTime minTime = minCard.getLastUsed();
-        List<AdminCard> tiedForLru = eligible.stream()
+        List<AdminCard> tiedForLru = selectedPool.stream()
                 .filter(a -> Objects.equals(a.getLastUsed(), minTime))
                 .collect(Collectors.toList());
         Collections.shuffle(tiedForLru, ThreadLocalRandom.current());
         return Optional.of(tiedForLru.get(0));
+    }
+
+    private static LocalDateTime mostRecentUseOrMinimum(List<AdminCard> cards) {
+        return cards.stream()
+                .map(AdminCard::getLastUsed)
+                .filter(Objects::nonNull)
+                .max(Comparator.naturalOrder())
+                .orElse(LocalDateTime.MIN);
     }
 
     private void sendPlatformSelection(Long chatId) {
